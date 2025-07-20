@@ -1,10 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import CommonHeader from '../components/CommonHeader';
 
 export default function HelpScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>HelpScreen</Text>
+    <View style={{ flex: 1 }}>
+      <CommonHeader title="ヘルプ" />
+      <View style={styles.container}>
+        <Text style={styles.text}>HelpScreen</Text>
+      </View>
     </View>
   );
 }

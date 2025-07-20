@@ -5,6 +5,7 @@ import { db, storage } from '../firebaseConfig';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import * as ImagePicker from 'expo-image-picker';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import CommonHeader from '../components/CommonHeader';
 
 const GENRES = [
   '運動系（球技）', '運動系（球技以外）', 'アウトドア系', '文化系', '芸術・芸能', '音楽系', '学問系', 'ボランティア', 'イベント', 'オールラウンド', 'その他',
@@ -121,87 +122,90 @@ export default function CircleSettingsScreen({ route, navigation }) {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-      <ScrollView contentContainerStyle={{ padding: 20 }}>
-        <Text style={styles.title}>サークル設定</Text>
-        {/* サークルアイコン画像 */}
-        <Text style={styles.label}>サークルアイコン画像</Text>
-        <TouchableOpacity style={styles.circleImagePicker} onPress={pickCircleImage}>
-          {circleImage || circleImageUrl ? (
-            <Image source={{ uri: circleImage || circleImageUrl }} style={styles.circleImage} />
-          ) : (
-            <Ionicons name="image-outline" size={100} color="#ccc" />
-          )}
-        </TouchableOpacity>
-        <Text style={styles.label}>サークル名</Text>
-        <TextInput style={styles.input} value={name} onChangeText={setName} />
-        <Text style={styles.label}>大学名</Text>
-        <TextInput 
-          style={[styles.input, styles.disabledInput]} 
-          value={universityName} 
-          onChangeText={setUniversityName}
-          editable={false}
-          placeholder="登録時に設定された大学名"
-        />
-        <Text style={styles.label}>代表者連絡先</Text>
-        <TextInput 
-          style={[styles.input, styles.disabledInput]} 
-          value={contactInfo} 
-          onChangeText={setContactInfo}
-          editable={false}
-          placeholder="登録時に設定された連絡先"
-        />
-        <Text style={styles.label}>サークル紹介</Text>
-        <TextInput style={styles.input} value={description} onChangeText={setDescription} multiline />
-        <Text style={styles.label}>ジャンル</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
-          {GENRES.map(item => (
-            <TouchableOpacity key={item} style={[styles.optionButton, genre === item && styles.optionButtonActive]} onPress={() => setGenre(item)}>
-              <Text style={[styles.optionButtonText, genre === item && styles.optionButtonTextActive]}>{item}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <Text style={styles.label}>特色（複数選択可）</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
-          {FEATURES.map(item => (
-            <TouchableOpacity key={item} style={[styles.optionButton, features.includes(item) && styles.optionButtonActive]} onPress={() => setFeatures(prev => prev.includes(item) ? prev.filter(f => f !== item) : [...prev, item])}>
-              <Text style={[styles.optionButtonText, features.includes(item) && styles.optionButtonTextActive]}>{item}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <Text style={styles.label}>活動頻度</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
-          {FREQUENCIES.map(item => (
-            <TouchableOpacity key={item} style={[styles.optionButton, frequency === item && styles.optionButtonActive]} onPress={() => setFrequency(item)}>
-              <Text style={[styles.optionButtonText, frequency === item && styles.optionButtonTextActive]}>{item}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <Text style={styles.label}>人数</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
-          {MEMBERS_OPTIONS.map(item => (
-            <TouchableOpacity key={item} style={[styles.optionButton, members === item && styles.optionButtonActive]} onPress={() => setMembers(item)}>
-              <Text style={[styles.optionButtonText, members === item && styles.optionButtonTextActive]}>{item}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <Text style={styles.label}>男女比</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
-          {GENDER_RATIO_OPTIONS.map(item => (
-            <TouchableOpacity key={item} style={[styles.optionButton, genderratio === item && styles.optionButtonActive]} onPress={() => setGenderratio(item)}>
-              <Text style={[styles.optionButtonText, genderratio === item && styles.optionButtonTextActive]}>{item}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <Text style={styles.label}>SNSリンク</Text>
-        <TextInput style={styles.input} value={snsLink} onChangeText={setSnsLink} placeholder="Instagram, X, etc." />
-        <Text style={styles.label}>新歓LINEグループリンク</Text>
-        <TextInput style={styles.input} value={shinkanLineGroupLink} onChangeText={setShinkanLineGroupLink} placeholder="https://line.me/～" />
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={loading}>
-          <Text style={styles.saveButtonText}>{loading ? '保存中...' : '保存する'}</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      <CommonHeader title="サークル設定" showBackButton onBack={() => navigation.goBack()} rightButtonLabel="保存" onRightButtonPress={handleSave} />
+      <SafeAreaView style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={{ padding: 20 }}>
+          <Text style={styles.title}>サークル設定</Text>
+          {/* サークルアイコン画像 */}
+          <Text style={styles.label}>サークルアイコン画像</Text>
+          <TouchableOpacity style={styles.circleImagePicker} onPress={pickCircleImage}>
+            {circleImage || circleImageUrl ? (
+              <Image source={{ uri: circleImage || circleImageUrl }} style={styles.circleImage} />
+            ) : (
+              <Ionicons name="image-outline" size={100} color="#ccc" />
+            )}
+          </TouchableOpacity>
+          <Text style={styles.label}>サークル名</Text>
+          <TextInput style={styles.input} value={name} onChangeText={setName} />
+          <Text style={styles.label}>大学名</Text>
+          <TextInput 
+            style={[styles.input, styles.disabledInput]} 
+            value={universityName} 
+            onChangeText={setUniversityName}
+            editable={false}
+            placeholder="登録時に設定された大学名"
+          />
+          <Text style={styles.label}>代表者連絡先</Text>
+          <TextInput 
+            style={[styles.input, styles.disabledInput]} 
+            value={contactInfo} 
+            onChangeText={setContactInfo}
+            editable={false}
+            placeholder="登録時に設定された連絡先"
+          />
+          <Text style={styles.label}>サークル紹介</Text>
+          <TextInput style={styles.input} value={description} onChangeText={setDescription} multiline />
+          <Text style={styles.label}>ジャンル</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
+            {GENRES.map(item => (
+              <TouchableOpacity key={item} style={[styles.optionButton, genre === item && styles.optionButtonActive]} onPress={() => setGenre(item)}>
+                <Text style={[styles.optionButtonText, genre === item && styles.optionButtonTextActive]}>{item}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.label}>特色（複数選択可）</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
+            {FEATURES.map(item => (
+              <TouchableOpacity key={item} style={[styles.optionButton, features.includes(item) && styles.optionButtonActive]} onPress={() => setFeatures(prev => prev.includes(item) ? prev.filter(f => f !== item) : [...prev, item])}>
+                <Text style={[styles.optionButtonText, features.includes(item) && styles.optionButtonTextActive]}>{item}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.label}>活動頻度</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
+            {FREQUENCIES.map(item => (
+              <TouchableOpacity key={item} style={[styles.optionButton, frequency === item && styles.optionButtonActive]} onPress={() => setFrequency(item)}>
+                <Text style={[styles.optionButtonText, frequency === item && styles.optionButtonTextActive]}>{item}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.label}>人数</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
+            {MEMBERS_OPTIONS.map(item => (
+              <TouchableOpacity key={item} style={[styles.optionButton, members === item && styles.optionButtonActive]} onPress={() => setMembers(item)}>
+                <Text style={[styles.optionButtonText, members === item && styles.optionButtonTextActive]}>{item}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.label}>男女比</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
+            {GENDER_RATIO_OPTIONS.map(item => (
+              <TouchableOpacity key={item} style={[styles.optionButton, genderratio === item && styles.optionButtonActive]} onPress={() => setGenderratio(item)}>
+                <Text style={[styles.optionButtonText, genderratio === item && styles.optionButtonTextActive]}>{item}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.label}>SNSリンク</Text>
+          <TextInput style={styles.input} value={snsLink} onChangeText={setSnsLink} placeholder="Instagram, X, etc." />
+          <Text style={styles.label}>新歓LINEグループリンク</Text>
+          <TextInput style={styles.input} value={shinkanLineGroupLink} onChangeText={setShinkanLineGroupLink} placeholder="https://line.me/～" />
+          <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={loading}>
+            <Text style={styles.saveButtonText}>{loading ? '保存中...' : '保存する'}</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 

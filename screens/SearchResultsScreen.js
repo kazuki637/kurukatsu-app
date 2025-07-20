@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '../firebaseConfig';
 import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
+import CommonHeader from '../components/CommonHeader';
 
 const SearchResultsScreen = ({ route, navigation }) => {
   const { circles } = route.params;
@@ -110,12 +111,7 @@ const SearchResultsScreen = ({ route, navigation }) => {
 
   return (
     <View style={styles.fullScreenContainer}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>検索結果 ({circles.length}件)</Text>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerLeftButton}>
-          <Ionicons name="chevron-back" size={24} color="#333" />
-        </TouchableOpacity>
-      </View>
+      <CommonHeader title="検索結果" showBackButton onBack={() => navigation.goBack()} />
       <SafeAreaView style={styles.contentSafeArea}>
 
       {circles.length > 0 ? (

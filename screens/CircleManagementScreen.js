@@ -5,6 +5,7 @@ import { db, auth } from '../firebaseConfig';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useNavigation } from '@react-navigation/native';
+import CommonHeader from '../components/CommonHeader';
 
 // グローバルキャッシュ
 let userCirclesCache = null;
@@ -128,9 +129,7 @@ export default function CircleManagementScreen({ navigation }) {
   // ここから先は user が必ず存在する
   return (
     <View style={styles.fullScreenContainer}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>サークル管理</Text>
-      </View>
+      <CommonHeader title="サークル管理" showBackButton onBack={() => navigation.goBack()} />
       <SafeAreaView style={styles.contentSafeArea}>
         {userCircles && userCircles.length > 0 ? (
           <ScrollView style={styles.circleDetailContainer}>

@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { db } from '../firebaseConfig';
 import { collection, getDocs, addDoc, doc, deleteDoc, query, where, orderBy } from 'firebase/firestore';
+import CommonHeader from '../components/CommonHeader';
 
 // 高度に洗練されたカレンダーコンポーネント
 const Calendar = ({ selectedDate, onDateSelect, events }) => {
@@ -373,92 +374,89 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
   // ローディング状態でも画面を表示し、データが取得できたら更新する
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-      <View style={styles.header}>
-        <Text style={styles.title}>スケジュール管理</Text>
-      </View>
-      
-      <ScrollView style={styles.container}>
-        {/* カレンダー */}
-        <Calendar 
-          selectedDate={selectedDate}
-          onDateSelect={handleDateSelect}
-          events={events}
-        />
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      <CommonHeader title="スケジュール管理" />
+      <SafeAreaView style={{ flex: 1 }}>
+        <ScrollView>
+          {/* カレンダー */}
+          <Calendar 
+            selectedDate={selectedDate}
+            onDateSelect={handleDateSelect}
+            events={events}
+          />
 
-        {/* 選択された日付のスケジュール */}
-        <View style={styles.scheduleSection}>
-          <Text style={styles.scheduleTitle}>
-            {formatDateForDisplay(selectedDate)}のスケジュール
-          </Text>
-          {getEventsForSelectedDate().length > 0 ? (
-            getEventsForSelectedDate().map(event => (
-              <TouchableOpacity 
-                key={event.id} 
-                style={[
-                  styles.eventItem,
-                  { borderLeftColor: event.color || '#007bff' }
-                ]}
-                onPress={() => navigateToEditSchedule(event)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.eventHeader}>
-                  <Ionicons name="calendar-outline" size={24} color={event.color || '#007bff'} />
-                  <View style={styles.eventTitleContainer}>
-                    <Text style={styles.eventTitle}>{event.title}</Text>
-                    <View style={styles.eventDetails}>
-                      {event.isAllDay ? (
-                        <Text style={styles.eventTimeBadge}>終日</Text>
-                      ) : event.startTime && event.endTime ? (
-                        <Text style={styles.eventTimeBadge}>{event.startTime} - {event.endTime}</Text>
-                      ) : event.startTime ? (
-                        <Text style={styles.eventTimeBadge}>{event.startTime}</Text>
-                      ) : null}
-                      {event.location && (
-                        <Text style={styles.eventLocationBadge}>{event.location}</Text>
-                      )}
+          {/* 選択された日付のスケジュール */}
+          <View style={styles.scheduleSection}>
+            <Text style={styles.scheduleTitle}>
+              {formatDateForDisplay(selectedDate)}のスケジュール
+            </Text>
+            {getEventsForSelectedDate().length > 0 ? (
+              getEventsForSelectedDate().map(event => (
+                <TouchableOpacity 
+                  key={event.id} 
+                  style={[
+                    styles.eventItem,
+                    { borderLeftColor: event.color || '#007bff' }
+                  ]}
+                  onPress={() => navigateToEditSchedule(event)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.eventHeader}>
+                    <Ionicons name="calendar-outline" size={24} color={event.color || '#007bff'} />
+                    <View style={styles.eventTitleContainer}>
+                      <Text style={styles.eventTitle}>{event.title}</Text>
+                      <View style={styles.eventDetails}>
+                        {event.isAllDay ? (
+                          <Text style={styles.eventTimeBadge}>終日</Text>
+                        ) : event.startTime && event.endTime ? (
+                          <Text style={styles.eventTimeBadge}>{event.startTime} - {event.endTime}</Text>
+                        ) : event.startTime ? (
+                          <Text style={styles.eventTimeBadge}>{event.startTime}</Text>
+                        ) : null}
+                        {event.location && (
+                          <Text style={styles.eventLocationBadge}>{event.location}</Text>
+                        )}
+                      </View>
+                    </View>
+                    <View style={styles.eventActions}>
+                      <TouchableOpacity 
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          navigateToEditSchedule(event);
+                        }}
+                        style={styles.editButton}
+                      >
+                        <Ionicons name="create-outline" size={20} color="#007bff" />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          handleDelete(event.id);
+                        }}
+                        style={styles.deleteButton}
+                      >
+                        <Ionicons name="trash" size={20} color="#f44336" />
+                      </TouchableOpacity>
                     </View>
                   </View>
-                  <View style={styles.eventActions}>
-                    <TouchableOpacity 
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        navigateToEditSchedule(event);
-                      }}
-                      style={styles.editButton}
-                    >
-                      <Ionicons name="create-outline" size={20} color="#007bff" />
-                    </TouchableOpacity>
-                    <TouchableOpacity 
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        handleDelete(event.id);
-                      }}
-                      style={styles.deleteButton}
-                    >
-                      <Ionicons name="trash" size={20} color="#f44336" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-                {event.description && (
-                  <Text style={styles.eventDescription}>{event.description}</Text>
-                )}
-              </TouchableOpacity>
-            ))
-          ) : (
-            <Text style={styles.noEventText}>スケジュールがありません</Text>
-          )}
-          
-          {/* 追加ボタン */}
-          <TouchableOpacity style={styles.addButton} onPress={navigateToAddSchedule}>
-            <Ionicons name="add" size={24} color="#fff" />
-            <Text style={styles.addButtonText}>スケジュール追加</Text>
-          </TouchableOpacity>
-            </View>
-      </ScrollView>
-
-      
-    </SafeAreaView>
+                  {event.description && (
+                    <Text style={styles.eventDescription}>{event.description}</Text>
+                  )}
+                </TouchableOpacity>
+              ))
+            ) : (
+              <Text style={styles.noEventText}>この日に予定はありません</Text>
+            )}
+            
+            {/* 追加ボタン */}
+            <TouchableOpacity style={styles.addButton} onPress={navigateToAddSchedule}>
+              <Ionicons name="add" size={24} color="#fff" />
+              <Text style={styles.addButtonText}>スケジュール追加</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 

@@ -1,10 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import CommonHeader from '../components/CommonHeader';
 
 export default function TermsOfServiceScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>TermsOfServiceScreen</Text>
+    <View style={{ flex: 1 }}>
+      <CommonHeader title="利用規約" />
+      <View style={styles.container}>
+        <Text style={styles.text}>TermsOfServiceScreen</Text>
+      </View>
     </View>
   );
 }

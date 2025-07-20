@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, SafeAreaView, Activ
 import { Ionicons } from '@expo/vector-icons';
 import { db } from '../firebaseConfig';
 import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc, arrayRemove, arrayUnion } from 'firebase/firestore';
+import CommonHeader from '../components/CommonHeader';
 
 export default function CircleMemberManagementScreen({ route, navigation }) {
   const { circleId } = route.params;
@@ -158,57 +159,59 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-      <View style={styles.header}><Text style={styles.title}>メンバー管理</Text></View>
-      {/* 入会申請一覧 */}
-      {joinRequests.length > 0 && (
-        <View style={styles.requestSection}>
-          <Text style={styles.requestTitle}>入会申請</Text>
-          {joinRequests.map(request => (
-            <View key={request.id} style={styles.requestItem}>
-              <Ionicons name="person-add" size={28} color="#007bff" style={{ marginRight: 12 }} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.memberName}>{request.name || '申請者'}</Text>
-                <Text style={styles.memberInfo}>{request.university || ''} {request.grade || ''}</Text>
-                <Text style={styles.memberInfo}>{request.email || ''}</Text>
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      <CommonHeader title="メンバー管理" />
+      <SafeAreaView style={{ flex: 1 }}>
+        {/* 入会申請一覧 */}
+        {joinRequests.length > 0 && (
+          <View style={styles.requestSection}>
+            <Text style={styles.requestTitle}>入会申請</Text>
+            {joinRequests.map(request => (
+              <View key={request.id} style={styles.requestItem}>
+                <Ionicons name="person-add" size={28} color="#007bff" style={{ marginRight: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.memberName}>{request.name || '申請者'}</Text>
+                  <Text style={styles.memberInfo}>{request.university || ''} {request.grade || ''}</Text>
+                  <Text style={styles.memberInfo}>{request.email || ''}</Text>
+                </View>
+                <TouchableOpacity style={styles.approveButton} onPress={() => handleApprove(request)}>
+                  <Ionicons name="checkmark-circle" size={28} color="#28a745" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.rejectButton} onPress={() => handleReject(request.id)}>
+                  <Ionicons name="close-circle" size={28} color="#f44336" />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity style={styles.approveButton} onPress={() => handleApprove(request)}>
-                <Ionicons name="checkmark-circle" size={28} color="#28a745" />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.rejectButton} onPress={() => handleReject(request.id)}>
-                <Ionicons name="close-circle" size={28} color="#f44336" />
-              </TouchableOpacity>
-            </View>
-          ))}
-        </View>
-      )}
-      <FlatList
-        data={members}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <View style={styles.memberItem}>
-            {item.profileImageUrl ? (
-              <Image 
-                source={{ uri: item.profileImageUrl }} 
-                style={styles.memberAvatar} 
-              />
-            ) : (
-              <Ionicons name="person-circle-outline" size={40} color="#007bff" style={{ marginRight: 12 }} />
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={styles.memberName}>{item.name || '氏名未設定'}</Text>
-              <Text style={styles.memberInfo}>{item.university || ''} {item.grade || ''}</Text>
-              <Text style={styles.memberInfo}>{item.email || ''}</Text>
-            </View>
-            <TouchableOpacity style={styles.removeButton} onPress={() => handleRemove(item.id)}>
-              <Ionicons name="remove-circle" size={28} color="#f44336" />
-            </TouchableOpacity>
+            ))}
           </View>
         )}
-        ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#666', marginTop: 40 }}>メンバーがいません</Text>}
-        contentContainerStyle={{ padding: 20 }}
-      />
-    </SafeAreaView>
+        <FlatList
+          data={members}
+          keyExtractor={item => item.id}
+          renderItem={({ item }) => (
+            <View style={styles.memberItem}>
+              {item.profileImageUrl ? (
+                <Image 
+                  source={{ uri: item.profileImageUrl }} 
+                  style={styles.memberAvatar} 
+                />
+              ) : (
+                <Ionicons name="person-circle-outline" size={40} color="#007bff" style={{ marginRight: 12 }} />
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={styles.memberName}>{item.name || '氏名未設定'}</Text>
+                <Text style={styles.memberInfo}>{item.university || ''} {item.grade || ''}</Text>
+                <Text style={styles.memberInfo}>{item.email || ''}</Text>
+              </View>
+              <TouchableOpacity style={styles.removeButton} onPress={() => handleRemove(item.id)}>
+                <Ionicons name="remove-circle" size={28} color="#f44336" />
+              </TouchableOpacity>
+            </View>
+          )}
+          ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#666', marginTop: 40 }}>メンバーがいません</Text>}
+          contentContainerStyle={{ padding: 20 }}
+        />
+      </SafeAreaView>
+    </View>
   );
 }
 

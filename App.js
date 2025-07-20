@@ -180,9 +180,9 @@ function MainTabNavigator() {
 // モーダルとしてProfileEditScreenを表示するコンポーネント
 function ProfileEditScreenModal() {
   return (
-    <SafeAreaView style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#fff', zIndex: 999, flex: 1 }}>
+    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#fff', zIndex: 999, flex: 1 }}>
       <ProfileEditScreen forceToHome={true} />
-    </SafeAreaView>
+    </View>
   );
 }
 
