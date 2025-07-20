@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, Image, Alert, Switch, Platform, ScrollView, StatusBar } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Alert, Switch, Platform, ScrollView, StatusBar } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,8 @@ import { auth, db, storage } from '../firebaseConfig';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useNavigation, CommonActions } from '@react-navigation/native';
+import CommonHeader from '../components/CommonHeader';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const GRADES = ['大学1年', '大学2年', '大学3年', '大学4年', '大学院1年', '大学院2年', 'その他'];
 const GENDERS = ['男性', '女性', 'その他', '回答しない'];
@@ -123,10 +125,8 @@ export default function ProfileEditScreen(props) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>プロフィール編集</Text>
-      </View>
-      <SafeAreaView style={{ flex: 1 }}>
+      <CommonHeader title="プロフィール編集" showBackButton onBack={() => navigation.goBack()} rightButtonLabel="保存" onRightButtonPress={handleSave} />
+      <SafeAreaView style={{ flex: 1 }} edges={['left', 'right', 'bottom']}>
         <ScrollView contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled">
           <View style={{ height: 16 }} />
           <View style={styles.formGroup}>
@@ -189,17 +189,19 @@ export default function ProfileEditScreen(props) {
               <Text style={styles.datePickerText}>{birthday ? birthday.toLocaleDateString('ja-JP') : '生年月日を選択'}</Text>
             </TouchableOpacity>
             {showDatePicker && (
-              <DateTimePicker
-                value={birthday}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                locale="ja-JP"
-                onChange={(event, selectedDate) => {
-                  setShowDatePicker(Platform.OS === 'ios');
-                  if (selectedDate) setBirthday(selectedDate);
-                }}
-                maximumDate={new Date()}
-              />
+              <View style={styles.datePickerContainer}>
+                <DateTimePicker
+                  value={birthday}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  locale="ja-JP"
+                  onChange={(event, selectedDate) => {
+                    setShowDatePicker(Platform.OS === 'ios');
+                    if (selectedDate) setBirthday(selectedDate);
+                  }}
+                  maximumDate={new Date()}
+                />
+              </View>
             )}
           </View>
           <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={loading}>
@@ -214,27 +216,6 @@ export default function ProfileEditScreen(props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  header: {
-    width: '100%',
-    height: 115,
-    paddingTop: StatusBar.currentHeight,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    position: 'absolute',
-    bottom: 10,
-    left: 0,
-    right: 0,
-    textAlign: 'center',
-  },
   bodyContent: { padding: 20, paddingBottom: 40 },
   content: { padding: 20 },
   sectionTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, color: '#333' },
@@ -251,6 +232,7 @@ const styles = StyleSheet.create({
   selectedButtonText: { color: '#fff', fontWeight: 'bold' },
   datePickerButton: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, backgroundColor: '#fafafa', marginTop: 4 },
   datePickerText: { fontSize: 16, color: '#333' },
+  datePickerContainer: { alignItems: 'center', marginTop: 8 },
   imagePicker: { alignItems: 'center', marginTop: 8 },
   profileImage: { width: 100, height: 100, borderRadius: 50 },
   saveButton: { backgroundColor: '#007bff', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 24 },

@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet, SafeAreaView, Activ
 import { Ionicons } from '@expo/vector-icons';
 import { db } from '../firebaseConfig';
 import { collection, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import CommonHeader from '../components/CommonHeader';
 
 export default function CircleContactScreen({ route, navigation }) {
   const { circleId } = route.params;
@@ -57,32 +58,34 @@ export default function CircleContactScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-      <View style={styles.header}><Text style={styles.title}>連絡・お問い合わせ</Text></View>
-      <FlatList
-        data={messages}
-        keyExtractor={(item, idx) => item.id || idx.toString()}
-        renderItem={({ item }) => (
-          <View style={styles.messageItem}>
-            <Ionicons name="mail-outline" size={28} color="#007bff" style={{ marginRight: 10 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.messageText}>{item.text}</Text>
-              <Text style={styles.messageDate}>{item.createdAt?.seconds ? new Date(item.createdAt.seconds * 1000).toLocaleString('ja-JP') : ''}</Text>
+      <View style={{ flex: 1 }}>
+        <CommonHeader title="サークル連絡先" />
+        <FlatList
+          data={messages}
+          keyExtractor={(item, idx) => item.id || idx.toString()}
+          renderItem={({ item }) => (
+            <View style={styles.messageItem}>
+              <Ionicons name="mail-outline" size={28} color="#007bff" style={{ marginRight: 10 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.messageText}>{item.text}</Text>
+                <Text style={styles.messageDate}>{item.createdAt?.seconds ? new Date(item.createdAt.seconds * 1000).toLocaleString('ja-JP') : ''}</Text>
+              </View>
             </View>
-          </View>
-        )}
-        ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#666', marginTop: 40 }}>メッセージがありません</Text>}
-        contentContainerStyle={{ padding: 20 }}
-      />
-      <View style={styles.inputRow}>
-        <TextInput
-          style={styles.input}
-          value={newMessage}
-          onChangeText={setNewMessage}
-          placeholder="メッセージを入力..."
+          )}
+          ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#666', marginTop: 40 }}>メッセージがありません</Text>}
+          contentContainerStyle={{ padding: 20 }}
         />
-        <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
-          <Ionicons name="send" size={24} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.input}
+            value={newMessage}
+            onChangeText={setNewMessage}
+            placeholder="メッセージを入力..."
+          />
+          <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
+            <Ionicons name="send" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );

@@ -19,6 +19,7 @@ import { auth, db, storage } from '../firebaseConfig';
 import { doc, onSnapshot, updateDoc, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
+import CommonHeader from '../components/CommonHeader';
 
 const { width } = Dimensions.get('window');
 const gridItemSize = (width - 20 * 3) / 2;
@@ -165,9 +166,7 @@ export default function MyPageScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>マイページ</Text>
-      </View>
+      <CommonHeader title="マイページ" />
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView>
           <View style={styles.profileSection}>
@@ -231,27 +230,6 @@ export default function MyPageScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
-  header: {
-    width: '100%',
-    height: 115,
-    paddingTop: StatusBar.currentHeight,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    position: 'absolute',
-    bottom: 10,
-    left: 0,
-    right: 0,
-    textAlign: 'center',
-  },
   profileSection: { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 20 },
   profileImageContainerSimple: { alignItems: 'center', marginBottom: 12 },
   profileImage: { width: 100, height: 100, borderRadius: 50 },

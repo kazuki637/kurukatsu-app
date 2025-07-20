@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, FlatList, ActivityIndicator, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import CommonHeader from '../components/CommonHeader';
 
 const DUMMY_UNIVERSITIES = [
   '東京大学', '京都大学', '大阪大学', '早稲田大学', '慶應義塾大学', '一橋大学', '東京工業大学',
@@ -83,15 +84,7 @@ const UniversitySelectionScreen = ({ route, navigation }) => {
 
   return (
     <View style={styles.fullScreenContainer}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerLeftButton}>
-          <Ionicons name="chevron-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>大学選択</Text>
-        <TouchableOpacity onPress={handleComplete} style={styles.headerRightButton}>
-          <Text style={styles.doneButtonText}>完了</Text>
-        </TouchableOpacity>
-      </View>
+      <CommonHeader title="大学選択" showBackButton onBack={() => navigation.goBack()} rightButtonLabel="完了" onRightButtonPress={handleComplete} />
       <SafeAreaView style={styles.contentSafeArea}>
         <View style={styles.searchBarContainer}>
           <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
@@ -134,50 +127,6 @@ const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
     backgroundColor: '#eef2f5',
-  },
-  header: {
-    width: '100%',
-    height: 115, // ヘッダーの縦幅を調整
-    paddingTop: StatusBar.currentHeight, // ステータスバーの高さ分を確保
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    position: 'absolute',
-    bottom: 10, // ヘッダー下部からの距離を調整
-    left: 0,
-    right: 0,
-    textAlign: 'center',
-  },
-  headerLeftButton: {
-    position: 'absolute',
-    bottom: 10,
-    left: 15,
-    width: 30,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  headerRightButton: {
-    position: 'absolute',
-    bottom: 10,
-    right: 15,
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-  },
-  doneButtonText: {
-    fontSize: 16,
-    color: '#007bff',
-    fontWeight: 'bold',
   },
   contentSafeArea: {
     flex: 1,

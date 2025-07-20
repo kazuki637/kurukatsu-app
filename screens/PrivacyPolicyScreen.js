@@ -1,10 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import CommonHeader from '../components/CommonHeader';
 
 export default function PrivacyPolicyScreen() {
   return (
-    <View style={styles.container}>
-      <Text style={styles.text}>PrivacyPolicyScreen</Text>
+    <View style={{ flex: 1 }}>
+      <CommonHeader title="プライバシーポリシー" />
+      <View style={styles.container}>
+        <Text style={styles.text}>PrivacyPolicyScreen</Text>
+      </View>
     </View>
   );
 }

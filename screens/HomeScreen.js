@@ -1,12 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, SafeAreaView, StatusBar } from 'react-native';
+import CommonHeader from '../components/CommonHeader';
 
 const HomeScreen = ({ navigation }) => {
   return (
     <View style={styles.fullScreenContainer}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>ホーム</Text>
-      </View>
+      <CommonHeader title="ホーム" />
       <SafeAreaView style={styles.contentSafeArea}>
         <View style={styles.emptyContentContainer}>
           <Text style={styles.emptyContentText}>ホーム画面</Text>
@@ -20,27 +19,6 @@ const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
     backgroundColor: '#eef2f5',
-  },
-  header: {
-    width: '100%',
-    height: 115, // ヘッダーの縦幅を調整
-    paddingTop: StatusBar.currentHeight, // ステータスバーの高さ分を確保
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    position: 'absolute',
-    bottom: 10, // ヘッダー下部からの距離を調整
-    left: 0,
-    right: 0,
-    textAlign: 'center',
   },
   contentSafeArea: {
     flex: 1,
