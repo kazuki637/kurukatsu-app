@@ -24,7 +24,7 @@ const XLogo = ({ size = 32 }) => (
   </Svg>
 );
 
-export default function CircleDetailScreen({ route, navigation }) {
+export default function CircleProfileScreen({ route, navigation }) {
   const { circleId } = route.params;
   const [circleData, setCircleData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -209,7 +209,7 @@ export default function CircleDetailScreen({ route, navigation }) {
           <View style={styles.recommendList}>
             {circleData.recommendations.map((rec, idx) => (
               <View key={idx} style={styles.recommendItem}>
-                <Text style={styles.recommendText}>・{rec}</Text>
+                <Text style={styles.recommendText}>{rec}</Text>
               </View>
             ))}
           </View>
@@ -387,49 +387,6 @@ export default function CircleDetailScreen({ route, navigation }) {
   }
 
   if (circleData) {
-    circleData.leaderImageUrl = 'https://randomuser.me/api/portraits/men/1.jpg';
-    circleData.leaderMessage = 'みなさんの参加をお待ちしています！\nサークル活動の魅力をぜひ体験してください。';
-    circleData.activityImages = [
-      'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80',
-      'https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80',
-      'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&w=400&q=80',
-    ];
-    circleData.recommendations = [
-      '大学生活を充実させたい人',
-      '新しい友達を作りたい人',
-      'イベントや活動が好きな人',
-    ];
-    circleData.headerImageUrl = 'https://images.unsplash.com/photo-1465101178521-c1a9136a3b99?auto=format&fit=crop&w=800&q=80';
-    circleData.events = [
-      {
-        title: '新歓合宿',
-        image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=400&q=80',
-        detail: '毎年春に開催される新入生歓迎合宿です。みんなで親睦を深めます。',
-      },
-      {
-        title: '夏のBBQ大会',
-        image: 'https://images.unsplash.com/photo-1465101046530-73398c7f28ca?auto=format&fit=crop&w=400&q=80',
-        detail: '夏恒例のBBQイベント。自然の中で楽しく交流！',
-      },
-      {
-        title: '秋のスポーツ大会',
-        image: 'https://images.unsplash.com/photo-1519125323398-675f0ddb6308?auto=format&fit=crop&w=400&q=80',
-        detail: '秋はみんなでスポーツ！初心者も大歓迎です。',
-      },
-      {
-        title: 'クリスマスパーティー',
-        image: 'https://images.unsplash.com/photo-1465101178521-c1a9136a3b99?auto=format&fit=crop&w=400&q=80',
-        detail: '年末の一大イベント。プレゼント交換もあります。',
-      },
-    ];
-    circleData.welcome = {
-      conditions: '大学1年生以上・サークル活動に積極的に参加できる方',
-      schedule: [
-        { date: '2024-04-10', event: '新歓説明会' },
-        { date: '2024-04-15', event: '体験参加日' },
-        { date: '2024-04-20', event: '新歓BBQ' },
-      ],
-    };
   }
 
   return (

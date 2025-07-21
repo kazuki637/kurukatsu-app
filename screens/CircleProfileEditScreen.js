@@ -1,14 +1,1051 @@
-import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Linking, ActivityIndicator, Alert, SafeAreaView, StatusBar, Dimensions, TextInput } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { Image as RNImage } from 'react-native';
+import { db, auth } from '../firebaseConfig';
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot, increment, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 import CommonHeader from '../components/CommonHeader';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'; // 追加済み
+import * as ImagePicker from 'expo-image-picker'; // 追加済み
 
-export default function CircleProfileEditScreen() {
+const { width } = Dimensions.get('window');
+
+// const tabRoutes = [ // 削除
+//   { key: 'top', title: 'トップ' },
+//   { key: 'events', title: 'イベント' },
+//   { key: 'welcome', title: '新歓情報' },
+// ];
+
+// XロゴSVGコンポーネント
+const XLogo = ({ size = 32 }) => (
+  <Svg width={size} height={size} viewBox="0 0 1200 1227" fill="none">
+    <Path d="M1199.97 0H1067.6L600.01 529.09L132.4 0H0L494.18 587.29L0 1227H132.4L600.01 697.91L1067.6 1227H1200L705.82 639.71L1199.97 0ZM655.09 567.29L1067.6 70.59V0.59H1067.6L600.01 529.09L132.4 0.59H132.4V70.59L544.91 567.29L132.4 1156.41V1226.41H132.4L600.01 697.91L1067.6 1226.41H1067.6V1156.41L655.09 567.29Z" fill="#000"/>
+  </Svg>
+);
+
+export default function CircleProfileEditScreen({ route, navigation }) {
+  const { circleId } = route.params;
+  const [circleData, setCircleData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [hasRequested, setHasRequested] = useState(false);
+  const [isMember, setIsMember] = useState(false);
+  // const [tabIndex, setTabIndex] = useState(0); // 削除
+  // const [routes] = useState(tabRoutes); // 削除
+  const [activeTab, setActiveTab] = useState('top'); // 追加
+  const [uploading, setUploading] = useState(false); // 追加
+  const [eventFormVisible, setEventFormVisible] = useState(false); // イベント追加フォーム表示
+  const [eventTitle, setEventTitle] = useState('');
+  const [eventDetail, setEventDetail] = useState('');
+  const [eventImage, setEventImage] = useState(null);
+  const [eventUploading, setEventUploading] = useState(false);
+  const [editingEventIndex, setEditingEventIndex] = useState(null); // 編集中のイベントindex
+  const [editEventTitle, setEditEventTitle] = useState('');
+  const [editEventDetail, setEditEventDetail] = useState('');
+  const [editEventImage, setEditEventImage] = useState(null);
+  const [editEventUploading, setEditEventUploading] = useState(false);
+  const [description, setDescription] = useState(''); // サークル紹介編集用
+  const [descSaving, setDescSaving] = useState(false); // 保存中状態
+  const [recommendationsInput, setRecommendationsInput] = useState(''); // こんな人におすすめ編集用
+  const [recSaving, setRecSaving] = useState(false); // 保存中状態
+  const [leaderImage, setLeaderImage] = useState(null); // 代表者画像
+  const [leaderMessage, setLeaderMessage] = useState(''); // 代表者メッセージ
+  const [leaderSaving, setLeaderSaving] = useState(false); // 保存中
+  const [welcomeConditions, setWelcomeConditions] = useState(''); // 入会条件編集用
+  const [welcomeSaving, setWelcomeSaving] = useState(false); // 保存中状態
+  const [activityImages, setActivityImages] = useState([]); // 活動写真配列
+  const [activityUploading, setActivityUploading] = useState(false);
+
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return unsubscribeAuth;
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      const userDocRef = doc(db, 'users', user.uid);
+      const unsubscribeSnapshot = onSnapshot(userDocRef, (docSnap) => {
+        if (docSnap.exists()) {
+          const userData = docSnap.data();
+          const favorites = userData.favoriteCircleIds || [];
+          const joinedCircles = userData.joinedCircleIds || [];
+          setIsFavorite(favorites.includes(circleId));
+          setIsMember(joinedCircles.includes(circleId));
+        } else {
+          setIsFavorite(false);
+          setIsMember(false);
+        }
+      });
+      return unsubscribeSnapshot;
+    } else {
+      setIsFavorite(false);
+      setIsMember(false);
+    }
+  }, [user, circleId]);
+
+  useEffect(() => {
+    if (user && circleId) {
+      const checkRequest = async () => {
+        try {
+          const requestsRef = collection(db, 'circles', circleId, 'joinRequests');
+          const q = query(requestsRef, where('userId', '==', user.uid));
+          const snapshot = await getDocs(q);
+          setHasRequested(!snapshot.empty);
+        } catch (e) {
+          setHasRequested(false);
+        }
+      };
+      checkRequest();
+    }
+  }, [user, circleId]);
+
+  const handleJoinRequest = async () => {
+    if (!user) {
+      Alert.alert('ログインが必要です', '入会申請にはログインが必要です。');
+      return;
+    }
+    try {
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      const userData = userDoc.exists() ? userDoc.data() : {};
+      const requestsRef = collection(db, 'circles', circleId, 'joinRequests');
+      await addDoc(requestsRef, {
+        userId: user.uid,
+        name: userData.name || '',
+        university: userData.university || '',
+        grade: userData.grade || '',
+        email: user.email || '',
+        requestedAt: new Date(),
+      });
+      setHasRequested(true);
+      Alert.alert('申請完了', '入会申請を送信しました。');
+    } catch (e) {
+      Alert.alert('エラー', '申請の送信に失敗しました');
+    }
+  };
+
+  useEffect(() => {
+    const fetchCircleDetail = async () => {
+      try {
+        const docRef = doc(db, 'circles', circleId);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setCircleData({ id: docSnap.id, ...data });
+        } else {
+          Alert.alert("エラー", "サークルが見つかりませんでした。");
+          navigation.goBack();
+        }
+      } catch (error) {
+        console.error("Error fetching circle detail: ", error);
+        Alert.alert("エラー", "サークル情報の取得に失敗しました。");
+        navigation.goBack();
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCircleDetail();
+  }, [circleId]);
+
+  useEffect(() => {
+    // サークル紹介初期値セット
+    if (circleData && typeof circleData.description === 'string') {
+      setDescription(circleData.description);
+    }
+    // こんな人におすすめ初期値セット
+    if (circleData && Array.isArray(circleData.recommendations)) {
+      setRecommendationsInput(circleData.recommendations.join(', '));
+    }
+    if (circleData && typeof circleData.leaderMessage === 'string') {
+      setLeaderMessage(circleData.leaderMessage);
+    }
+    if (circleData && typeof circleData.leaderImageUrl === 'string') {
+      setLeaderImage({ uri: circleData.leaderImageUrl });
+    }
+    if (circleData && circleData.welcome && typeof circleData.welcome.conditions === 'string') {
+      setWelcomeConditions(circleData.welcome.conditions);
+    }
+    if (circleData && Array.isArray(circleData.activityImages)) {
+      setActivityImages(circleData.activityImages);
+    }
+  }, [circleData]);
+
+  const toggleFavorite = async () => {
+    if (!user) {
+      Alert.alert("ログインが必要です", "お気に入り機能を利用するにはログインしてください。");
+      return;
+    }
+
+    const userDocRef = doc(db, 'users', user.uid);
+    const circleDocRef = doc(db, 'circles', circleId);
+
+    try {
+      if (isFavorite) {
+        await updateDoc(userDocRef, { favoriteCircleIds: arrayRemove(circleId) });
+        await updateDoc(circleDocRef, { likes: increment(-1) });
+        Alert.alert("お気に入り解除", "サークルをお気に入りから削除しました。");
+      } else {
+        await updateDoc(userDocRef, { favoriteCircleIds: arrayUnion(circleId) });
+        await updateDoc(circleDocRef, { likes: increment(1) });
+        Alert.alert("お気に入り登録", "サークルをお気に入りに追加しました！");
+      }
+    } catch (error) {
+      console.error("Error toggling favorite: ", error);
+      Alert.alert("エラー", "お気に入り操作に失敗しました。");
+    }
+  };
+
+  // ヘッダー画像アップロード処理
+  const handleHeaderImagePress = async () => {
+    if (uploading) return;
+    // 画像選択
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setUploading(true);
+      try {
+        const asset = result.assets[0];
+        const response = await fetch(asset.uri);
+        const blob = await response.blob();
+        const storage = getStorage();
+        const fileName = `circle_images/headers/${circleId}_${Date.now()}`;
+        const imgRef = storageRef(storage, fileName);
+        await uploadBytes(imgRef, blob);
+        const downloadUrl = await getDownloadURL(imgRef);
+        // Firestoreに保存
+        await updateDoc(doc(db, 'circles', circleId), { headerImageUrl: downloadUrl });
+        setCircleData(prev => ({ ...prev, headerImageUrl: downloadUrl }));
+        Alert.alert('アップロード完了', 'ヘッダー画像を更新しました');
+      } catch (e) {
+        Alert.alert('エラー', '画像のアップロードに失敗しました');
+      } finally {
+        setUploading(false);
+      }
+    }
+  };
+
+  // ヘッダー画像削除処理
+  const handleDeleteHeaderImage = async () => {
+    try {
+      await updateDoc(doc(db, 'circles', circleId), { headerImageUrl: '' });
+      setCircleData(prev => ({ ...prev, headerImageUrl: '' }));
+      Alert.alert('削除完了', 'ヘッダー画像を削除しました');
+    } catch (e) {
+      Alert.alert('エラー', 'ヘッダー画像の削除に失敗しました');
+    }
+  };
+
+  // イベント画像選択
+  const handlePickEventImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setEventImage(result.assets[0]);
+    }
+  };
+
+  // イベント追加処理
+  const handleAddEvent = async () => {
+    if (!eventTitle || !eventDetail) {
+      Alert.alert('エラー', 'タイトルと詳細を入力してください');
+      return;
+    }
+    setEventUploading(true);
+    let imageUrl = '';
+    try {
+      if (eventImage) {
+        const response = await fetch(eventImage.uri);
+        const blob = await response.blob();
+        const storage = getStorage();
+        const fileName = `circle_images/events/${circleId}_${Date.now()}`;
+        const imgRef = storageRef(storage, fileName);
+        await uploadBytes(imgRef, blob);
+        imageUrl = await getDownloadURL(imgRef);
+      }
+      // Firestoreのevents配列に追加
+      const eventObj = {
+        title: eventTitle,
+        detail: eventDetail,
+        image: imageUrl,
+      };
+      await updateDoc(doc(db, 'circles', circleId), {
+        events: arrayUnion(eventObj)
+      });
+      setCircleData(prev => ({
+        ...prev,
+        events: prev.events ? [...prev.events, eventObj] : [eventObj]
+      }));
+      setEventFormVisible(false);
+      setEventTitle('');
+      setEventDetail('');
+      setEventImage(null);
+      Alert.alert('追加完了', 'イベントを追加しました');
+    } catch (e) {
+      Alert.alert('エラー', 'イベントの追加に失敗しました');
+    } finally {
+      setEventUploading(false);
+    }
+  };
+
+  // 編集モード開始
+  const handleEditEvent = (idx) => {
+    setEditingEventIndex(idx);
+    setEditEventTitle(circleData.events[idx].title);
+    setEditEventDetail(circleData.events[idx].detail);
+    setEditEventImage(circleData.events[idx].image ? { uri: circleData.events[idx].image } : null);
+  };
+  // 編集キャンセル
+  const handleCancelEditEvent = () => {
+    setEditingEventIndex(null);
+    setEditEventTitle('');
+    setEditEventDetail('');
+    setEditEventImage(null);
+  };
+  // 編集画像選択
+  const handlePickEditEventImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setEditEventImage(result.assets[0]);
+    }
+  };
+  // 編集保存
+  const handleSaveEditEvent = async () => {
+    if (!editEventTitle || !editEventDetail) {
+      Alert.alert('エラー', 'タイトルと詳細を入力してください');
+      return;
+    }
+    setEditEventUploading(true);
+    let imageUrl = editEventImage && editEventImage.uri ? editEventImage.uri : '';
+    try {
+      if (editEventImage && editEventImage.uri && !editEventImage.uri.startsWith('http')) {
+        const response = await fetch(editEventImage.uri);
+        const blob = await response.blob();
+        const storage = getStorage();
+        const fileName = `circle_images/events/${circleId}_${Date.now()}`;
+        const imgRef = storageRef(storage, fileName);
+        await uploadBytes(imgRef, blob);
+        imageUrl = await getDownloadURL(imgRef);
+      }
+      // 既存イベント配列を編集
+      const newEvents = [...circleData.events];
+      newEvents[editingEventIndex] = {
+        ...newEvents[editingEventIndex],
+        title: editEventTitle,
+        detail: editEventDetail,
+        image: imageUrl,
+      };
+      await updateDoc(doc(db, 'circles', circleId), { events: newEvents });
+      setCircleData(prev => ({ ...prev, events: newEvents }));
+      setEditingEventIndex(null);
+      setEditEventTitle('');
+      setEditEventDetail('');
+      setEditEventImage(null);
+      Alert.alert('保存完了', 'イベントを更新しました');
+    } catch (e) {
+      Alert.alert('エラー', 'イベントの更新に失敗しました');
+    } finally {
+      setEditEventUploading(false);
+    }
+  };
+  // イベント削除
+  const handleDeleteEvent = async (idx) => {
+    try {
+      const eventObj = circleData.events[idx];
+      await updateDoc(doc(db, 'circles', circleId), {
+        events: arrayRemove(eventObj)
+      });
+      setCircleData(prev => ({
+        ...prev,
+        events: prev.events.filter((_, i) => i !== idx)
+      }));
+      setEditingEventIndex(null);
+      Alert.alert('削除完了', 'イベントを削除しました');
+    } catch (e) {
+      Alert.alert('エラー', 'イベントの削除に失敗しました');
+    }
+  };
+
+  // サークル紹介保存処理
+  const handleSaveDescription = async () => {
+    setDescSaving(true);
+    try {
+      await updateDoc(doc(db, 'circles', circleId), { description });
+      setCircleData(prev => ({ ...prev, description }));
+      Alert.alert('保存完了', 'サークル紹介を更新しました');
+    } catch (e) {
+      Alert.alert('エラー', 'サークル紹介の保存に失敗しました');
+    } finally {
+      setDescSaving(false);
+    }
+  };
+
+  // こんな人におすすめ保存処理
+  const handleSaveRecommendations = async () => {
+    setRecSaving(true);
+    try {
+      const recArr = recommendationsInput.split(',').map(s => s.trim()).filter(Boolean);
+      await updateDoc(doc(db, 'circles', circleId), { recommendations: recArr });
+      setCircleData(prev => ({ ...prev, recommendations: recArr }));
+      Alert.alert('保存完了', 'おすすめ項目を更新しました');
+    } catch (e) {
+      Alert.alert('エラー', 'おすすめ項目の保存に失敗しました');
+    } finally {
+      setRecSaving(false);
+    }
+  };
+
+  // 代表者画像選択
+  const handlePickLeaderImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setLeaderImage(result.assets[0]);
+    }
+  };
+  // 代表者情報保存
+  const handleSaveLeader = async () => {
+    setLeaderSaving(true);
+    let imageUrl = leaderImage && leaderImage.uri ? leaderImage.uri : '';
+    try {
+      if (leaderImage && leaderImage.uri && !leaderImage.uri.startsWith('http')) {
+        const response = await fetch(leaderImage.uri);
+        const blob = await response.blob();
+        const storage = getStorage();
+        const fileName = `circle_images/leaders/${circleId}_${Date.now()}`;
+        const imgRef = storageRef(storage, fileName);
+        await uploadBytes(imgRef, blob);
+        imageUrl = await getDownloadURL(imgRef);
+      }
+      await updateDoc(doc(db, 'circles', circleId), {
+        leaderImageUrl: imageUrl,
+        leaderMessage: leaderMessage,
+      });
+      Alert.alert('保存完了', '代表者情報を更新しました');
+    } catch (e) {
+      Alert.alert('エラー', '代表者情報の保存に失敗しました');
+    } finally {
+      setLeaderSaving(false);
+    }
+  };
+
+  // 入会条件保存処理
+  const handleSaveWelcomeConditions = async () => {
+    setWelcomeSaving(true);
+    try {
+      const newWelcome = { ...(circleData.welcome || {}), conditions: welcomeConditions };
+      await updateDoc(doc(db, 'circles', circleId), { welcome: newWelcome });
+      setCircleData(prev => ({ ...prev, welcome: newWelcome }));
+      Alert.alert('保存完了', '入会条件を更新しました');
+    } catch (e) {
+      Alert.alert('エラー', '入会条件の保存に失敗しました');
+    } finally {
+      setWelcomeSaving(false);
+    }
+  };
+
+  // 活動写真追加
+  const handleAddActivityImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setActivityUploading(true);
+      try {
+        const asset = result.assets[0];
+        const response = await fetch(asset.uri);
+        const blob = await response.blob();
+        const storage = getStorage();
+        const fileName = `circle_images/activities/${circleId}_${Date.now()}`;
+        const imgRef = storageRef(storage, fileName);
+        await uploadBytes(imgRef, blob);
+        const downloadUrl = await getDownloadURL(imgRef);
+        const newImages = [...activityImages, downloadUrl];
+        await updateDoc(doc(db, 'circles', circleId), { activityImages: newImages });
+        setActivityImages(newImages);
+        setCircleData(prev => ({ ...prev, activityImages: newImages }));
+        Alert.alert('アップロード完了', '活動写真を追加しました');
+      } catch (e) {
+        Alert.alert('エラー', '活動写真の追加に失敗しました');
+      } finally {
+        setActivityUploading(false);
+      }
+    }
+  };
+  // 活動写真削除
+  const handleDeleteActivityImage = async (idx) => {
+    try {
+      const newImages = activityImages.filter((_, i) => i !== idx);
+      await updateDoc(doc(db, 'circles', circleId), { activityImages: newImages });
+      setActivityImages(newImages);
+      setCircleData(prev => ({ ...prev, activityImages: newImages }));
+      Alert.alert('削除完了', '活動写真を削除しました');
+    } catch (e) {
+      Alert.alert('エラー', '活動写真の削除に失敗しました');
+    }
+  };
+
+  // 活動写真差し替え
+  const handleReplaceActivityImage = async (idx) => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      setActivityUploading(true);
+      try {
+        const asset = result.assets[0];
+        const response = await fetch(asset.uri);
+        const blob = await response.blob();
+        const storage = getStorage();
+        const fileName = `circle_images/activities/${circleId}_${Date.now()}`;
+        const imgRef = storageRef(storage, fileName);
+        await uploadBytes(imgRef, blob);
+        const downloadUrl = await getDownloadURL(imgRef);
+        const newImages = [...activityImages];
+        newImages[idx] = downloadUrl;
+        await updateDoc(doc(db, 'circles', circleId), { activityImages: newImages });
+        setActivityImages(newImages);
+        setCircleData(prev => ({ ...prev, activityImages: newImages }));
+        Alert.alert('変更完了', '活動写真を変更しました');
+      } catch (e) {
+        Alert.alert('エラー', '活動写真の変更に失敗しました');
+      } finally {
+        setActivityUploading(false);
+      }
+    }
+  };
+
+  const renderTopTab = () => (
+    <View style={styles.tabContent}>
+      {/* 活動写真アップロード・表示 */}
+      <View style={{marginBottom: 20, width: '100%'}}>
+        {activityImages && activityImages.length > 0 ? (
+          <View style={{position: 'relative', width: '100%', aspectRatio: 16/9, alignSelf: 'center'}}>
+            <TouchableOpacity onPress={() => handleReplaceActivityImage(0)} activeOpacity={0.7} style={{width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center'}}>
+              <Image source={{ uri: activityImages[0] }} style={{width: '100%', aspectRatio: 16/9, borderRadius: 0, backgroundColor: '#eee', marginBottom: 20}} />
+            </TouchableOpacity>
+            {/* ゴミ箱ボタン */}
+            <TouchableOpacity
+              style={{position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 16, padding: 4, zIndex: 2}}
+              onPress={() => handleDeleteActivityImage(0)}
+            >
+              <Ionicons name="trash-outline" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          // 画像がない場合は追加ボタンのみ
+          <TouchableOpacity onPress={handleAddActivityImage} disabled={activityUploading} style={{width: '100%', aspectRatio: 16/9, borderRadius: 0, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center', marginBottom: 20, alignSelf: 'center'}}>
+            {activityUploading ? (
+              <ActivityIndicator size="large" color="#007bff" />
+            ) : (
+              <Ionicons name="camera-outline" size={48} color="#aaa" />
+            )}
+          </TouchableOpacity>
+        )}
+      </View>
+      {/* 基本情報 */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>基本情報</Text>
+        <View style={styles.infoGrid}>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>活動頻度</Text>
+            <Text style={styles.infoValue}>{circleData.frequency}</Text>
+          </View>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>人数</Text>
+            <Text style={styles.infoValue}>{circleData.members}</Text>
+          </View>
+          <View style={styles.infoItem}>
+            <Text style={styles.infoLabel}>男女比</Text>
+            <Text style={styles.infoValue}>{circleData.genderratio}</Text>
+          </View>
+        </View>
+        {circleData.features && circleData.features.length > 0 && (
+          <View style={styles.featuresContainer}>
+            <Text style={styles.infoLabel}>特色</Text>
+            <View style={styles.featuresList}>
+              {circleData.features.map((feature, index) => (
+                <View key={index} style={styles.featureTag}>
+                  <Text style={styles.featureText}>{feature}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+      </View>
+      {/* サークル紹介（基本情報の下に移動・編集可） */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>サークル紹介</Text>
+        <TextInput
+          value={description}
+          onChangeText={setDescription}
+          multiline
+          style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 80, fontSize: 16, marginBottom: 8}}
+        />
+        <TouchableOpacity onPress={handleSaveDescription} disabled={descSaving} style={{alignSelf: 'flex-end'}}>
+          <View style={{backgroundColor: descSaving ? '#aaa' : '#007bff', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18}}>
+            <Text style={{color: '#fff', fontWeight: 'bold'}}>{descSaving ? '保存中...' : '保存'}</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+      {/* こんな人におすすめ（サークル紹介の下に追加・編集可） */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>こんな人におすすめ</Text>
+        <TextInput
+          value={recommendationsInput}
+          onChangeText={setRecommendationsInput}
+          multiline
+          placeholder={"・新しい友達を作りたい人\n・○○が好きな人\n・○○が得意な人"}
+          style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 60, fontSize: 16, marginBottom: 8}}
+        />
+        <TouchableOpacity onPress={handleSaveRecommendations} disabled={recSaving} style={{alignSelf: 'flex-end'}}>
+          <View style={{backgroundColor: recSaving ? '#aaa' : '#007bff', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18}}>
+            <Text style={{color: '#fff', fontWeight: 'bold'}}>{recSaving ? '保存中...' : '保存'}</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      {/* 代表者編集（こんな人におすすめの下に追加） */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>代表者からのメッセージ</Text>
+        <TouchableOpacity onPress={handlePickLeaderImage} style={{alignSelf: 'flex-start', marginBottom: 12}}>
+          {leaderImage && leaderImage.uri ? (
+            <Image source={{ uri: leaderImage.uri }} style={{width: 72, height: 72, borderRadius: 36, backgroundColor: '#eee'}} />
+          ) : (
+            <View style={{width: 72, height: 72, borderRadius: 36, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center'}}>
+              <Ionicons name="camera-outline" size={36} color="#aaa" />
+            </View>
+          )}
+        </TouchableOpacity>
+        <TextInput
+          value={leaderMessage}
+          onChangeText={setLeaderMessage}
+          multiline
+          placeholder="代表者からのメッセージを入力"
+          style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 60, fontSize: 16, marginBottom: 8}}
+        />
+        <TouchableOpacity onPress={handleSaveLeader} disabled={leaderSaving} style={{alignSelf: 'flex-end'}}>
+          <View style={{backgroundColor: leaderSaving ? '#aaa' : '#007bff', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18}}>
+            <Text style={{color: '#fff', fontWeight: 'bold'}}>{leaderSaving ? '保存中...' : '保存'}</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      {/* SNSリンク */}
+      {(circleData.snsLink || circleData.xLink) && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>SNS</Text>
+          <View style={styles.snsLargeRow}>
+            {circleData.snsLink && (
+              <TouchableOpacity onPress={() => Linking.openURL(circleData.snsLink)} style={styles.snsLargeButton}>
+                <RNImage source={require('../assets/Instagram_Glyph_Gradient.png')} style={styles.snsLargeLogo} />
+              </TouchableOpacity>
+            )}
+            {circleData.xLink && (
+              <TouchableOpacity onPress={() => Linking.openURL(circleData.xLink)} style={styles.snsLargeButton}>
+                <RNImage source={require('../assets/X_logo-black.png')} style={styles.snsLargeLogo} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      )}
+
+      {/* LINEグループ */}
+      {circleData.lineGroupLink && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>LINEグループ</Text>
+          <TouchableOpacity style={styles.lineButton} onPress={() => Linking.openURL(circleData.lineGroupLink)}>
+            <Ionicons name="logo-whatsapp" size={24} color="#06C755" />
+            <Text style={styles.lineButtonText}>LINEグループを開く</Text>
+            <Ionicons name="chevron-forward" size={20} color="#666" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.copyButton} onPress={() => {
+            // Clipboard.setString(circleData.lineGroupLink);
+            Alert.alert('コピーしました', 'LINEグループリンクをコピーしました');
+          }}>
+            <Ionicons name="copy-outline" size={18} color="#333" />
+            <Text style={styles.copyButtonText}>リンクをコピー</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* 新歓スケジュール */}
+      {circleData.schedule && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>新歓スケジュール</Text>
+          <Text style={styles.scheduleText}>{circleData.schedule}</Text>
+        </View>
+      )}
+    </View>
+  );
+
+  const renderEventsTab = () => (
+    <View style={styles.tabContent}>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>恒例イベント</Text>
+        {/* イベント追加ボタン */}
+        <TouchableOpacity style={{marginBottom: 16, alignSelf: 'center'}} onPress={() => setEventFormVisible(true)}>
+          <View style={{backgroundColor: '#007bff', borderRadius: 24, width: 48, height: 48, alignItems: 'center', justifyContent: 'center'}}>
+            <Text style={{color: '#fff', fontWeight: 'bold', fontSize: 32, lineHeight: 40}}>＋</Text>
+          </View>
+        </TouchableOpacity>
+        {/* イベント追加フォーム */}
+        {eventFormVisible && (
+          <View style={{marginBottom: 20, backgroundColor: '#f8f8f8', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#e0e0e0', position: 'relative'}}>
+            {/* 右上に閉じるボタン */}
+            <TouchableOpacity
+              style={{ position: 'absolute', top: 8, right: 8, zIndex: 2 }}
+              onPress={() => setEventFormVisible(false)}
+              disabled={eventUploading}
+            >
+              <Ionicons name="close-outline" size={24} color="#666" />
+            </TouchableOpacity>
+            <Text style={{fontWeight: 'bold', fontSize: 16, marginBottom: 8}}>イベント追加</Text>
+            <TextInput
+              placeholder="タイトル"
+              value={eventTitle}
+              onChangeText={setEventTitle}
+              style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginBottom: 8, backgroundColor: '#fff'}}
+            />
+            <TextInput
+              placeholder="詳細"
+              value={eventDetail}
+              onChangeText={setEventDetail}
+              multiline
+              style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginBottom: 8, backgroundColor: '#fff', minHeight: 60}}
+            />
+            <TouchableOpacity onPress={handlePickEventImage} style={{marginBottom: 8}}>
+              <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                <Ionicons name="image-outline" size={24} color="#007bff" />
+                <Text style={{marginLeft: 8, color: '#007bff'}}>画像を選択</Text>
+              </View>
+            </TouchableOpacity>
+            {eventImage && (
+              <Image source={{ uri: eventImage.uri }} style={{width: '100%', aspectRatio: 16/9, borderRadius: 8, marginBottom: 8}} />
+            )}
+            <View style={{flexDirection: 'row', justifyContent: 'flex-end'}}>
+              <TouchableOpacity onPress={() => setEventFormVisible(false)} style={{marginRight: 16}} disabled={eventUploading}>
+                <Text style={{color: '#666'}}>キャンセル</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleAddEvent} disabled={eventUploading}>
+                <View style={{backgroundColor: eventUploading ? '#aaa' : '#007bff', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18}}>
+                  <Text style={{color: '#fff', fontWeight: 'bold'}}>{eventUploading ? '追加中...' : '保存'}</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+        {/* イベントリスト */}
+        {circleData.events && circleData.events.length > 0 && (
+          circleData.events.slice(0, 4).map((event, idx) => (
+            <View key={idx} style={styles.eventCard}>
+              {/* 編集/削除ボタン */}
+              <TouchableOpacity
+                style={{ position: 'absolute', top: 8, right: 8, zIndex: 2 }}
+                onPress={() =>
+                  editingEventIndex === idx
+                    ? handleDeleteEvent(idx)
+                    : handleEditEvent(idx)
+                }
+              >
+                <Ionicons
+                  name={editingEventIndex === idx ? 'trash-outline' : 'create-outline'}
+                  size={24}
+                  color={editingEventIndex === idx ? '#e74c3c' : '#007bff'}
+                />
+              </TouchableOpacity>
+              {/* 編集モード */}
+              {editingEventIndex === idx ? (
+                <View style={{backgroundColor: '#f8f8f8', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#e0e0e0', marginBottom: 0, position: 'relative'}}>
+                  <Text style={{fontWeight: 'bold', fontSize: 16, marginBottom: 8}}>イベント編集</Text>
+                  <TextInput
+                    placeholder="タイトル"
+                    value={editEventTitle}
+                    onChangeText={setEditEventTitle}
+                    style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginBottom: 8, backgroundColor: '#fff'}}
+                  />
+                  <TextInput
+                    placeholder="詳細"
+                    value={editEventDetail}
+                    onChangeText={setEditEventDetail}
+                    multiline
+                    style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginBottom: 8, backgroundColor: '#fff', minHeight: 60}}
+                  />
+                  <TouchableOpacity onPress={handlePickEditEventImage} style={{marginBottom: 8}}>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Ionicons name="image-outline" size={24} color="#007bff" />
+                      <Text style={{marginLeft: 8, color: '#007bff'}}>画像を選択</Text>
+                    </View>
+                  </TouchableOpacity>
+                  {editEventImage && (
+                    <Image source={{ uri: editEventImage.uri }} style={{width: '100%', aspectRatio: 16/9, borderRadius: 8, marginBottom: 8}} />
+                  )}
+                  <View style={{flexDirection: 'row', justifyContent: 'flex-end'}}>
+                    <TouchableOpacity onPress={handleCancelEditEvent} style={{marginRight: 16}} disabled={editEventUploading}>
+                      <Text style={{color: '#666'}}>キャンセル</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handleSaveEditEvent} disabled={editEventUploading}>
+                      <View style={{backgroundColor: editEventUploading ? '#aaa' : '#007bff', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18}}>
+                        <Text style={{color: '#fff', fontWeight: 'bold'}}>{editEventUploading ? '保存中...' : '保存'}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
+                <>
+                  <Text style={styles.eventTitle}>{event.title}</Text>
+                  {event.image && (
+                    <Image source={{ uri: event.image }} style={styles.eventImage} resizeMode="cover" />
+                  )}
+                  <Text style={styles.eventDetail}>{event.detail}</Text>
+                </>
+              )}
+            </View>
+          ))
+        )}
+      </View>
+    </View>
+  );
+
+  const renderWelcomeTab = () => (
+    <View style={styles.tabContent}>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>入会条件</Text>
+        <TextInput
+          value={welcomeConditions}
+          onChangeText={setWelcomeConditions}
+          multiline
+          placeholder={"・○○経験者\n・○○大学に在籍中の方\n・大学１年生"}
+          style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 60, fontSize: 16, marginBottom: 8}}
+        />
+        <TouchableOpacity onPress={handleSaveWelcomeConditions} disabled={welcomeSaving} style={{alignSelf: 'flex-end'}}>
+          <View style={{backgroundColor: welcomeSaving ? '#aaa' : '#007bff', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18}}>
+            <Text style={{color: '#fff', fontWeight: 'bold'}}>{welcomeSaving ? '保存中...' : '保存'}</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>新歓スケジュール</Text>
+        {circleData.welcome?.schedule && circleData.welcome.schedule.length > 0 ? (
+          <View style={styles.calendarList}>
+            {circleData.welcome.schedule.map((item, idx) => (
+              <View key={idx} style={styles.calendarItem}>
+                <Text style={styles.calendarDate}>{item.date}</Text>
+                <Text style={styles.calendarEvent}>{item.event}</Text>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <Text style={styles.placeholderText}>新歓スケジュールは未設定です</Text>
+        )}
+      </View>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>参加予約</Text>
+        <TouchableOpacity style={styles.reserveButton} onPress={() => Alert.alert('予約', '参加予約機能は今後実装予定です。')}>
+          <Text style={styles.reserveButtonText}>参加を予約する</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  // タブバー部分を元のactiveTab/setActiveTab方式に戻す
+  const renderTabBar = () => (
+    <View style={styles.tabBarContainer}>
+      <View style={styles.tabBar}>
+        <TouchableOpacity
+          style={[styles.tabItem, activeTab === 'top' && styles.activeTabItem]}
+          onPress={() => setActiveTab('top')}
+        >
+          <Text style={[styles.tabLabel, activeTab === 'top' && styles.activeTabLabel]}>
+            トップ
+          </Text>
+          {activeTab === 'top' && <View style={styles.activeIndicator} />}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabItem, activeTab === 'events' && styles.activeTabItem]}
+          onPress={() => setActiveTab('events')}
+        >
+          <Text style={[styles.tabLabel, activeTab === 'events' && styles.activeTabLabel]}>
+            イベント
+          </Text>
+          {activeTab === 'events' && <View style={styles.activeIndicator} />}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabItem, activeTab === 'welcome' && styles.activeTabItem]}
+          onPress={() => setActiveTab('welcome')}
+        >
+          <Text style={[styles.tabLabel, activeTab === 'welcome' && styles.activeTabLabel]}>
+            新歓情報
+          </Text>
+          {activeTab === 'welcome' && <View style={styles.activeIndicator} />}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007bff" />
+        <Text>サークル情報を読み込み中...</Text>
+      </View>
+    );
+  }
+
+  if (!circleData) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>サークル情報がありません。</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <CommonHeader title="プロフィール編集" />
-      <SafeAreaView style={{ flex: 1 }}>
-        <View style={styles.content}>
-          <Text style={styles.text}>この画面の内容は削除されました</Text>
+      <CommonHeader title={circleData && circleData.name ? circleData.name : 'サークル詳細'} showBackButton onBack={() => navigation.goBack()} />
+      
+      <ScrollView 
+        style={styles.scrollView}
+        stickyHeaderIndices={[2]} // タブバーをスティッキーヘッダーに設定
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ヘッダー画像エリア */}
+        <TouchableOpacity style={styles.headerImageContainer} onPress={handleHeaderImagePress} activeOpacity={0.7}>
+          {uploading ? (
+            <View style={styles.headerImagePlaceholder}>
+              <ActivityIndicator size="large" color="#007bff" />
+            </View>
+          ) : circleData.headerImageUrl ? (
+            <>
+              <Image source={{ uri: circleData.headerImageUrl }} style={styles.headerImage} />
+              {/* ゴミ箱ボタン */}
+              <TouchableOpacity
+                style={{position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 16, padding: 4, zIndex: 2}}
+                onPress={handleDeleteHeaderImage}
+              >
+                <Ionicons name="trash-outline" size={24} color="#fff" />
+              </TouchableOpacity>
+            </>
+          ) : (
+            <View style={styles.headerImagePlaceholder}>
+              <Ionicons name="camera-outline" size={48} color="#aaa" />
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* サークル基本情報 */}
+        <View style={styles.circleInfoSection}>
+          <View style={styles.circleInfo}>
+            <View style={styles.logoContainer}>
+              {circleData.imageUrl ? (
+                <Image source={{ uri: circleData.imageUrl }} style={styles.circleLogo} />
+              ) : (
+                <View style={styles.logoPlaceholder}>
+                  <Ionicons name="people-outline" size={32} color="#ccc" />
+                </View>
+              )}
+            </View>
+            <View style={styles.circleTextInfo}>
+              <View style={styles.circleNameRow}>
+                <Text style={styles.circleName}>{circleData.name}</Text>
+                {circleData.isOfficial && (
+                  <View style={styles.officialBadge}>
+                    <Ionicons name="checkmark-circle" size={16} color="#28a745" />
+                    <Text style={styles.officialText}>公式</Text>
+                  </View>
+                )}
+                {/* SNSボタン（X, Instagram） */}
+                {(circleData.xLink || circleData.snsLink) && (
+                  <View style={styles.snsIconRow}>
+                    {circleData.snsLink && (
+                      <TouchableOpacity onPress={() => Linking.openURL(circleData.snsLink)} style={styles.snsIconButton}>
+                        <RNImage source={require('../assets/Instagram_Glyph_Gradient.png')} style={styles.snsLogoImage} />
+                      </TouchableOpacity>
+                    )}
+                    {circleData.xLink && (
+                      <TouchableOpacity onPress={() => Linking.openURL(circleData.xLink)} style={styles.snsIconButton}>
+                        <RNImage source={require('../assets/X_logo-black.png')} style={styles.snsLogoImage} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+              </View>
+              <Text style={styles.universityName}>{circleData.universityName}</Text>
+              <Text style={styles.genre}>{circleData.genre}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* サークル紹介 */}
+        {/* このセクションを削除 */}
+
+        {/* タブバー */}
+        {renderTabBar()}
+
+        {/* タブコンテンツ */}
+        <View style={styles.tabContentContainer}>
+          {activeTab === 'top' && renderTopTab()}
+          {activeTab === 'events' && renderEventsTab()}
+          {activeTab === 'welcome' && renderWelcomeTab()}
+        </View>
+      </ScrollView>
+
+      {/* アクションボタン */}
+      <SafeAreaView style={styles.actionBar}>
+        <View style={styles.actionButtons}>
+          <TouchableOpacity style={styles.favoriteButton} onPress={toggleFavorite}>
+            <Ionicons 
+              name={isFavorite ? "bookmark" : "bookmark-outline"} 
+              size={24} 
+              color={isFavorite ? "gold" : "#666"} 
+            />
+            <Text style={[styles.favoriteButtonText, isFavorite && styles.favoriteButtonTextActive]}>
+              {isFavorite ? "保存済み" : "保存"}
+            </Text>
+          </TouchableOpacity>
+          
+          {isMember ? (
+            <View style={styles.memberButton}>
+              <Ionicons name="checkmark-circle" size={20} color="#fff" />
+              <Text style={styles.memberButtonText}>入会済み</Text>
+            </View>
+          ) : hasRequested ? (
+            <View style={styles.requestedButton}>
+              <Ionicons name="checkmark-circle" size={20} color="#28a745" />
+              <Text style={styles.requestedButtonText}>申請済み</Text>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.joinButton} onPress={handleJoinRequest}>
+              <Text style={styles.joinButtonText}>入会申請</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
     </View>
@@ -18,12 +1055,507 @@ export default function CircleProfileEditScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f8f8f8',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
   },
-  text: {
-    fontSize: 18,
-    color: '#888',
+  scrollViewContent: {
+    paddingBottom: 20,
   },
-}); 
+  headerImageContainer: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: '#f0f0f0',
+  },
+  headerImage: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    resizeMode: 'cover',
+  },
+  headerImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+  },
+  circleInfoSection: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  circleInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  logoPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  circleLogo: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 30,
+  },
+  circleTextInfo: {
+    marginLeft: 15,
+    flex: 1,
+  },
+  circleNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'space-between',
+  },
+  circleName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  officialBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e0f2f7',
+    borderRadius: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginLeft: 8,
+  },
+  officialText: {
+    fontSize: 12,
+    color: '#28a745',
+    fontWeight: 'bold',
+  },
+  universityName: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 2,
+  },
+  genre: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
+  },
+  tabBarContainer: {
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    width: '100%',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    width: '100%',
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    position: 'relative',
+  },
+  activeTabItem: {
+    // アクティブインジケーターは別途表示
+  },
+  tabLabel: {
+    fontSize: 16,
+    color: '#666',
+  },
+  activeTabLabel: {
+    color: '#007bff',
+    fontWeight: 'bold',
+  },
+  activeIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: '#007bff',
+  },
+  tabContentContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  tabContent: {
+    padding: 20,
+  },
+  section: {
+    marginBottom: 25,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+  },
+  description: {
+    fontSize: 16,
+    textAlign: 'left',
+    lineHeight: 24,
+    color: '#666',
+  },
+  infoGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  infoItem: {
+    width: '30%', // Adjust as needed
+    alignItems: 'center',
+    backgroundColor: '#f8fafd',
+    borderWidth: 1,
+    borderColor: '#cce5ed',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+  },
+  infoLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+  },
+  infoValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  featuresContainer: {
+    marginTop: 10,
+  },
+  featuresList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  featureTag: {
+    backgroundColor: '#e0f2f7',
+    borderRadius: 15,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#cce5ed',
+  },
+  featureText: {
+    fontSize: 13,
+    color: '#333',
+  },
+  snsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 5,
+  },
+  snsButtonText: {
+    color: '#E1306C',
+    fontSize: 15,
+    textDecorationLine: 'underline',
+    marginLeft: 8,
+  },
+  lineButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e6ffe6',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 5,
+  },
+  lineButtonText: {
+    color: '#06C755',
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  copyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 5,
+    alignSelf: 'flex-start',
+  },
+  copyButtonText: {
+    color: '#333',
+    fontSize: 13,
+    marginLeft: 8,
+  },
+  scheduleText: {
+    fontSize: 16,
+    textAlign: 'left',
+    lineHeight: 24,
+    color: '#666',
+  },
+  placeholderText: {
+    fontSize: 16,
+    color: '#999',
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+  actionBar: {
+    backgroundColor: '#fff',
+    paddingVertical: 18, // 以前は22
+    paddingHorizontal: 20,
+    borderTopWidth: 0.5,
+    borderTopColor: '#eee',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    borderTopWidth: 0.5,
+    borderTopColor: '#eee',
+    paddingVertical: 18, // 以前は22
+  },
+  favoriteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 16, // 以前は10
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  favoriteButtonText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#666',
+  },
+  favoriteButtonTextActive: {
+    color: '#000',
+    fontWeight: 'bold',
+  },
+  memberButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#007bff',
+    paddingVertical: 16, // 以前は10
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: '#007bff',
+  },
+  memberButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  requestedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#eee',
+    paddingVertical: 16, // 以前は10
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: '#ccc',
+  },
+  requestedButtonText: {
+    color: '#28a745',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  joinButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#007bff',
+    paddingVertical: 16, // 以前は10
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: '#007bff',
+  },
+  joinButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  leaderSection: {
+    alignItems: 'flex-start',
+  },
+  leaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  leaderImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#eee',
+    marginRight: 16,
+  },
+  leaderImagePlaceholder: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#eee',
+    marginRight: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  leaderBalloon: {
+    flex: 1,
+    backgroundColor: '#f0f8ff',
+    borderRadius: 16,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#cce5ed',
+    minHeight: 56,
+    justifyContent: 'center',
+  },
+  leaderMessage: {
+    fontSize: 15,
+    color: '#333',
+    lineHeight: 22,
+  },
+  activityImagesScroll: {
+    marginBottom: 20,
+  },
+  activityImage: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 0,
+    backgroundColor: '#eee',
+    marginBottom: 20,
+  },
+  recommendList: {
+    marginTop: 4,
+  },
+  recommendItem: {
+    marginBottom: 4,
+  },
+  recommendText: {
+    fontSize: 15,
+    color: '#444',
+    lineHeight: 22,
+  },
+  snsIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+    gap: 4,
+  },
+  snsIconButton: {
+    marginLeft: 4,
+    padding: 2,
+  },
+  snsLogoImage: {
+    width: 32,
+    height: 32,
+    resizeMode: 'contain',
+  },
+  snsLargeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 20,
+    marginTop: 8,
+  },
+  snsLargeButton: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#e0e0e0',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  snsLargeLogo: {
+    width: 32,
+    height: 32,
+    resizeMode: 'contain',
+  },
+  eventCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    padding: 16,
+    marginBottom: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  eventTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#333',
+  },
+  eventImage: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 8,
+    marginBottom: 10,
+    backgroundColor: '#eee',
+  },
+  eventDetail: {
+    fontSize: 15,
+    color: '#555',
+    lineHeight: 22,
+  },
+  calendarList: {
+    marginTop: 8,
+  },
+  calendarItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  calendarDate: {
+    fontSize: 15,
+    color: '#007bff',
+    width: 100,
+    fontWeight: 'bold',
+  },
+  calendarEvent: {
+    fontSize: 15,
+    color: '#333',
+  },
+  reserveButton: {
+    backgroundColor: '#007bff',
+    borderRadius: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  reserveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+});

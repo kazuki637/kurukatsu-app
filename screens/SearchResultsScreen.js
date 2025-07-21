@@ -118,24 +118,23 @@ const SearchResultsScreen = ({ route, navigation }) => {
 };
 
   return (
-    <View style={styles.fullScreenContainer}>
+    <View style={[styles.fullScreenContainer, { flex: 1 }]}> 
       <CommonHeader title="検索結果" showBackButton onBack={() => navigation.goBack()} />
-      <SafeAreaView style={styles.contentSafeArea}>
-
-      {circles.length > 0 ? (
-        <FlatList
-          data={circles}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => renderItem({ item, userSavedCircles, toggleSave })}
-          contentContainerStyle={styles.listContent}
-          extraData={userSavedCircles} // userSavedCircles の変更を検知して再レンダリング
-        />
-      ) : (
-        <View style={styles.noResultsContainer}>
-          <Text style={styles.noResultsText}>該当するサークルは見つかりませんでした。</Text>
-        </View>
-      )}
-    </SafeAreaView>
+      <SafeAreaView style={[styles.contentSafeArea, { flex: 1 }]}> 
+        {circles.length > 0 ? (
+          <FlatList
+            data={circles}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => renderItem({ item, userSavedCircles, toggleSave })}
+            contentContainerStyle={[styles.listContent, { paddingBottom: 40 }]}
+            extraData={userSavedCircles}
+          />
+        ) : (
+          <View style={styles.noResultsContainer}>
+            <Text style={styles.noResultsText}>該当するサークルは見つかりませんでした。</Text>
+          </View>
+        )}
+      </SafeAreaView>
     </View>
   );
 };
@@ -243,7 +242,7 @@ const styles = StyleSheet.create({
   },
   headerImageCard: {
     width: '100%',
-    height: 120,
+    aspectRatio: 16 / 9,
     borderRadius: 8,
     marginBottom: 10,
   },
