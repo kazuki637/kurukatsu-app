@@ -169,7 +169,7 @@ export default function CircleManagementScreen({ navigation }) {
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.managementGridItem} onPress={() => navigation.navigate('CircleContact', { circleId: userCircles[0].id })}>
                   <Ionicons name="mail-outline" size={32} color="#007bff" />
-                  <Text style={styles.managementGridItemText}>連絡・お問い合わせ</Text>
+                  <Text style={styles.managementGridItemText}>連絡</Text>
                 </TouchableOpacity>
               </View>
               <View style={styles.managementRow}>
@@ -198,7 +198,7 @@ export default function CircleManagementScreen({ navigation }) {
               style={styles.createButton}
               onPress={handleRegisterCirclePress}
             >
-              <Ionicons name="add-circle-outline" size={24} color="#fff" />
+              <Ionicons name="add-circle-outline" size={32} color="#fff" />
               <Text style={styles.createButtonText}>新しいサークルを登録する</Text>
             </TouchableOpacity>
           </View>

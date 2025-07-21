@@ -75,6 +75,10 @@ const SearchResultsScreen = ({ route, navigation }) => {
   const renderItem = ({ item, userSavedCircles, toggleSave }) => {
     console.log("Rendering item:", item); // Add this line for debugging
     const isSaved = userSavedCircles[item.id];
+    // ダミーヘッダー画像
+    if (!item.headerImageUrl) {
+      item.headerImageUrl = 'https://images.unsplash.com/photo-1465101178521-c1a9136a3b99?auto=format&fit=crop&w=800&q=80';
+    }
     return (
     <TouchableOpacity 
       style={styles.resultItem}
@@ -93,12 +97,16 @@ const SearchResultsScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
+      {/* ヘッダー画像（サークル詳細画面のheaderImageUrl） */}
+      {item.headerImageUrl && (
+        <Image source={{ uri: item.headerImageUrl }} style={styles.headerImageCard} resizeMode="cover" />
+      )}
+
       {item.thumbnailImage && (
         <Image 
           source={{ uri: item.thumbnailImage }}
           style={styles.thumbnailImage}
           placeholder={{ blurhash: 'LKN]y_?b%M_3%Mxu%Mxu%Mxu%Mxu' }} contentFit="cover" transition={1000}
-          onError={(e) => console.log("Thumbnail Image Load Error:", e.nativeEvent.error, item.thumbnailImage)}
         />
       )}
 
@@ -232,6 +240,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     color: '#666',
+  },
+  headerImageCard: {
+    width: '100%',
+    height: 120,
+    borderRadius: 8,
+    marginBottom: 10,
   },
 });
 
