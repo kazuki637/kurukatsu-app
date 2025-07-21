@@ -21,7 +21,7 @@ import GenreSelectionScreen from './screens/GenreSelectionScreen';
 import ProfileEditScreen from './screens/ProfileEditScreen';
 import NotificationSettingsScreen from './screens/NotificationSettingsScreen';
 import PrivacySettingsScreen from './screens/PrivacySettingsScreen';
-import CircleDetailScreen from './screens/CircleDetailScreen';
+import CircleProfileScreen from './screens/CircleProfileScreen';
 import FeatureSelectionScreen from './screens/FeatureSelectionScreen';
 import FrequencySelectionScreen from './screens/FrequencySelectionScreen';
 import GenderRatioSelectionScreen from './screens/GenderRatioSelectionScreen';
@@ -67,7 +67,7 @@ function HomeStackScreen() {
   return (
     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
       <HomeStack.Screen name="Home" component={HomeScreen} />
-      <HomeStack.Screen name="CircleDetail" component={CircleDetailScreen} />
+      <HomeStack.Screen name="CircleDetail" component={CircleProfileScreen} />
     </HomeStack.Navigator>
   );
 }
@@ -84,7 +84,7 @@ function SearchStackScreen() {
       <SearchStack.Screen name="MembersSelection" component={MembersSelectionScreen} />
       <SearchStack.Screen name="GenderRatioSelection" component={GenderRatioSelectionScreen} />
       <SearchStack.Screen name="SearchResults" component={SearchResultsScreen} />
-      <SearchStack.Screen name="CircleDetail" component={CircleDetailScreen} />
+      <SearchStack.Screen name="CircleDetail" component={CircleProfileScreen} />
     </SearchStack.Navigator>
   );
 }
@@ -94,7 +94,7 @@ function MyPageStackScreen() {
   return (
     <MyPageStack.Navigator screenOptions={{ headerShown: false }}>
       <MyPageStack.Screen name="MyPage" component={MyPageScreen} />
-      <MyPageStack.Screen name="CircleDetail" component={CircleDetailScreen} />
+      <MyPageStack.Screen name="CircleDetail" component={CircleProfileScreen} />
       <MyPageStack.Screen name="CircleMember" component={CircleMemberScreen} />
       <MyPageStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
       <MyPageStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
