@@ -176,7 +176,7 @@ export default function MyPageScreen({ navigation }) {
                 style={styles.profileImage}
               />
             </View>
-            <Text style={styles.userName}>{userProfile?.name || 'ユーザー名'}</Text>
+            <Text style={styles.userName}>{userProfile?.nickname || 'ユーザー名'}</Text>
             {(userProfile?.isUniversityPublic && (userProfile?.university || '大学名')) || (userProfile?.isGradePublic && (userProfile?.grade || '学年')) ? (
               <Text style={styles.userUniversity}>
                 {userProfile?.isUniversityPublic && (userProfile?.university || '大学名')}
