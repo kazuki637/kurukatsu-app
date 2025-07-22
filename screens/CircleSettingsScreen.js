@@ -24,7 +24,6 @@ export default function CircleSettingsScreen({ route, navigation }) {
   const [name, setName] = useState('');
   const [universityName, setUniversityName] = useState('');
   const [contactInfo, setContactInfo] = useState('');
-  const [description, setDescription] = useState('');
   const [genre, setGenre] = useState('');
   const [features, setFeatures] = useState([]);
   const [frequency, setFrequency] = useState('');
@@ -48,7 +47,6 @@ export default function CircleSettingsScreen({ route, navigation }) {
           setName(d.name || '');
           setUniversityName(d.universityName || '');
           setContactInfo(d.contactInfo || '');
-          setDescription(d.description || '');
           setGenre(d.genre || '');
           setFeatures(d.features || []);
           setFrequency(d.frequency || '');
@@ -100,15 +98,13 @@ export default function CircleSettingsScreen({ route, navigation }) {
       const docRef = doc(db, 'circles', circleId);
       await updateDoc(docRef, {
         name,
-        description,
+        universityName,
+        contactInfo,
         genre,
         features,
         frequency,
         members,
         genderratio,
-        snsLink,
-        xLink,
-        shinkanLineGroupLink,
         imageUrl,
       });
       Alert.alert('保存完了', 'サークル設定を保存しました');
@@ -162,8 +158,6 @@ export default function CircleSettingsScreen({ route, navigation }) {
               editable={false}
               placeholder="登録時に設定された連絡先"
             />
-            <Text style={styles.label}>サークル紹介</Text>
-            <TextInput style={styles.input} value={description} onChangeText={setDescription} multiline />
             <Text style={styles.label}>ジャンル</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
               {GENRES.map(item => (
@@ -204,12 +198,7 @@ export default function CircleSettingsScreen({ route, navigation }) {
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={styles.label}>SNSリンク（Instagram）</Text>
-            <TextInput style={styles.input} value={snsLink} onChangeText={setSnsLink} placeholder="InstagramのURL" />
-            <Text style={styles.label}>SNSリンク（X）</Text>
-            <TextInput style={styles.input} value={xLink} onChangeText={setXLink} placeholder="X（旧Twitter）のURL" />
-            <Text style={styles.label}>新歓LINEグループリンク</Text>
-            <TextInput style={styles.input} value={shinkanLineGroupLink} onChangeText={setShinkanLineGroupLink} placeholder="https://line.me/～" />
+            {/* SNSリンク（Instagram）、SNSリンク（X）、新歓LINEグループリンクを削除 */}
             <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={loading}>
               <Text style={styles.saveButtonText}>{loading ? '保存中...' : '保存する'}</Text>
             </TouchableOpacity>

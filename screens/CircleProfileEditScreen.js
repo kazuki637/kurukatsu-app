@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Linking, ActivityIndicator, Alert, SafeAreaView, StatusBar, Dimensions, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Linking, ActivityIndicator, Alert, SafeAreaView, StatusBar, Dimensions, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as RNImage } from 'react-native';
 import { db, auth } from '../firebaseConfig';
@@ -424,6 +424,30 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       setLeaderImage(result.assets[0]);
     }
   };
+
+  // 代表者画像削除処理
+  const handleDeleteLeaderImage = async () => {
+    Alert.alert(
+      "画像を削除",
+      "本当に代表者の画像を削除しますか？",
+      [
+        { text: "キャンセル", style: "cancel" },
+        { 
+          text: "削除", 
+          onPress: async () => {
+            try {
+              await updateDoc(doc(db, 'circles', circleId), { leaderImageUrl: '' });
+              setLeaderImage(null);
+              Alert.alert('削除完了', '代表者の画像を削除しました');
+            } catch (e) {
+              Alert.alert('エラー', '画像の削除に失敗しました');
+            }
+          },
+          style: "destructive"
+        }
+      ]
+    );
+  };
   // 代表者情報保存
   const handleSaveLeader = async () => {
     setLeaderSaving(true);
@@ -635,15 +659,22 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       {/* 代表者編集（こんな人におすすめの下に追加） */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>代表者からのメッセージ</Text>
-        <TouchableOpacity onPress={handlePickLeaderImage} style={{alignSelf: 'flex-start', marginBottom: 12}}>
-          {leaderImage && leaderImage.uri ? (
-            <Image source={{ uri: leaderImage.uri }} style={{width: 72, height: 72, borderRadius: 36, backgroundColor: '#eee'}} />
-          ) : (
-            <View style={{width: 72, height: 72, borderRadius: 36, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center'}}>
-              <Ionicons name="camera-outline" size={36} color="#aaa" />
-            </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginBottom: 12 }}>
+          <TouchableOpacity onPress={handlePickLeaderImage}>
+            {leaderImage && leaderImage.uri ? (
+              <Image source={{ uri: leaderImage.uri }} style={{width: 72, height: 72, borderRadius: 36, backgroundColor: '#eee'}} />
+            ) : (
+              <View style={{width: 72, height: 72, borderRadius: 36, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center'}}>
+                <Ionicons name="camera-outline" size={36} color="#aaa" />
+              </View>
+            )}
+          </TouchableOpacity>
+          {leaderImage && leaderImage.uri && (
+            <TouchableOpacity onPress={handleDeleteLeaderImage} style={{ marginLeft: 12, padding: 8, backgroundColor: '#fee', borderRadius: 24 }}>
+              <Ionicons name="trash-outline" size={24} color="#e74c3c" />
+            </TouchableOpacity>
           )}
-        </TouchableOpacity>
+        </View>
         <TextInput
           value={leaderMessage}
           onChangeText={setLeaderMessage}
@@ -658,24 +689,42 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* SNSリンク */}
-      {(circleData.snsLink || circleData.xLink) && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>SNS</Text>
-          <View style={styles.snsLargeRow}>
-            {circleData.snsLink && (
-              <TouchableOpacity onPress={() => Linking.openURL(circleData.snsLink)} style={styles.snsLargeButton}>
-                <RNImage source={require('../assets/Instagram_Glyph_Gradient.png')} style={styles.snsLargeLogo} />
-              </TouchableOpacity>
-            )}
-            {circleData.xLink && (
-              <TouchableOpacity onPress={() => Linking.openURL(circleData.xLink)} style={styles.snsLargeButton}>
-                <RNImage source={require('../assets/X_logo-black.png')} style={styles.snsLargeLogo} />
-              </TouchableOpacity>
-            )}
-          </View>
+      {/* SNSリンク（編集可） */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>SNS</Text>
+        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 8}}>
+          <RNImage source={require('../assets/Instagram_Glyph_Gradient.png')} style={styles.snsLargeLogo} />
+          <TextInput
+            value={circleData.snsLink || ''}
+            onChangeText={text => setCircleData(prev => ({ ...prev, snsLink: text }))}
+            placeholder="Instagramリンクを入力"
+            style={{flex: 1, marginLeft: 8, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', fontSize: 16}}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
         </View>
-      )}
+        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 8}}>
+          <RNImage source={require('../assets/X_logo-black.png')} style={styles.snsLargeLogo} />
+          <TextInput
+            value={circleData.xLink || ''}
+            onChangeText={text => setCircleData(prev => ({ ...prev, xLink: text }))}
+            placeholder="X（旧Twitter）リンクを入力"
+            style={{flex: 1, marginLeft: 8, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', fontSize: 16}}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+        <TouchableOpacity onPress={async () => {
+          // 保存処理
+          const docRef = doc(db, 'circles', circleId);
+          await updateDoc(docRef, { snsLink: circleData.snsLink, xLink: circleData.xLink });
+          Alert.alert('保存完了', 'SNSリンクを保存しました');
+        }} style={{alignSelf: 'flex-end', marginTop: 8}}>
+          <View style={{backgroundColor: '#007bff', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18}}>
+            <Text style={{color: '#fff', fontWeight: 'bold'}}>保存</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
 
       {/* LINEグループ */}
       {circleData.lineGroupLink && (
@@ -851,6 +900,31 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           </View>
         </TouchableOpacity>
       </View>
+      {/* 新歓LINEグループ 追加 */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>新歓LINEグループ</Text>
+        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+          <Ionicons name="logo-whatsapp" size={24} color="#06C755" />
+          <TextInput
+            value={circleData.shinkanLineGroupLink || ''}
+            onChangeText={text => setCircleData(prev => ({ ...prev, shinkanLineGroupLink: text }))}
+            placeholder="LINEグループ招待リンクを入力"
+            style={{flex: 1, marginLeft: 8, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', fontSize: 16}}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+        </View>
+        <TouchableOpacity onPress={async () => {
+          // 保存処理
+          const docRef = doc(db, 'circles', circleId);
+          await updateDoc(docRef, { shinkanLineGroupLink: circleData.shinkanLineGroupLink });
+          Alert.alert('保存完了', '新歓LINEグループリンクを保存しました');
+        }} style={{alignSelf: 'flex-end', marginTop: 8}}>
+          <View style={{backgroundColor: '#007bff', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18}}>
+            <Text style={{color: '#fff', fontWeight: 'bold'}}>保存</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>新歓スケジュール</Text>
         {circleData.welcome?.schedule && circleData.welcome.schedule.length > 0 ? (
@@ -928,127 +1002,103 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   }
 
   return (
-    <View style={styles.container}>
-      <CommonHeader title={circleData && circleData.name ? circleData.name : 'サークル詳細'} showBackButton onBack={() => navigation.goBack()} />
-      
-      <ScrollView 
-        style={styles.scrollView}
-        stickyHeaderIndices={[2]} // タブバーをスティッキーヘッダーに設定
-        showsVerticalScrollIndicator={false}
-      >
-        {/* ヘッダー画像エリア */}
-        <TouchableOpacity style={styles.headerImageContainer} onPress={handleHeaderImagePress} activeOpacity={0.7}>
-          {uploading ? (
-            <View style={styles.headerImagePlaceholder}>
-              <ActivityIndicator size="large" color="#007bff" />
-            </View>
-          ) : circleData.headerImageUrl ? (
-            <>
-              <Image source={{ uri: circleData.headerImageUrl }} style={styles.headerImage} />
-              {/* ゴミ箱ボタン */}
-              <TouchableOpacity
-                style={{position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 16, padding: 4, zIndex: 2}}
-                onPress={handleDeleteHeaderImage}
-              >
-                <Ionicons name="trash-outline" size={24} color="#fff" />
-              </TouchableOpacity>
-            </>
-          ) : (
-            <View style={styles.headerImagePlaceholder}>
-              <Ionicons name="camera-outline" size={48} color="#aaa" />
-            </View>
-          )}
-        </TouchableOpacity>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'position'}
+      keyboardVerticalOffset={0}
+    >
+      <View style={styles.container}>
+        <CommonHeader title={circleData && circleData.name ? circleData.name : 'サークル詳細'} showBackButton onBack={() => navigation.goBack()} />
+        
+        <ScrollView 
+          style={styles.scrollView}
+          stickyHeaderIndices={[2]} // タブバーをスティッキーヘッダーに設定
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ヘッダー画像エリア */}
+          <TouchableOpacity style={styles.headerImageContainer} onPress={handleHeaderImagePress} activeOpacity={0.7}>
+            {uploading ? (
+              <View style={styles.headerImagePlaceholder}>
+                <ActivityIndicator size="large" color="#007bff" />
+              </View>
+            ) : circleData.headerImageUrl ? (
+              <>
+                <Image source={{ uri: circleData.headerImageUrl }} style={styles.headerImage} />
+                {/* ゴミ箱ボタン */}
+                <TouchableOpacity
+                  style={{position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 16, padding: 4, zIndex: 2}}
+                  onPress={handleDeleteHeaderImage}
+                >
+                  <Ionicons name="trash-outline" size={24} color="#fff" />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View style={styles.headerImagePlaceholder}>
+                <Ionicons name="camera-outline" size={48} color="#aaa" />
+              </View>
+            )}
+          </TouchableOpacity>
 
-        {/* サークル基本情報 */}
-        <View style={styles.circleInfoSection}>
-          <View style={styles.circleInfo}>
-            <View style={styles.logoContainer}>
-              {circleData.imageUrl ? (
-                <Image source={{ uri: circleData.imageUrl }} style={styles.circleLogo} />
-              ) : (
-                <View style={styles.logoPlaceholder}>
-                  <Ionicons name="people-outline" size={32} color="#ccc" />
-                </View>
-              )}
-            </View>
-            <View style={styles.circleTextInfo}>
-              <View style={styles.circleNameRow}>
-                <Text style={styles.circleName}>{circleData.name}</Text>
-                {circleData.isOfficial && (
-                  <View style={styles.officialBadge}>
-                    <Ionicons name="checkmark-circle" size={16} color="#28a745" />
-                    <Text style={styles.officialText}>公式</Text>
-                  </View>
-                )}
-                {/* SNSボタン（X, Instagram） */}
-                {(circleData.xLink || circleData.snsLink) && (
-                  <View style={styles.snsIconRow}>
-                    {circleData.snsLink && (
-                      <TouchableOpacity onPress={() => Linking.openURL(circleData.snsLink)} style={styles.snsIconButton}>
-                        <RNImage source={require('../assets/Instagram_Glyph_Gradient.png')} style={styles.snsLogoImage} />
-                      </TouchableOpacity>
-                    )}
-                    {circleData.xLink && (
-                      <TouchableOpacity onPress={() => Linking.openURL(circleData.xLink)} style={styles.snsIconButton}>
-                        <RNImage source={require('../assets/X_logo-black.png')} style={styles.snsLogoImage} />
-                      </TouchableOpacity>
-                    )}
+          {/* サークル基本情報 */}
+          <View style={styles.circleInfoSection}>
+            <View style={styles.circleInfo}>
+              <View style={styles.logoContainer}>
+                {circleData.imageUrl ? (
+                  <Image source={{ uri: circleData.imageUrl }} style={styles.circleLogo} />
+                ) : (
+                  <View style={styles.logoPlaceholder}>
+                    <Ionicons name="people-outline" size={32} color="#ccc" />
                   </View>
                 )}
               </View>
-              <Text style={styles.universityName}>{circleData.universityName}</Text>
-              <Text style={styles.genre}>{circleData.genre}</Text>
+              <View style={styles.circleTextInfo}>
+                <View style={styles.circleNameRow}>
+                  <Text style={styles.circleName}>{circleData.name}</Text>
+                  {circleData.isOfficial && (
+                    <View style={styles.officialBadge}>
+                      <Ionicons name="checkmark-circle" size={16} color="#28a745" />
+                      <Text style={styles.officialText}>公式</Text>
+                    </View>
+                  )}
+                  {/* SNSボタン（X, Instagram） */}
+                  {(circleData.xLink || circleData.snsLink) && (
+                    <View style={styles.snsIconRow}>
+                      {circleData.snsLink && (
+                        <TouchableOpacity onPress={() => Linking.openURL(circleData.snsLink)} style={styles.snsIconButton}>
+                          <RNImage source={require('../assets/Instagram_Glyph_Gradient.png')} style={styles.snsLogoImage} />
+                        </TouchableOpacity>
+                      )}
+                      {circleData.xLink && (
+                        <TouchableOpacity onPress={() => Linking.openURL(circleData.xLink)} style={styles.snsIconButton}>
+                          <RNImage source={require('../assets/X_logo-black.png')} style={styles.snsLogoImage} />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.universityName}>{circleData.universityName}</Text>
+                <Text style={styles.genre}>{circleData.genre}</Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* サークル紹介 */}
-        {/* このセクションを削除 */}
+          {/* サークル紹介 */}
+          {/* このセクションを削除 */}
 
-        {/* タブバー */}
-        {renderTabBar()}
+          {/* タブバー */}
+          {renderTabBar()}
 
-        {/* タブコンテンツ */}
-        <View style={styles.tabContentContainer}>
-          {activeTab === 'top' && renderTopTab()}
-          {activeTab === 'events' && renderEventsTab()}
-          {activeTab === 'welcome' && renderWelcomeTab()}
-        </View>
-      </ScrollView>
+          {/* タブコンテンツ */}
+          <View style={styles.tabContentContainer}>
+            {activeTab === 'top' && renderTopTab()}
+            {activeTab === 'events' && renderEventsTab()}
+            {activeTab === 'welcome' && renderWelcomeTab()}
+          </View>
+        </ScrollView>
 
-      {/* アクションボタン */}
-      <SafeAreaView style={styles.actionBar}>
-        <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.favoriteButton} onPress={toggleFavorite}>
-            <Ionicons 
-              name={isFavorite ? "bookmark" : "bookmark-outline"} 
-              size={24} 
-              color={isFavorite ? "gold" : "#666"} 
-            />
-            <Text style={[styles.favoriteButtonText, isFavorite && styles.favoriteButtonTextActive]}>
-              {isFavorite ? "保存済み" : "保存"}
-            </Text>
-          </TouchableOpacity>
-          
-          {isMember ? (
-            <View style={styles.memberButton}>
-              <Ionicons name="checkmark-circle" size={20} color="#fff" />
-              <Text style={styles.memberButtonText}>入会済み</Text>
-            </View>
-          ) : hasRequested ? (
-            <View style={styles.requestedButton}>
-              <Ionicons name="checkmark-circle" size={20} color="#28a745" />
-              <Text style={styles.requestedButtonText}>申請済み</Text>
-            </View>
-          ) : (
-            <TouchableOpacity style={styles.joinButton} onPress={handleJoinRequest}>
-              <Text style={styles.joinButtonText}>入会申請</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </SafeAreaView>
-    </View>
+        {/* アクションボタン完全削除済み */}
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 

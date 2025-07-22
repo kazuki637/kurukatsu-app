@@ -197,10 +197,12 @@ export default function CircleProfileScreen({ route, navigation }) {
       </View>
 
       {/* サークル紹介 */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>サークル紹介</Text>
-        <Text style={styles.description}>{circleData.description}</Text>
-      </View>
+      {circleData.description && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>サークル紹介</Text>
+          <Text style={styles.description}>{circleData.description}</Text>
+        </View>
+      )}
 
       {/* こんな人におすすめ */}
       {circleData.recommendations && circleData.recommendations.length > 0 && (
@@ -217,19 +219,15 @@ export default function CircleProfileScreen({ route, navigation }) {
       )}
 
       {/* 代表者紹介 */}
-      {(circleData.leaderImageUrl || circleData.leaderMessage) && (
+      {circleData.leaderMessage && (
         <View style={[styles.section, styles.leaderSection]}>
           <Text style={styles.sectionTitle}>代表者からのメッセージ</Text>
           <View style={styles.leaderRow}>
-            {circleData.leaderImageUrl ? (
+            {circleData.leaderImageUrl && (
               <Image source={{ uri: circleData.leaderImageUrl }} style={styles.leaderImage} />
-            ) : (
-              <View style={styles.leaderImagePlaceholder}>
-                <Ionicons name="person-circle-outline" size={56} color="#ccc" />
-              </View>
             )}
             <View style={styles.leaderBalloon}>
-              <Text style={styles.leaderMessage}>{circleData.leaderMessage || 'メッセージは未登録です'}</Text>
+              <Text style={styles.leaderMessage}>{circleData.leaderMessage}</Text>
             </View>
           </View>
         </View>
@@ -310,6 +308,16 @@ export default function CircleProfileScreen({ route, navigation }) {
         <Text style={styles.sectionTitle}>入会条件</Text>
         <Text style={styles.description}>{circleData.welcome?.conditions || '入会条件は未設定です'}</Text>
       </View>
+      {/* 新歓LINEグループ 追加 */}
+      {circleData.shinkanLineGroupLink && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>新歓LINEグループ</Text>
+          <TouchableOpacity style={styles.lineButton} onPress={() => Linking.openURL(circleData.shinkanLineGroupLink)}>
+            <Ionicons name="logo-whatsapp" size={24} color="#06C755" />
+            <Text style={styles.lineButtonText}>LINEグループを開く</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>新歓スケジュール</Text>
         {circleData.welcome?.schedule && circleData.welcome.schedule.length > 0 ? (
@@ -399,15 +407,11 @@ export default function CircleProfileScreen({ route, navigation }) {
         showsVerticalScrollIndicator={false}
       >
         {/* ヘッダー画像エリア */}
-        <View style={styles.headerImageContainer}>
-          {circleData.headerImageUrl ? (
+        {circleData.headerImageUrl && (
+          <View style={styles.headerImageContainer}>
             <Image source={{ uri: circleData.headerImageUrl }} style={styles.headerImage} />
-          ) : (
-            <View style={styles.headerImagePlaceholder}>
-              <Ionicons name="image-outline" size={48} color="#ccc" />
-            </View>
-          )}
-        </View>
+          </View>
+        )}
 
         {/* サークル基本情報 */}
         <View style={styles.circleInfoSection}>
@@ -515,15 +519,15 @@ const styles = StyleSheet.create({
   scrollViewContent: {
     paddingBottom: 20,
   },
-  headerImageContainer: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-    backgroundColor: '#f0f0f0',
-  },
   headerImage: {
     width: '100%',
     aspectRatio: 16 / 9,
     resizeMode: 'cover',
+  },
+  headerImageContainer: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    backgroundColor: '#f0f0f0',
   },
   headerImagePlaceholder: {
     width: '100%',
@@ -532,6 +536,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f0f0f0',
   },
+  
   circleInfoSection: {
     backgroundColor: '#fff',
     padding: 20,
