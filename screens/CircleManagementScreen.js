@@ -14,7 +14,7 @@ const CACHE_DURATION = 30000; // 30秒間キャッシュ
 
 export default function CircleManagementScreen({ navigation }) {
   const [isModalVisible, setModalVisible] = useState(false);
-  const [userCircles, setUserCircles] = useState(null);
+  const [userCircles, setUserCircles] = useState(undefined);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
@@ -79,7 +79,7 @@ export default function CircleManagementScreen({ navigation }) {
         console.log('States updated: loading=false, initialLoadComplete=true, isInitialLoad=false');
       }, (error) => {
         console.error("Error fetching user circles: ", error);
-        setUserCircles([]);
+        setUserCircles(undefined);
         setLoading(false);
         setInitialLoadComplete(true);
         setIsInitialLoad(false);
@@ -88,7 +88,7 @@ export default function CircleManagementScreen({ navigation }) {
       return unsubscribeSnapshot;
     } else {
       console.log('No user, setting empty state');
-      setUserCircles([]);
+      setUserCircles(undefined);
       setLoading(false);
       setInitialLoadComplete(true);
       setIsInitialLoad(false);
@@ -111,6 +111,23 @@ export default function CircleManagementScreen({ navigation }) {
 
   // 初回ローディング時のみローディング画面を表示
   if (isInitialLoad && (!user || loading || !initialLoadComplete)) {
+    return (
+      <View style={styles.fullScreenContainer}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>サークル管理</Text>
+        </View>
+        <SafeAreaView style={styles.contentSafeArea}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#007bff" />
+            <Text>サークル情報を読み込み中...</Text>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  // Firestore取得中やuserCirclesがnullの間はローディング画面を表示
+  if (loading || userCircles === undefined) {
     return (
       <View style={styles.fullScreenContainer}>
         <View style={styles.header}>
