@@ -75,10 +75,6 @@ const SearchResultsScreen = ({ route, navigation }) => {
   const renderItem = ({ item, userSavedCircles, toggleSave }) => {
     console.log("Rendering item:", item); // Add this line for debugging
     const isSaved = userSavedCircles[item.id];
-    // ダミーヘッダー画像
-    if (!item.headerImageUrl) {
-      item.headerImageUrl = 'https://images.unsplash.com/photo-1465101178521-c1a9136a3b99?auto=format&fit=crop&w=800&q=80';
-    }
     return (
     <TouchableOpacity 
       style={styles.resultItem}
@@ -110,9 +106,11 @@ const SearchResultsScreen = ({ route, navigation }) => {
         />
       )}
 
-      <View style={styles.descriptionContainer}>
-        <Text style={styles.descriptionText} numberOfLines={3}>{item.description}</Text>
-      </View>
+      {item.description ? (
+        <View style={styles.descriptionContainer}>
+          <Text style={styles.descriptionText} numberOfLines={3}>{item.description}</Text>
+        </View>
+      ) : null}
     </TouchableOpacity>
   );
 };
