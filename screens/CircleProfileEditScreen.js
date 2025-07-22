@@ -566,6 +566,26 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     }
   };
 
+  // 画面上部のCommonHeaderに保存ボタンを追加
+  const handleHeaderSave = async () => {
+    // 必要な保存処理をここにまとめて実装（例：サークル紹介、こんな人におすすめ、代表者情報、SNSリンク、入会条件など）
+    // 例としてサークル紹介のみ保存
+    try {
+      await updateDoc(doc(db, 'circles', circleId), {
+        description,
+        recommendations: recommendationsInput.split(',').map(s => s.trim()).filter(Boolean),
+        leaderMessage,
+        welcome: { ...(circleData.welcome || {}), conditions: welcomeConditions },
+        snsLink: circleData.snsLink,
+        xLink: circleData.xLink,
+        shinkanLineGroupLink: circleData.shinkanLineGroupLink,
+      });
+      Alert.alert('保存完了', 'プロフィール情報を保存しました');
+    } catch (e) {
+      Alert.alert('エラー', '保存に失敗しました');
+    }
+  };
+
   const renderTopTab = () => (
     <View style={styles.tabContent}>
       {/* 活動写真アップロード・表示 */}
@@ -633,11 +653,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           multiline
           style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 80, fontSize: 16, marginBottom: 8}}
         />
-        <TouchableOpacity onPress={handleSaveDescription} disabled={descSaving} style={{alignSelf: 'flex-end'}}>
-          <View style={{backgroundColor: descSaving ? '#aaa' : '#007bff', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18}}>
-            <Text style={{color: '#fff', fontWeight: 'bold'}}>{descSaving ? '保存中...' : '保存'}</Text>
-          </View>
-        </TouchableOpacity>
       </View>
       {/* こんな人におすすめ（サークル紹介の下に追加・編集可） */}
       <View style={styles.section}>
@@ -649,11 +664,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           placeholder={"・新しい友達を作りたい人\n・○○が好きな人\n・○○が得意な人"}
           style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 60, fontSize: 16, marginBottom: 8}}
         />
-        <TouchableOpacity onPress={handleSaveRecommendations} disabled={recSaving} style={{alignSelf: 'flex-end'}}>
-          <View style={{backgroundColor: recSaving ? '#aaa' : '#007bff', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18}}>
-            <Text style={{color: '#fff', fontWeight: 'bold'}}>{recSaving ? '保存中...' : '保存'}</Text>
-          </View>
-        </TouchableOpacity>
       </View>
 
       {/* 代表者編集（こんな人におすすめの下に追加） */}
@@ -682,11 +692,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           placeholder="代表者からのメッセージを入力"
           style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 60, fontSize: 16, marginBottom: 8}}
         />
-        <TouchableOpacity onPress={handleSaveLeader} disabled={leaderSaving} style={{alignSelf: 'flex-end'}}>
-          <View style={{backgroundColor: leaderSaving ? '#aaa' : '#007bff', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18}}>
-            <Text style={{color: '#fff', fontWeight: 'bold'}}>{leaderSaving ? '保存中...' : '保存'}</Text>
-          </View>
-        </TouchableOpacity>
       </View>
 
       {/* SNSリンク（編集可） */}
@@ -714,16 +719,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             autoCorrect={false}
           />
         </View>
-        <TouchableOpacity onPress={async () => {
-          // 保存処理
-          const docRef = doc(db, 'circles', circleId);
-          await updateDoc(docRef, { snsLink: circleData.snsLink, xLink: circleData.xLink });
-          Alert.alert('保存完了', 'SNSリンクを保存しました');
-        }} style={{alignSelf: 'flex-end', marginTop: 8}}>
-          <View style={{backgroundColor: '#007bff', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18}}>
-            <Text style={{color: '#fff', fontWeight: 'bold'}}>保存</Text>
-          </View>
-        </TouchableOpacity>
       </View>
 
       {/* LINEグループ */}
@@ -894,11 +889,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           placeholder={"・○○経験者\n・○○大学に在籍中の方\n・大学１年生"}
           style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 60, fontSize: 16, marginBottom: 8}}
         />
-        <TouchableOpacity onPress={handleSaveWelcomeConditions} disabled={welcomeSaving} style={{alignSelf: 'flex-end'}}>
-          <View style={{backgroundColor: welcomeSaving ? '#aaa' : '#007bff', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18}}>
-            <Text style={{color: '#fff', fontWeight: 'bold'}}>{welcomeSaving ? '保存中...' : '保存'}</Text>
-          </View>
-        </TouchableOpacity>
       </View>
       {/* 新歓LINEグループ 追加 */}
       <View style={styles.section}>
@@ -914,16 +904,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             autoCorrect={false}
           />
         </View>
-        <TouchableOpacity onPress={async () => {
-          // 保存処理
-          const docRef = doc(db, 'circles', circleId);
-          await updateDoc(docRef, { shinkanLineGroupLink: circleData.shinkanLineGroupLink });
-          Alert.alert('保存完了', '新歓LINEグループリンクを保存しました');
-        }} style={{alignSelf: 'flex-end', marginTop: 8}}>
-          <View style={{backgroundColor: '#007bff', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18}}>
-            <Text style={{color: '#fff', fontWeight: 'bold'}}>保存</Text>
-          </View>
-        </TouchableOpacity>
       </View>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>新歓スケジュール</Text>
@@ -1002,7 +982,8 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       keyboardVerticalOffset={0}
     >
       <View style={styles.container}>
-        <CommonHeader title={circleData && circleData.name ? circleData.name : 'サークル詳細'} showBackButton onBack={() => navigation.goBack()} />
+        <CommonHeader title={circleData && circleData.name ? circleData.name : 'サークル詳細'} showBackButton onBack={() => navigation.goBack()} 
+          rightButtonLabel="保存" onRightButtonPress={handleHeaderSave} />
         
         <ScrollView 
           style={styles.scrollView}
