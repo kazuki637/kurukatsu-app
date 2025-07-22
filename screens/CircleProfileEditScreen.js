@@ -940,12 +940,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           <Text style={styles.placeholderText}>新歓スケジュールは未設定です</Text>
         )}
       </View>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>参加予約</Text>
-        <TouchableOpacity style={styles.reserveButton} onPress={() => Alert.alert('予約', '参加予約機能は今後実装予定です。')}>
-          <Text style={styles.reserveButtonText}>参加を予約する</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 
