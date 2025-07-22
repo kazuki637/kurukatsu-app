@@ -20,13 +20,6 @@ export default function CircleManagementScreen({ navigation }) {
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
-  console.log('=== CircleManagementScreen Render ===');
-  console.log('loading:', loading);
-  console.log('initialLoadComplete:', initialLoadComplete);
-  console.log('isInitialLoad:', isInitialLoad);
-  console.log('userCircles:', userCircles);
-  console.log('userCircles length:', userCircles ? userCircles.length : 'null');
-
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -38,8 +31,6 @@ export default function CircleManagementScreen({ navigation }) {
   }, [isInitialLoad]);
 
   useEffect(() => {
-    console.log('=== useEffect triggered ===');
-    console.log('user:', user);
     
     if (user) {
       const now = Date.now();
@@ -51,14 +42,10 @@ export default function CircleManagementScreen({ navigation }) {
         setLoading(false);
         setInitialLoadComplete(true);
         setIsInitialLoad(false);
-        console.log('Using cached data');
         return;
       }
       
-      console.log('Setting loading to true and initialLoadComplete to false');
-      if (isInitialLoad) {
-        setLoading(true);
-      }
+      setLoading(true);
       setInitialLoadComplete(false);
       const q = query(collection(db, 'circles'), where('contactInfo', '==', user.email));
       const unsubscribeSnapshot = onSnapshot(q, (snapshot) => {
@@ -66,7 +53,6 @@ export default function CircleManagementScreen({ navigation }) {
         snapshot.forEach(doc => {
           circles.push({ id: doc.id, ...doc.data() });
         });
-        console.log('Firestore data received:', circles);
         
         // キャッシュに保存
         userCirclesCache = circles;
@@ -76,7 +62,6 @@ export default function CircleManagementScreen({ navigation }) {
         setLoading(false);
         setInitialLoadComplete(true);
         setIsInitialLoad(false);
-        console.log('States updated: loading=false, initialLoadComplete=true, isInitialLoad=false');
       }, (error) => {
         console.error("Error fetching user circles: ", error);
         setUserCircles(undefined);
@@ -87,7 +72,6 @@ export default function CircleManagementScreen({ navigation }) {
       });
       return unsubscribeSnapshot;
     } else {
-      console.log('No user, setting empty state');
       setUserCircles(undefined);
       setLoading(false);
       setInitialLoadComplete(true);

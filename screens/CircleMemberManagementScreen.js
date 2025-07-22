@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { db } from '../firebaseConfig';
-import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc, arrayRemove, arrayUnion } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc, setDoc, arrayRemove, arrayUnion } from 'firebase/firestore';
 import CommonHeader from '../components/CommonHeader';
 
 export default function CircleMemberManagementScreen({ route, navigation }) {
@@ -15,35 +15,31 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
     const fetchMembers = async () => {
       setLoading(true);
       try {
-        // サークル情報を取得してmemberIdsからメンバー情報を取得
-        const circleDoc = await getDoc(doc(db, 'circles', circleId));
-        if (circleDoc.exists()) {
-          const circleData = circleDoc.data();
-          const memberIds = circleData.memberIds || [];
-          
-          // メンバーIDからユーザー情報を取得
-          const membersList = [];
-          for (const memberId of memberIds) {
-            try {
-              const userDoc = await getDoc(doc(db, 'users', memberId));
-              if (userDoc.exists()) {
-                const userData = userDoc.data();
-                membersList.push({
-                  id: memberId,
-                  name: userData.name || '氏名未設定',
-                  university: userData.university || '',
-                  grade: userData.grade || '',
-                  email: userData.email || '',
-                  profileImageUrl: userData.profileImageUrl || null,
-                });
-              }
-            } catch (error) {
-              console.error('Error fetching user data:', error);
+        // membersサブコレクションからメンバーID一覧を取得
+        const membersRef = collection(db, 'circles', circleId, 'members');
+        const membersSnap = await getDocs(membersRef);
+        const memberIds = membersSnap.docs.map(doc => doc.id);
+        // メンバーIDからユーザー情報を取得
+        const membersList = [];
+        for (const memberId of memberIds) {
+          try {
+            const userDoc = await getDoc(doc(db, 'users', memberId));
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              membersList.push({
+                id: memberId,
+                name: userData.name || '氏名未設定',
+                university: userData.university || '',
+                grade: userData.grade || '',
+                email: userData.email || '',
+                profileImageUrl: userData.profileImageUrl || null,
+              });
             }
+          } catch (error) {
+            console.error('Error fetching user data:', error);
           }
-          setMembers(membersList);
         }
-        
+        setMembers(membersList);
         // 入会申請も取得
         const requestsRef = collection(db, 'circles', circleId, 'joinRequests');
         const reqSnap = await getDocs(requestsRef);
@@ -65,18 +61,14 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
       { text: 'キャンセル', style: 'cancel' },
       { text: '退会', style: 'destructive', onPress: async () => {
         try {
-          // サークルのmemberIdsから削除
-          const circleDocRef = doc(db, 'circles', circleId);
-          await updateDoc(circleDocRef, {
-            memberIds: arrayRemove(memberId)
-          });
-          
+          // membersサブコレクションから削除
+          const memberDocRef = doc(db, 'circles', circleId, 'members', memberId);
+          await deleteDoc(memberDocRef);
           // ユーザーのjoinedCircleIdsからも削除
           const userDocRef = doc(db, 'users', memberId);
           await updateDoc(userDocRef, {
             joinedCircleIds: arrayRemove(circleId)
           });
-          
           setMembers(prev => prev.filter(m => m.id !== memberId));
         } catch (e) {
           console.error('Error removing member:', e);
@@ -89,51 +81,68 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
   const handleApprove = async (request) => {
     setLoading(true);
     try {
-      // サークルのmemberIdsに追加
-      const circleDocRef = doc(db, 'circles', circleId);
-      await updateDoc(circleDocRef, {
-        memberIds: arrayUnion(request.userId)
-      });
-      
+      const auth = require('firebase/auth');
+      const currentUser = auth.getAuth().currentUser;
+      // membersサブコレクションに追加
+      const memberDocRef = doc(db, 'circles', circleId, 'members', request.userId);
+      await setDoc(memberDocRef, { joinedAt: new Date() });
       // ユーザーのjoinedCircleIdsに追加
       const userDocRef = doc(db, 'users', request.userId);
       await updateDoc(userDocRef, {
         joinedCircleIds: arrayUnion(circleId)
       });
-      
       // 申請削除
-      await deleteDoc(doc(db, 'circles', circleId, 'joinRequests', request.id));
-      setJoinRequests(prev => prev.filter(r => r.id !== request.id));
-      
-      // メンバー一覧を再取得
-      const circleDoc = await getDoc(doc(db, 'circles', circleId));
-      if (circleDoc.exists()) {
-        const circleData = circleDoc.data();
-        const memberIds = circleData.memberIds || [];
-        
-        const membersList = [];
-        for (const memberId of memberIds) {
-          try {
-            const userDoc = await getDoc(doc(db, 'users', memberId));
-            if (userDoc.exists()) {
-              const userData = userDoc.data();
-                               membersList.push({
-                   id: memberId,
-                   name: userData.name || '氏名未設定',
-                   university: userData.university || '',
-                   grade: userData.grade || '',
-                   email: userData.email || '',
-                   profileImageUrl: userData.profileImageUrl || null,
-                 });
-            }
-          } catch (error) {
-            console.error('Error fetching user data:', error);
-          }
+      try {
+        await deleteDoc(doc(db, 'circles', circleId, 'joinRequests', request.id));
+        setJoinRequests(prev => prev.filter(r => r.id !== request.id));
+      } catch (e) {
+        Alert.alert('エラー', '申請の削除に失敗しました');
+        console.error('Firestoreエラー:', e);
+        try {
+          console.log('JSON.stringify:', JSON.stringify(e));
+        } catch (jsonErr) {
+          console.log('JSON.stringifyできませんでした:', jsonErr);
+          console.log('e.message:', e.message);
+          console.log('e.code:', e.code);
+          console.log('e.name:', e.name);
+          console.log('e:', e);
         }
-        setMembers(membersList);
       }
+      // メンバー一覧を再取得
+      const membersRef = collection(db, 'circles', circleId, 'members');
+      const membersSnap = await getDocs(membersRef);
+      const memberIds = membersSnap.docs.map(doc => doc.id);
+      const membersList = [];
+      for (const memberId of memberIds) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', memberId));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            membersList.push({
+              id: memberId,
+              name: userData.name || '氏名未設定',
+              university: userData.university || '',
+              grade: userData.grade || '',
+              email: userData.email || '',
+              profileImageUrl: userData.profileImageUrl || null,
+            });
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+        }
+      }
+      setMembers(membersList);
     } catch (e) {
       console.error('Error approving request:', e);
+      try {
+        console.log('外側catch節JSON.stringify:', JSON.stringify(e));
+      } catch (jsonErr) {
+        console.log('外側catch節JSON.stringifyできませんでした:', jsonErr);
+        console.log('e.message:', e.message);
+        console.log('e.code:', e.code);
+        console.log('e.name:', e.name);
+        console.log('e:', e);
+      }
       Alert.alert('エラー', '申請の許可に失敗しました');
     } finally {
       setLoading(false);
@@ -143,9 +152,35 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
   const handleReject = async (requestId) => {
     setLoading(true);
     try {
-      await deleteDoc(doc(db, 'circles', circleId, 'joinRequests', requestId));
-      setJoinRequests(prev => prev.filter(r => r.id !== requestId));
+      const auth = require('firebase/auth');
+      const currentUser = auth.getAuth().currentUser;
+      // 申請削除
+      try {
+        await deleteDoc(doc(db, 'circles', circleId, 'joinRequests', requestId));
+        setJoinRequests(prev => prev.filter(r => r.id !== requestId));
+      } catch (e) {
+        console.error('Firestoreエラー:', e);
+        try {
+          console.log('JSON.stringify:', JSON.stringify(e));
+        } catch (jsonErr) {
+          console.log('JSON.stringifyできませんでした:', jsonErr);
+          console.log('e.message:', e.message);
+          console.log('e.code:', e.code);
+          console.log('e.name:', e.name);
+          console.log('e:', e);
+        }
+      }
     } catch (e) {
+      console.error('外側catch節に到達');
+      try {
+        console.log('外側catch節JSON.stringify:', JSON.stringify(e));
+      } catch (jsonErr) {
+        console.log('外側catch節JSON.stringifyできませんでした:', jsonErr);
+        console.log('e.message:', e.message);
+        console.log('e.code:', e.code);
+        console.log('e.name:', e.name);
+        console.log('e:', e);
+      }
       Alert.alert('エラー', '申請の却下に失敗しました');
     } finally {
       setLoading(false);
