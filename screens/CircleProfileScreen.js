@@ -240,12 +240,12 @@ export default function CircleProfileScreen({ route, navigation }) {
           <View style={styles.snsLargeRow}>
             {circleData.snsLink && (
               <TouchableOpacity onPress={() => Linking.openURL(circleData.snsLink)} style={styles.snsLargeButton}>
-                <RNImage source={require('../assets/Instagram_Glyph_Gradient.png')} style={styles.snsLargeLogo} />
+                <RNImage source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} style={styles.snsLargeLogo} />
               </TouchableOpacity>
             )}
             {circleData.xLink && (
               <TouchableOpacity onPress={() => Linking.openURL(circleData.xLink)} style={styles.snsLargeButton}>
-                <RNImage source={require('../assets/X_logo-black.png')} style={styles.snsLargeLogo} />
+                <RNImage source={require('../assets/SNS-icons/X_logo-black.png')} style={styles.snsLargeLogo} />
               </TouchableOpacity>
             )}
           </View>
@@ -433,12 +433,12 @@ export default function CircleProfileScreen({ route, navigation }) {
                   <View style={styles.snsIconRow}>
                     {circleData.snsLink && (
                       <TouchableOpacity onPress={() => Linking.openURL(circleData.snsLink)} style={styles.snsIconButton}>
-                        <RNImage source={require('../assets/Instagram_Glyph_Gradient.png')} style={styles.snsLogoImage} />
+                        <RNImage source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} style={styles.snsLogoImage} />
                       </TouchableOpacity>
                     )}
                     {circleData.xLink && (
                       <TouchableOpacity onPress={() => Linking.openURL(circleData.xLink)} style={styles.snsIconButton}>
-                        <RNImage source={require('../assets/X_logo-black.png')} style={styles.snsLogoImage} />
+                        <RNImage source={require('../assets/SNS-icons/X_logo-black.png')} style={styles.snsLogoImage} />
                       </TouchableOpacity>
                     )}
                   </View>
