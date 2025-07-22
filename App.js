@@ -9,6 +9,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from './firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import OnboardingScreen from './screens/OnboardingScreen';
 
 // Import all your screens
 import HomeScreen from './screens/HomeScreen';
@@ -190,20 +192,37 @@ function ProfileEditScreenModal() {
 function AppNavigator() {
   const [user, setUser] = useState(null);
   const [initializing, setInitializing] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(null);
 
   useEffect(() => {
+    const checkOnboarding = async () => {
+      const seen = await AsyncStorage.getItem('seenOnboarding');
+      setShowOnboarding(seen !== 'true');
+    };
+    checkOnboarding();
+
     const subscriber = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (initializing) setInitializing(false);
     });
-    return subscriber; // unsubscribe on unmount
+    return subscriber;
   }, []);
 
-  if (initializing) return null; // Show a splash screen or loading indicator
+  if (initializing || showOnboarding === null) return null;
 
   return (
     <RootStack.Navigator>
-      {user ? (
+      {showOnboarding ? (
+        <RootStack.Screen
+          name="Onboarding"
+          options={{ headerShown: false }}
+        >
+          {props => <OnboardingScreen {...props} onFinish={async () => {
+            await AsyncStorage.setItem('seenOnboarding', 'true');
+            setShowOnboarding(false);
+          }} />}
+        </RootStack.Screen>
+      ) : user ? (
         <RootStack.Screen 
           name="Main" 
           component={MainTabNavigatorWithProfileCheck} 
@@ -216,7 +235,6 @@ function AppNavigator() {
           options={{ headerShown: false }} 
         />
       )}
-      
     </RootStack.Navigator>
   );
 }

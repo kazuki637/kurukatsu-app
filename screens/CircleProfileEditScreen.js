@@ -693,7 +693,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>SNS</Text>
         <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 8}}>
-          <RNImage source={require('../assets/Instagram_Glyph_Gradient.png')} style={styles.snsLargeLogo} />
+          <RNImage source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} style={styles.snsLargeLogo} />
           <TextInput
             value={circleData.snsLink || ''}
             onChangeText={text => setCircleData(prev => ({ ...prev, snsLink: text }))}
@@ -704,7 +704,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           />
         </View>
         <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 8}}>
-          <RNImage source={require('../assets/X_logo-black.png')} style={styles.snsLargeLogo} />
+          <RNImage source={require('../assets/SNS-icons/X_logo-black.png')} style={styles.snsLargeLogo} />
           <TextInput
             value={circleData.xLink || ''}
             onChangeText={text => setCircleData(prev => ({ ...prev, xLink: text }))}
@@ -1059,12 +1059,12 @@ export default function CircleProfileEditScreen({ route, navigation }) {
                     <View style={styles.snsIconRow}>
                       {circleData.snsLink && (
                         <TouchableOpacity onPress={() => Linking.openURL(circleData.snsLink)} style={styles.snsIconButton}>
-                          <RNImage source={require('../assets/Instagram_Glyph_Gradient.png')} style={styles.snsLogoImage} />
+                          <RNImage source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} style={styles.snsLogoImage} />
                         </TouchableOpacity>
                       )}
                       {circleData.xLink && (
                         <TouchableOpacity onPress={() => Linking.openURL(circleData.xLink)} style={styles.snsIconButton}>
-                          <RNImage source={require('../assets/X_logo-black.png')} style={styles.snsLogoImage} />
+                          <RNImage source={require('../assets/SNS-icons/X_logo-black.png')} style={styles.snsLogoImage} />
                         </TouchableOpacity>
                       )}
                     </View>
