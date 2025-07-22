@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Image } from 'react-native';
 import { auth } from '../firebaseConfig';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -55,7 +55,7 @@ const LoginScreen = ({ navigation }) => {
         style={styles.signupButton}
         onPress={() => navigation.navigate('Signup')}
       >
-        <Text style={styles.signupButtonText}>アカウントをお持ちでないですか？ 新規登録</Text>
+        <Text style={styles.signupButtonText}>新規登録はこちら</Text>
       </TouchableOpacity>
       {/* 開発用：オンボーディング再表示ボタン */}
       <TouchableOpacity

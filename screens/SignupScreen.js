@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
   registerButton: {
     width: '90%',
     height: 50,
-    backgroundColor: '#28a745', // Green color for register button
+    backgroundColor: '#007bff',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
