@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { View, Image, TouchableOpacity, Text, StyleSheet, Dimensions, SafeAreaView } from 'react-native';
 
 const onboardingImages = [
-  require('../assets/onboarding/onboarding1.png'),
-  require('../assets/onboarding/onboarding2.png'),
-  require('../assets/onboarding/onboarding3.png'),
-  require('../assets/onboarding/onboarding4.png'),
+  require('../assets/onboarding/onboarding1.jpg'),
+  require('../assets/onboarding/onboarding2.jpg'),
+  require('../assets/onboarding/onboarding3.jpg'),
+  require('../assets/onboarding/onboarding4.jpg'),
 ];
 
 export default function OnboardingScreen({ navigation, route, onFinish }) {
@@ -50,10 +50,10 @@ const styles = StyleSheet.create({
     alignItems: 'center', padding: 24, backgroundColor: 'rgba(255,255,255,0.0)'
   },
   mainButton: {
-    width: '100%', backgroundColor: '#fff', borderRadius: 24,
+    width: '100%', backgroundColor: '#007bff', borderRadius: 24,
     paddingVertical: 18, alignItems: 'center', shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, elevation: 4,
   },
-  buttonText: { color: '#007bff', fontSize: 18, fontWeight: 'bold' },
-  skipText: { color: '#ffffff', fontSize: 16, marginTop: 20},
+  buttonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  skipText: { color: '#007bff', fontSize: 16, marginTop: 20},
 }); 
