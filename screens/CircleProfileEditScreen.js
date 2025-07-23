@@ -8,6 +8,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import CommonHeader from '../components/CommonHeader';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'; // 追加済み
 import * as ImagePicker from 'expo-image-picker'; // 追加済み
+import useFirestoreDoc from '../hooks/useFirestoreDoc';
 
 const { width } = Dimensions.get('window');
 
@@ -26,8 +27,8 @@ const XLogo = ({ size = 32 }) => (
 
 export default function CircleProfileEditScreen({ route, navigation }) {
   const { circleId } = route.params;
-  const [circleData, setCircleData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // サークルデータ取得（キャッシュ30秒）
+  const { data: circleData, loading, error, reload } = useFirestoreDoc(db, circleId ? `circles/${circleId}` : '', { cacheDuration: 30000 });
   const [user, setUser] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [hasRequested, setHasRequested] = useState(false);
@@ -127,31 +128,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     }
   };
 
-  useEffect(() => {
-    const fetchCircleDetail = async () => {
-      try {
-        const docRef = doc(db, 'circles', circleId);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setCircleData({ id: docSnap.id, ...data });
-        } else {
-          Alert.alert("エラー", "サークルが見つかりませんでした。");
-          navigation.goBack();
-        }
-      } catch (error) {
-        console.error("Error fetching circle detail: ", error);
-        Alert.alert("エラー", "サークル情報の取得に失敗しました。");
-        navigation.goBack();
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCircleDetail();
-  }, [circleId]);
-
+  // 既存の冗長なuseEffectやローディング・エラー処理を削除し、circleData, loading, errorを直接利用する形に整理
   useEffect(() => {
     // サークル紹介初期値セット
     if (circleData && typeof circleData.description === 'string') {
@@ -223,7 +200,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         const downloadUrl = await getDownloadURL(imgRef);
         // Firestoreに保存
         await updateDoc(doc(db, 'circles', circleId), { headerImageUrl: downloadUrl });
-        setCircleData(prev => ({ ...prev, headerImageUrl: downloadUrl }));
+        // setCircleData(prev => ({ ...prev, headerImageUrl: downloadUrl })); // useFirestoreDocは自動で更新
         Alert.alert('アップロード完了', 'ヘッダー画像を更新しました');
       } catch (e) {
         Alert.alert('エラー', '画像のアップロードに失敗しました');
@@ -237,7 +214,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   const handleDeleteHeaderImage = async () => {
     try {
       await updateDoc(doc(db, 'circles', circleId), { headerImageUrl: '' });
-      setCircleData(prev => ({ ...prev, headerImageUrl: '' }));
+      // setCircleData(prev => ({ ...prev, headerImageUrl: '' })); // useFirestoreDocは自動で更新
       Alert.alert('削除完了', 'ヘッダー画像を削除しました');
     } catch (e) {
       Alert.alert('エラー', 'ヘッダー画像の削除に失敗しました');
@@ -284,10 +261,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       await updateDoc(doc(db, 'circles', circleId), {
         events: arrayUnion(eventObj)
       });
-      setCircleData(prev => ({
-        ...prev,
-        events: prev.events ? [...prev.events, eventObj] : [eventObj]
-      }));
+      // setCircleData(prev => ({ // useFirestoreDocは自動で更新
+      //   ...prev,
+      //   events: prev.events ? [...prev.events, eventObj] : [eventObj]
+      // }));
       setEventFormVisible(false);
       setEventTitle('');
       setEventDetail('');
@@ -353,7 +330,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         image: imageUrl,
       };
       await updateDoc(doc(db, 'circles', circleId), { events: newEvents });
-      setCircleData(prev => ({ ...prev, events: newEvents }));
+      // setCircleData(prev => ({ ...prev, events: newEvents })); // useFirestoreDocは自動で更新
       setEditingEventIndex(null);
       setEditEventTitle('');
       setEditEventDetail('');
@@ -372,10 +349,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       await updateDoc(doc(db, 'circles', circleId), {
         events: arrayRemove(eventObj)
       });
-      setCircleData(prev => ({
-        ...prev,
-        events: prev.events.filter((_, i) => i !== idx)
-      }));
+      // setCircleData(prev => ({ // useFirestoreDocは自動で更新
+      //   ...prev,
+      //   events: prev.events.filter((_, i) => i !== idx)
+      // }));
       setEditingEventIndex(null);
       Alert.alert('削除完了', 'イベントを削除しました');
     } catch (e) {
@@ -388,7 +365,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     setDescSaving(true);
     try {
       await updateDoc(doc(db, 'circles', circleId), { description });
-      setCircleData(prev => ({ ...prev, description }));
+      // setCircleData(prev => ({ ...prev, description })); // useFirestoreDocは自動で更新
       Alert.alert('保存完了', 'サークル紹介を更新しました');
     } catch (e) {
       Alert.alert('エラー', 'サークル紹介の保存に失敗しました');
@@ -403,7 +380,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     try {
       const recArr = recommendationsInput.split(',').map(s => s.trim()).filter(Boolean);
       await updateDoc(doc(db, 'circles', circleId), { recommendations: recArr });
-      setCircleData(prev => ({ ...prev, recommendations: recArr }));
+      // setCircleData(prev => ({ ...prev, recommendations: recArr })); // useFirestoreDocは自動で更新
       Alert.alert('保存完了', 'おすすめ項目を更新しました');
     } catch (e) {
       Alert.alert('エラー', 'おすすめ項目の保存に失敗しました');
@@ -480,7 +457,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     try {
       const newWelcome = { ...(circleData.welcome || {}), conditions: welcomeConditions };
       await updateDoc(doc(db, 'circles', circleId), { welcome: newWelcome });
-      setCircleData(prev => ({ ...prev, welcome: newWelcome }));
+      // setCircleData(prev => ({ ...prev, welcome: newWelcome })); // useFirestoreDocは自動で更新
       Alert.alert('保存完了', '入会条件を更新しました');
     } catch (e) {
       Alert.alert('エラー', '入会条件の保存に失敗しました');
@@ -511,7 +488,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         const newImages = [...activityImages, downloadUrl];
         await updateDoc(doc(db, 'circles', circleId), { activityImages: newImages });
         setActivityImages(newImages);
-        setCircleData(prev => ({ ...prev, activityImages: newImages }));
+        // setCircleData(prev => ({ ...prev, activityImages: newImages })); // useFirestoreDocは自動で更新
         Alert.alert('アップロード完了', '活動写真を追加しました');
       } catch (e) {
         Alert.alert('エラー', '活動写真の追加に失敗しました');
@@ -526,7 +503,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       const newImages = activityImages.filter((_, i) => i !== idx);
       await updateDoc(doc(db, 'circles', circleId), { activityImages: newImages });
       setActivityImages(newImages);
-      setCircleData(prev => ({ ...prev, activityImages: newImages }));
+      // setCircleData(prev => ({ ...prev, activityImages: newImages })); // useFirestoreDocは自動で更新
       Alert.alert('削除完了', '活動写真を削除しました');
     } catch (e) {
       Alert.alert('エラー', '活動写真の削除に失敗しました');
@@ -556,7 +533,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         newImages[idx] = downloadUrl;
         await updateDoc(doc(db, 'circles', circleId), { activityImages: newImages });
         setActivityImages(newImages);
-        setCircleData(prev => ({ ...prev, activityImages: newImages }));
+        // setCircleData(prev => ({ ...prev, activityImages: newImages })); // useFirestoreDocは自動で更新
         Alert.alert('変更完了', '活動写真を変更しました');
       } catch (e) {
         Alert.alert('エラー', '活動写真の変更に失敗しました');
@@ -958,19 +935,26 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     </View>
   );
 
-  if (loading) {
+  // ローディング・エラー時のUIを共通化
+  if (loading && !circleData) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#007bff" />
-        <Text>サークル情報を読み込み中...</Text>
       </View>
     );
   }
-
+  if (error) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>サークルデータの取得に失敗しました</Text>
+        <TouchableOpacity onPress={reload}><Text>再読み込み</Text></TouchableOpacity>
+      </View>
+    );
+  }
   if (!circleData) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text>サークル情報がありません。</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>サークルが見つかりませんでした</Text>
       </View>
     );
   }

@@ -20,146 +20,84 @@ import { doc, onSnapshot, updateDoc, collection, query, where, getDocs, getDoc }
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import * as ImagePicker from 'expo-image-picker';
 import CommonHeader from '../components/CommonHeader';
+import useFirestoreDoc from '../hooks/useFirestoreDoc';
 
 const { width } = Dimensions.get('window');
 const gridItemSize = (width - 20 * 3) / 2;
 
 // グローバルキャッシュ
-let userProfileCache = null;
-let circlesCache = { joined: [], saved: [] };
-let lastFetchTime = 0;
-const CACHE_DURATION = 30000; // 30秒間キャッシュ
+// let userProfileCache = null;
+// let circlesCache = { joined: [], saved: [] };
+// let lastFetchTime = 0;
+// const CACHE_DURATION = 30000; // 30秒間キャッシュ
 
 export default function MyPageScreen({ navigation }) {
-  const [userProfile, setUserProfile] = useState(null);
+  const user = auth.currentUser;
+  const userId = user ? user.uid : null;
+  // ユーザープロフィール取得（キャッシュ30秒）
+  const { data: userProfile, loading, error, reload } = useFirestoreDoc(db, userId ? `users/${userId}` : '', { cacheDuration: 30000 });
   const [savedCircles, setSavedCircles] = useState([]);
   const [joinedCircles, setJoinedCircles] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [circlesLoading, setCirclesLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const user = auth.currentUser;
 
-  useFocusEffect(
-    useCallback(() => {
-      if (!user) {
-        setLoading(false);
-        setIsInitialLoad(false);
-        return;
-      }
-      
-      const now = Date.now();
-      const isCacheValid = (now - lastFetchTime) < CACHE_DURATION;
-      
-      // キャッシュが有効な場合はキャッシュから表示
-      if (isCacheValid && userProfileCache && circlesCache) {
-        setUserProfile(userProfileCache);
-        setJoinedCircles(circlesCache.joined);
-        setSavedCircles(circlesCache.saved);
-        setLoading(false);
-        setCirclesLoading(false);
-        setIsInitialLoad(false);
-        return;
-      }
-      
-      // 初回のみローディングを表示
-      if (isInitialLoad) {
-        setLoading(true);
-      }
-      
-      const fetchUserData = async () => {
-        try {
-          const userDocRef = doc(db, 'users', user.uid);
-          const userDoc = await getDoc(userDocRef);
-          
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            userData.isUniversityPublic = userData.isUniversityPublic !== false;
-            userData.isGradePublic = userData.isGradePublic !== false;
-            
-            // キャッシュに保存
-            userProfileCache = userData;
-            setUserProfile(userData);
-            
-            // サークルデータの取得を開始
-            if (isInitialLoad) {
-              setCirclesLoading(true);
-            }
-            
-            // 所属サークル取得（より安全な方法）
-            const joinedCirclesData = [];
-            if (userData.joinedCircleIds && userData.joinedCircleIds.length > 0) {
-              try {
-                // Firestoreの 'in' クエリは最大10個の要素まで
-                const batchSize = 10;
-                for (let i = 0; i < userData.joinedCircleIds.length; i += batchSize) {
-                  const batch = userData.joinedCircleIds.slice(i, i + batchSize);
-                  const circlesRef = collection(db, 'circles');
-                  const q = query(circlesRef, where('__name__', 'in', batch));
-                  const querySnapshot = await getDocs(q);
-                  joinedCirclesData.push(...querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-                }
-              } catch (error) {
-                console.error("Error fetching joined circles: ", error);
-              }
-            }
-            
-            // 保存サークル取得（より安全な方法）
-            const savedCirclesData = [];
-            if (userData.favoriteCircleIds && userData.favoriteCircleIds.length > 0) {
-              try {
-                // Firestoreの 'in' クエリは最大10個の要素まで
-                const batchSize = 10;
-                for (let i = 0; i < userData.favoriteCircleIds.length; i += batchSize) {
-                  const batch = userData.favoriteCircleIds.slice(i, i + batchSize);
-                  const circlesRef = collection(db, 'circles');
-                  const q = query(circlesRef, where('__name__', 'in', batch));
-                  const querySnapshot = await getDocs(q);
-                  savedCirclesData.push(...querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-                }
-              } catch (error) {
-                console.error("Error fetching saved circles: ", error);
-              }
-            }
-            
-            // キャッシュに保存
-            circlesCache = { joined: joinedCirclesData, saved: savedCirclesData };
-            lastFetchTime = Date.now();
-            
-            setJoinedCircles(joinedCirclesData);
-            setSavedCircles(savedCirclesData);
-            
-            // サークルデータの取得完了
-            setCirclesLoading(false);
-          } else {
-            setUserProfile(null);
-            setSavedCircles([]);
-            setJoinedCircles([]);
-            userProfileCache = null;
-            circlesCache = { joined: [], saved: [] };
+  // userProfile取得後にサークル情報を取得
+  React.useEffect(() => {
+    const fetchCircles = async () => {
+      if (!userProfile) return;
+      setCirclesLoading(true);
+      try {
+        // joinedCircles
+        let joined = [];
+        if (userProfile.joinedCircleIds && userProfile.joinedCircleIds.length > 0) {
+          const batchSize = 10;
+          for (let i = 0; i < userProfile.joinedCircleIds.length; i += batchSize) {
+            const batch = userProfile.joinedCircleIds.slice(i, i + batchSize);
+            const circlesRef = collection(db, 'circles');
+            const q = query(circlesRef, where('__name__', 'in', batch));
+            const querySnapshot = await getDocs(q);
+            joined.push(...querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
           }
-        } catch (error) {
-          console.error("Error fetching user data: ", error);
-          setUserProfile(null);
-          setSavedCircles([]);
-          setJoinedCircles([]);
-          setCirclesLoading(false);
-          userProfileCache = null;
-          circlesCache = { joined: [], saved: [] };
-        } finally {
-          setLoading(false);
-          setIsInitialLoad(false);
         }
-      };
-      
-      fetchUserData();
-    }, [user, isInitialLoad])
-  );
+        setJoinedCircles(joined);
+        // savedCircles
+        let saved = [];
+        if (userProfile.favoriteCircleIds && userProfile.favoriteCircleIds.length > 0) {
+          const batchSize = 10;
+          for (let i = 0; i < userProfile.favoriteCircleIds.length; i += batchSize) {
+            const batch = userProfile.favoriteCircleIds.slice(i, i + batchSize);
+            const circlesRef = collection(db, 'circles');
+            const q = query(circlesRef, where('__name__', 'in', batch));
+            const querySnapshot = await getDocs(q);
+            saved.push(...querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+          }
+        }
+        setSavedCircles(saved);
+      } catch (e) {
+        setJoinedCircles([]);
+        setSavedCircles([]);
+      } finally {
+        setCirclesLoading(false);
+      }
+    };
+    fetchCircles();
+  }, [userProfile]);
+
+  // useFocusEffectや冗長なキャッシュ・ローディング処理を削除
 
   // 初回ローディング時のみローディング画面を表示
-  if (isInitialLoad && loading && !userProfile) {
+  if (loading && !userProfile) {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color="#007bff" style={{ flex: 1 }} />
+      </View>
+    );
+  }
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text>ユーザーデータの取得に失敗しました</Text>
+        <TouchableOpacity onPress={reload}><Text>再読み込み</Text></TouchableOpacity>
       </View>
     );
   }

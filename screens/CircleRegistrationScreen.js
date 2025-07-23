@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, SafeAr
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { db, storage, auth } from '../firebaseConfig';
-import { collection, addDoc, doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, updateDoc, arrayUnion, setDoc } from 'firebase/firestore';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
@@ -145,8 +145,11 @@ export default function CircleRegistrationScreen() {
         imageUrl,
         createdAt: new Date(),
         createdBy: user.uid, // 作成者IDを追加
-        memberIds: [user.uid], // 作成者をメンバーとして追加
+        // memberIds: [user.uid], // ← 削除
       });
+
+      // 作成者をmembersサブコレクションに追加
+      await setDoc(doc(db, 'circles', circleDocRef.id, 'members', user.uid), { joinedAt: new Date() });
 
       // ユーザーのjoinedCircleIdsに新しいサークルIDを追加
       const userDocRef = doc(db, 'users', user.uid);

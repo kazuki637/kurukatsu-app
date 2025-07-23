@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { View, Image, TouchableOpacity, Text, StyleSheet, Dimensions, SafeAreaView } from 'react-native';
 
 const onboardingImages = [
-  require('../assets/onboarding/onboarding1.jpg'),
-  require('../assets/onboarding/onboarding2.jpg'),
-  require('../assets/onboarding/onboarding3.jpg'),
-  require('../assets/onboarding/onboarding4.jpg'),
+  require('../assets/onboarding/onboarding1.png'),
+  require('../assets/onboarding/onboarding2.png'),
+  require('../assets/onboarding/onboarding3.png'),
+  require('../assets/onboarding/onboarding4.png'),
 ];
 
 export default function OnboardingScreen({ navigation, route, onFinish }) {
