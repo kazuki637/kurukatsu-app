@@ -111,9 +111,24 @@ const SearchScreen = ({ navigation }) => {
     return `${value[0]}、他${value.length - 1}件`;
   };
 
+  const getFilterIcon = (label) => {
+    switch (label) {
+      case '大学': return <Ionicons name="school-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
+      case 'ジャンル': return <Ionicons name="grid-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
+      case '特色': return <Ionicons name="star-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
+      case '活動頻度': return <Ionicons name="calendar-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
+      case '人数': return <Ionicons name="people-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
+      case '男女比': return <Ionicons name="male-female-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
+      default: return null;
+    }
+  };
+
   const FilterItem = ({ label, value, onPress }) => (
     <TouchableOpacity style={styles.filterItem} onPress={onPress}>
-      <Text style={styles.filterLabel}>{label}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        {getFilterIcon(label)}
+        <Text style={styles.filterLabel}>{label}</Text>
+      </View>
       <View style={styles.filterValueContainer}>
         <Text style={[styles.filterValue, value && value.length > 0 && { color: '#007bff' }]} numberOfLines={1}>{formatFilterValue(value)}</Text>
         <Ionicons name="chevron-forward" size={20} color="#666" />

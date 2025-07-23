@@ -1,21 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
 import CommonHeader from '../components/CommonHeader';
 import { db } from '../firebaseConfig';
 import { doc, getDoc } from 'firebase/firestore';
-import { TabView } from 'react-native-tab-view';
-import { Dimensions } from 'react-native';
-
-const { width } = Dimensions.get('window');
 
 export default function CircleMemberScreen({ route, navigation }) {
   const { circleId } = route.params;
   const [circleName, setCircleName] = useState('メンバー');
   const [tabIndex, setTabIndex] = useState(0);
-  const [routes] = useState([
+  const tabs = [
     { key: 'calendar', title: 'カレンダー' },
     { key: 'news', title: 'お知らせ' },
-  ]);
+  ];
 
   useEffect(() => {
     const fetchCircle = async () => {
@@ -30,61 +26,36 @@ export default function CircleMemberScreen({ route, navigation }) {
     fetchCircle();
   }, [circleId]);
 
-  const renderScene = ({ route }) => {
-    switch (route.key) {
-      case 'calendar':
+  // タブ切り替え用
+  const renderTabContent = () => {
+    switch (tabIndex) {
+      case 0:
         return <View style={styles.tabContent}><Text style={styles.text}>カレンダー（ダミー表示）</Text></View>;
-      case 'news':
+      case 1:
         return <View style={styles.tabContent}><Text style={styles.text}>お知らせ（ダミー表示）</Text></View>;
       default:
         return null;
     }
   };
 
-  const renderTabBar = (props) => {
-    const inputRange = props.navigationState.routes.map((x, i) => i);
-    const tabWidth = width / props.navigationState.routes.length;
-    return (
-      <View style={styles.tabBar}>
-        {props.navigationState.routes.map((route, i) => (
-          <TouchableOpacity
-            key={route.key}
-            style={styles.tabItem}
-            onPress={() => setTabIndex(i)}
-          >
-            <Text style={[styles.tabLabel, props.navigationState.index === i && styles.activeTabLabel]}>{route.title}</Text>
-          </TouchableOpacity>
-        ))}
-        <Animated.View
-          style={[
-            styles.activeIndicator,
-            {
-              width: tabWidth,
-              transform: [{
-                translateX: props.position.interpolate({
-                  inputRange,
-                  outputRange: inputRange.map(i => i * tabWidth),
-                })
-              }],
-            },
-          ]}
-        />
-      </View>
-    );
-  };
-
   return (
     <>
       <CommonHeader title={circleName} />
       <SafeAreaView style={styles.container}>
-        <TabView
-          navigationState={{ index: tabIndex, routes }}
-          renderScene={renderScene}
-          onIndexChange={setTabIndex}
-          renderTabBar={renderTabBar}
-          swipeEnabled={true}
-          initialLayout={{ width }}
-        />
+        {/* タブバー */}
+        <View style={styles.tabBar}>
+          {tabs.map((tab, i) => (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.tabItem, tabIndex === i && styles.tabItemActive]}
+              onPress={() => setTabIndex(i)}
+            >
+              <Text style={[styles.tabText, tabIndex === i && styles.tabTextActive]}>{tab.title}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {/* タブ内容 */}
+        {renderTabContent()}
       </SafeAreaView>
     </>
   );
@@ -117,15 +88,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 16,
   },
-  activeTabItem: {
+  tabItemActive: {
     borderBottomWidth: 2,
     borderBottomColor: '#007bff',
   },
-  tabLabel: {
+  tabText: {
     fontSize: 16,
     color: '#666',
   },
-  activeTabLabel: {
+  tabTextActive: {
     color: '#007bff',
     fontWeight: 'bold',
   },
@@ -134,12 +105,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#fff',
-  },
-  activeIndicator: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    height: 2,
-    backgroundColor: '#007bff',
   },
 }); 

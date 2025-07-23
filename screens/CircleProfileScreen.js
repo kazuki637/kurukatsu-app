@@ -6,8 +6,7 @@ import { db, auth } from '../firebaseConfig';
 import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot, increment, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import CommonHeader from '../components/CommonHeader';
-// import { TabView } from 'react-native-tab-view'; // 削除
-// import { Animated } from 'react-native'; // 削除
+import useFirestoreDoc from '../hooks/useFirestoreDoc';
 
 const { width } = Dimensions.get('window');
 
@@ -26,8 +25,8 @@ const XLogo = ({ size = 32 }) => (
 
 export default function CircleProfileScreen({ route, navigation }) {
   const { circleId } = route.params;
-  const [circleData, setCircleData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // サークルデータ取得（キャッシュ30秒）
+  const { data: circleData, loading, error, reload } = useFirestoreDoc(db, circleId ? `circles/${circleId}` : '', { cacheDuration: 30000 });
   const [user, setUser] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [hasRequested, setHasRequested] = useState(false);
@@ -105,30 +104,7 @@ export default function CircleProfileScreen({ route, navigation }) {
     }
   };
 
-  useEffect(() => {
-    const fetchCircleDetail = async () => {
-      try {
-        const docRef = doc(db, 'circles', circleId);
-        const docSnap = await getDoc(docRef);
-
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setCircleData({ id: docSnap.id, ...data });
-        } else {
-          Alert.alert("エラー", "サークルが見つかりませんでした。");
-          navigation.goBack();
-        }
-      } catch (error) {
-        console.error("Error fetching circle detail: ", error);
-        Alert.alert("エラー", "サークル情報の取得に失敗しました。");
-        navigation.goBack();
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCircleDetail();
-  }, [circleId]);
+  // 既存の冗長なuseEffectやローディング・エラー処理を削除し、circleData, loading, errorを直接利用する形に整理
 
   const toggleFavorite = async () => {
     if (!user) {
@@ -371,24 +347,28 @@ export default function CircleProfileScreen({ route, navigation }) {
     </View>
   );
 
-  if (loading) {
+  // ローディング・エラー時のUIを共通化
+  if (loading && !circleData) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#007bff" />
-        <Text>サークル情報を読み込み中...</Text>
       </View>
     );
   }
-
+  if (error) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>サークルデータの取得に失敗しました</Text>
+        <TouchableOpacity onPress={reload}><Text>再読み込み</Text></TouchableOpacity>
+      </View>
+    );
+  }
   if (!circleData) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text>サークル情報がありません。</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <Text>サークルが見つかりませんでした</Text>
       </View>
     );
-  }
-
-  if (circleData) {
   }
 
   return (

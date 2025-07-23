@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, StatusBar, Modal, ScrollView, ActivityIndicator, Image, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, StatusBar, Modal, ScrollView, ActivityIndicator, Image, Alert, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { db, auth } from '../firebaseConfig';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -11,6 +13,13 @@ import CommonHeader from '../components/CommonHeader';
 let userCirclesCache = null;
 let lastFetchTime = 0;
 const CACHE_DURATION = 30000; // 30秒間キャッシュ
+const BUTTON_SIZE = (Dimensions.get('window').width - 40) / 2.5; // 2列+等間隔
+const GRID_WIDTH = BUTTON_SIZE * 2 + 10; // ボタン2個＋間隔
+const GRID_COLUMNS = 3;
+const GRID_ROWS = 2;
+const BUTTON_GRID_MARGIN = 32;
+const BUTTON_GRID_GAP = 16;
+const BUTTON_SIZE_3COL = (Dimensions.get('window').width - BUTTON_GRID_GAP * (GRID_COLUMNS + 1)) / GRID_COLUMNS;
 
 export default function CircleManagementScreen({ navigation }) {
   const [isModalVisible, setModalVisible] = useState(false);
@@ -128,58 +137,103 @@ export default function CircleManagementScreen({ navigation }) {
   }
 
   // ここから先は user が必ず存在する
+  // 管理ボタンのリストを6セル分に（5個＋1空セル）
+  const managementButtonsGrid = [
+    {
+      label: 'プロフィール編集',
+      icon: 'create-outline',
+      onPress: () => navigation.navigate('CircleProfileEdit', { circleId: userCircles[0].id })
+    },
+    {
+      label: 'メンバー管理',
+      icon: 'people-outline',
+      onPress: () => navigation.navigate('CircleMemberManagement', { circleId: userCircles[0].id })
+    },
+    {
+      label: 'スケジュール管理',
+      icon: 'calendar-outline',
+      onPress: () => navigation.navigate('CircleScheduleManagement', { circleId: userCircles[0].id })
+    },
+    {
+      label: '連絡',
+      icon: 'mail-outline',
+      onPress: () => navigation.navigate('CircleContact', { circleId: userCircles[0].id })
+    },
+    {
+      label: 'アナリティクス',
+      icon: 'stats-chart-outline',
+      onPress: () => Alert.alert('アナリティクス', '今後実装予定の機能です')
+    },
+    {
+      label: 'サークル設定',
+      icon: 'settings-outline',
+      onPress: () => navigation.navigate('CircleSettings', { circleId: userCircles[0].id })
+    },
+  ];
+
   return (
     <View style={styles.fullScreenContainer}>
       <CommonHeader title="サークル管理" showBackButton onBack={() => navigation.goBack()} />
       <SafeAreaView style={styles.contentSafeArea}>
         {userCircles && userCircles.length > 0 ? (
           <ScrollView style={styles.circleDetailContainer}>
-            {userCircles.length > 0 && (
-              <View style={styles.overviewSection}>
-                {/* サークルアイコン部分 */}
-                <View style={styles.circleImageContainer}>
-                  <View style={styles.circleImagePlaceholder}>
-                    {userCircles[0].imageUrl ? (
-                      <Image source={{ uri: userCircles[0].imageUrl }} style={styles.circleImage} />
-                    ) : (
-                      <Ionicons name="image-outline" size={60} color="#ccc" />
-                    )}
-                  </View>
-                </View>
-                <Text style={styles.circleName}>{userCircles[0].name}</Text>
-                <Text style={styles.universityName}>{userCircles[0].universityName}</Text>
-                <Text style={styles.statusText}>公開中</Text>
+            {/* サークル情報：アイコン＋サークル名・ジャンル（横並び） */}
+            <View style={styles.circleInfoRow}>
+              <View style={styles.circleImageLargeContainer}>
+                {userCircles[0].imageUrl ? (
+                  <Image source={{ uri: userCircles[0].imageUrl }} style={styles.circleImageLarge} />
+                ) : (
+                  <Ionicons name="image-outline" size={64} color="#ccc" />
+                )}
               </View>
-            )}
-
+              <View style={styles.circleInfoTextCol}>
+                <Text style={styles.circleInfoName}>{userCircles[0].name}</Text>
+                <Text style={styles.circleInfoSub}>
+                  {userCircles[0].universityName}
+                  {userCircles[0].genre ? `・${userCircles[0].genre}` : ''}
+                </Text>
+              </View>
+            </View>
+            {/* サブスクリプション提案カード */}
+            <LinearGradient
+              colors={["#f0fcfd", "#b2ebf2"]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.subscriptionCard}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <MaterialCommunityIcons name="crown-outline" size={24} color="#ffb300" style={{ marginRight: 8 }} />
+                <Text style={styles.subscriptionTitle}>プレミアム</Text>
+                <View style={{ flex: 1 }} />
+                <TouchableOpacity style={styles.subscriptionButton}><Text style={styles.subscriptionButtonText}>無料で体験する</Text></TouchableOpacity>
+              </View>
+              <Text style={styles.subscriptionDesc}>¥0で7日間プレミアムを楽しみましょう</Text>
+              <View style={styles.subscriptionFeatureRow}>
+                <View style={styles.subscriptionFeature}><Ionicons name="remove-circle-outline" size={20} color="#333" /><Text style={styles.subscriptionFeatureText}>広告削除</Text></View>
+                <View style={styles.subscriptionFeature}><Ionicons name="stats-chart-outline" size={20} color="#333" /><Text style={styles.subscriptionFeatureText}>アナリティクス</Text></View>
+                <View style={styles.subscriptionFeature}><Ionicons name="star-outline" size={20} color="#333" /><Text style={styles.subscriptionFeatureText}>おすすめ掲載</Text></View>
+              </View>
+            </LinearGradient>
+            {/* 管理ボタン（グリッド） */}
             <View style={styles.managementGridSection}>
-              <View style={styles.managementRow}>
-                <TouchableOpacity style={styles.managementGridItem} onPress={() => navigation.navigate('CircleProfileEdit', { circleId: userCircles[0].id })}>
-                  <Ionicons name="create-outline" size={32} color="#007bff" />
-                  <Text style={styles.managementGridItemText}>プロフィール編集</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.managementGridItem} onPress={() => navigation.navigate('CircleMemberManagement', { circleId: userCircles[0].id })}>
-                  <Ionicons name="people-outline" size={32} color="#007bff" />
-                  <Text style={styles.managementGridItemText}>メンバー管理</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.managementRow}>
-                <TouchableOpacity style={styles.managementGridItem} onPress={() => navigation.navigate('CircleScheduleManagement', { circleId: userCircles[0].id })}>
-                  <Ionicons name="calendar-outline" size={32} color="#007bff" />
-                  <Text style={styles.managementGridItemText}>スケジュール管理</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.managementGridItem} onPress={() => navigation.navigate('CircleContact', { circleId: userCircles[0].id })}>
-                  <Ionicons name="mail-outline" size={32} color="#007bff" />
-                  <Text style={styles.managementGridItemText}>連絡</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.managementRow}>
-                <TouchableOpacity style={styles.managementGridItem} onPress={() => navigation.navigate('CircleSettings', { circleId: userCircles[0].id })}>
-                  <Ionicons name="settings-outline" size={32} color="#007bff" />
-                  <Text style={styles.managementGridItemText}>サークル設定</Text>
-                </TouchableOpacity>
-                <View style={styles.managementGridItemPlaceholder} />
-              </View>
+              {Array.from({ length: GRID_ROWS }).map((_, rowIdx) => (
+                <View style={styles.managementRow3col} key={rowIdx}>
+                  {managementButtonsGrid.slice(rowIdx * GRID_COLUMNS, rowIdx * GRID_COLUMNS + GRID_COLUMNS).map((btn, colIdx) => (
+                    btn ? (
+                      <TouchableOpacity
+                        key={btn.label}
+                        style={styles.managementGridItem3col}
+                        onPress={btn.onPress}
+                      >
+                        <Ionicons name={btn.icon} size={28} color="#007bff" />
+                        <Text style={styles.managementGridItemText}>{btn.label}</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <View key={`empty-${colIdx}`} style={styles.managementGridItem3col} />
+                    )
+                  ))}
+                </View>
+              ))}
             </View>
           </ScrollView>
         ) : (
@@ -434,19 +488,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f8f8',
   },
-  overviewSection: {
-    padding: 20,
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
+  // overviewSection, circleName, universityName, statusText など不要なスタイルは削除または未使用化
   circleImagePlaceholder: {
     width: 120,
     height: 120,
@@ -482,40 +524,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  circleName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 5,
-  },
-  universityName: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 10,
-  },
-  statusText: {
-    fontSize: 14,
-    color: '#28a745',
-    fontWeight: 'bold',
-    backgroundColor: '#e6ffe6',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 15,
-  },
+  // circleName, universityName, statusText など不要なスタイルは削除または未使用化
   managementGridSection: {
     flex: 1,
     paddingHorizontal: 10,
   },
   managementRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-evenly', // 等間隔配置
     marginBottom: 15,
   },
   managementGridItem: {
-    width: '48%',
-    aspectRatio: 1,
+    width: BUTTON_SIZE,
+    aspectRatio: 1, // 正方形
     backgroundColor: '#fff',
-    borderRadius: 15,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -523,16 +546,168 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    marginHorizontal: 5, // 等間隔
+    marginVertical: 2,
   },
   managementGridItemText: {
-    fontSize: 12,
+    fontSize: 10, // 12→10
     color: '#333',
     textAlign: 'center',
-    marginTop: 8,
+    marginTop: 4, // 8→4
     fontWeight: '500',
   },
   managementGridItemPlaceholder: {
-    width: '48%',
+    width: BUTTON_SIZE,
     aspectRatio: 1,
+    marginHorizontal: 5,
+    marginVertical: 2,
+  },
+  overviewSectionCardLike: {
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    marginTop: 10,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    width: GRID_WIDTH,
+    alignSelf: 'center',
+  },
+  overviewCardTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  overviewCardSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
+    textAlign: 'center',
+  },
+  overviewCardStatus: {
+    fontSize: 12,
+    color: '#28a745',
+    backgroundColor: '#e6ffe6',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginTop: 6,
+    textAlign: 'center',
+    fontWeight: 'bold',
+  },
+  circleInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 10,
+    paddingHorizontal: 20,
+  },
+  circleImageLargeContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  circleImageLarge: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    resizeMode: 'cover',
+  },
+  circleInfoTextCol: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  circleInfoName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#222',
+  },
+  circleInfoSub: {
+    fontSize: 13,
+    color: '#888',
+    marginTop: 4,
+  },
+  circleInfoGenre: {
+    fontSize: 14,
+    color: '#888',
+    marginTop: 4,
+  },
+  subscriptionCard: {
+    backgroundColor: '#e0f7fa',
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  subscriptionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#111',
+  },
+  subscriptionButton: {
+    backgroundColor: '#111',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  subscriptionButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 13,
+  },
+  subscriptionDesc: {
+    fontSize: 13,
+    color: '#333',
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  subscriptionFeatureRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  subscriptionFeature: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  subscriptionFeatureText: {
+    fontSize: 12,
+    color: '#333',
+    marginTop: 2,
+  },
+  managementRow3col: {
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
+    marginBottom: BUTTON_GRID_GAP,
+    marginHorizontal: 0,
+  },
+  managementGridItem3col: {
+    width: BUTTON_SIZE_3COL,
+    height: BUTTON_SIZE_3COL,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
 });
