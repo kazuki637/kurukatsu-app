@@ -41,6 +41,13 @@ export default function MyPageScreen({ navigation }) {
   const [circlesLoading, setCirclesLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
 
+  // 画面がフォーカスされたときにユーザーデータをリロード
+  useFocusEffect(
+    React.useCallback(() => {
+      reload && reload();
+    }, [reload])
+  );
+
   // userProfile取得後にサークル情報を取得
   React.useEffect(() => {
     const fetchCircles = async () => {
@@ -81,7 +88,10 @@ export default function MyPageScreen({ navigation }) {
       }
     };
     fetchCircles();
-  }, [userProfile]);
+  }, [
+    userProfile?.joinedCircleIds && userProfile.joinedCircleIds.join(','),
+    userProfile?.favoriteCircleIds && userProfile.favoriteCircleIds.join(',')
+  ]);
 
   // useFocusEffectや冗長なキャッシュ・ローディング処理を削除
 

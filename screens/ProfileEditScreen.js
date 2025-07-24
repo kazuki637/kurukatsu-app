@@ -73,7 +73,23 @@ export default function ProfileEditScreen(props) {
       quality: 1,
     });
     if (!result.canceled) {
-      setProfileImage(result.assets[0].uri);
+      const uri = result.assets[0].uri;
+      setProfileImage(uri);
+      try {
+        // 即時アップロード＆Firestore更新
+        const response = await fetch(uri);
+        const blob = await response.blob();
+        const storageRef = ref(storage, `profile_images/${user.uid}`);
+        await uploadBytes(storageRef, blob);
+        const downloadUrl = await getDownloadURL(storageRef);
+        setProfileImageUrl(downloadUrl);
+        // Firestoreも即時更新
+        const userDocRef = doc(db, 'users', user.uid);
+        await updateDoc(userDocRef, { profileImageUrl: downloadUrl });
+        // 成功時のAlertは不要
+      } catch (e) {
+        Alert.alert('エラー', 'プロフィール画像のアップロードに失敗しました');
+      }
     }
   };
 
@@ -84,14 +100,7 @@ export default function ProfileEditScreen(props) {
     }
     setLoading(true);
     try {
-      let imageUrl = profileImageUrl;
-      if (profileImage) {
-        const response = await fetch(profileImage);
-        const blob = await response.blob();
-        const storageRef = ref(storage, `profile_images/${user.uid}`);
-        await uploadBytes(storageRef, blob);
-        imageUrl = await getDownloadURL(storageRef);
-      }
+      // 画像アップロード処理はpickImageで即時実施済み
       const userDocRef = doc(db, 'users', user.uid);
       await setDoc(userDocRef, {
         name,
@@ -102,7 +111,7 @@ export default function ProfileEditScreen(props) {
         isGradePublic,
         gender,
         birthday: birthday.toISOString().split('T')[0],
-        profileImageUrl: imageUrl,
+        profileImageUrl: profileImageUrl,
       }, { merge: true });
       Alert.alert('保存完了', 'プロフィールを保存しました。');
       if (forceToHome) {
