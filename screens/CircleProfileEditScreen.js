@@ -6,7 +6,7 @@ import { db, auth } from '../firebaseConfig';
 import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot, increment, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import CommonHeader from '../components/CommonHeader';
-import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'; // 追加済み
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'; // 追加済み
 import * as ImagePicker from 'expo-image-picker'; // 追加済み
 import useFirestoreDoc from '../hooks/useFirestoreDoc';
 
@@ -24,6 +24,24 @@ const XLogo = ({ size = 32 }) => (
     <Path d="M1199.97 0H1067.6L600.01 529.09L132.4 0H0L494.18 587.29L0 1227H132.4L600.01 697.91L1067.6 1227H1200L705.82 639.71L1199.97 0ZM655.09 567.29L1067.6 70.59V0.59H1067.6L600.01 529.09L132.4 0.59H132.4V70.59L544.91 567.29L132.4 1156.41V1226.41H132.4L600.01 697.91L1067.6 1226.41H1067.6V1156.41L655.09 567.29Z" fill="#000"/>
   </Svg>
 );
+
+// Firebase StorageのdownloadURLからストレージパスを抽出し削除する共通関数
+const deleteImageFromStorage = async (url) => {
+  if (!url) return;
+  try {
+    // downloadURLからパスを抽出
+    // 例: https://firebasestorage.googleapis.com/v0/b/xxx.appspot.com/o/circle_images%2Fheaders%2Fxxxx.jpg?alt=media&token=...
+    const matches = url.match(/\/o\/([^?]+)\?/);
+    if (!matches || !matches[1]) return;
+    const path = decodeURIComponent(matches[1]);
+    const storage = getStorage();
+    const imgRef = storageRef(storage, path);
+    await deleteObject(imgRef);
+  } catch (e) {
+    // 失敗しても致命的でないのでconsoleに出すだけ
+    console.warn('画像のStorage削除に失敗:', e);
+  }
+};
 
 export default function CircleProfileEditScreen({ route, navigation }) {
   const { circleId } = route.params;
@@ -190,6 +208,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     if (!result.canceled && result.assets && result.assets.length > 0) {
       setUploading(true);
       try {
+        // 既存画像があればStorageから削除
+        if (circleData.headerImageUrl) {
+          await deleteImageFromStorage(circleData.headerImageUrl);
+        }
         const asset = result.assets[0];
         const response = await fetch(asset.uri);
         const blob = await response.blob();
@@ -200,8 +222,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         const downloadUrl = await getDownloadURL(imgRef);
         // Firestoreに保存
         await updateDoc(doc(db, 'circles', circleId), { headerImageUrl: downloadUrl });
-        // setCircleData(prev => ({ ...prev, headerImageUrl: downloadUrl })); // useFirestoreDocは自動で更新
-        Alert.alert('アップロード完了', 'ヘッダー画像を更新しました');
+        reload && reload(); // 追加: 変更を即時反映
       } catch (e) {
         Alert.alert('エラー', '画像のアップロードに失敗しました');
       } finally {
@@ -213,9 +234,13 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   // ヘッダー画像削除処理
   const handleDeleteHeaderImage = async () => {
     try {
+      // 既存画像があればStorageから削除
+      if (circleData.headerImageUrl) {
+        await deleteImageFromStorage(circleData.headerImageUrl);
+      }
       await updateDoc(doc(db, 'circles', circleId), { headerImageUrl: '' });
-      // setCircleData(prev => ({ ...prev, headerImageUrl: '' })); // useFirestoreDocは自動で更新
       Alert.alert('削除完了', 'ヘッダー画像を削除しました');
+      reload && reload(); // 追加: 変更を即時反映
     } catch (e) {
       Alert.alert('エラー', 'ヘッダー画像の削除に失敗しました');
     }
@@ -261,15 +286,11 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       await updateDoc(doc(db, 'circles', circleId), {
         events: arrayUnion(eventObj)
       });
-      // setCircleData(prev => ({ // useFirestoreDocは自動で更新
-      //   ...prev,
-      //   events: prev.events ? [...prev.events, eventObj] : [eventObj]
-      // }));
       setEventFormVisible(false);
       setEventTitle('');
       setEventDetail('');
       setEventImage(null);
-      Alert.alert('追加完了', 'イベントを追加しました');
+      reload && reload(); // 追加: 変更を即時反映
     } catch (e) {
       Alert.alert('エラー', 'イベントの追加に失敗しました');
     } finally {
@@ -313,6 +334,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     let imageUrl = editEventImage && editEventImage.uri ? editEventImage.uri : '';
     try {
       if (editEventImage && editEventImage.uri && !editEventImage.uri.startsWith('http')) {
+        // 既存画像があればStorageから削除
+        if (circleData.events && circleData.events[editingEventIndex] && circleData.events[editingEventIndex].image) {
+          await deleteImageFromStorage(circleData.events[editingEventIndex].image);
+        }
         const response = await fetch(editEventImage.uri);
         const blob = await response.blob();
         const storage = getStorage();
@@ -330,12 +355,11 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         image: imageUrl,
       };
       await updateDoc(doc(db, 'circles', circleId), { events: newEvents });
-      // setCircleData(prev => ({ ...prev, events: newEvents })); // useFirestoreDocは自動で更新
       setEditingEventIndex(null);
       setEditEventTitle('');
       setEditEventDetail('');
       setEditEventImage(null);
-      Alert.alert('保存完了', 'イベントを更新しました');
+      reload && reload();
     } catch (e) {
       Alert.alert('エラー', 'イベントの更新に失敗しました');
     } finally {
@@ -346,15 +370,18 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   const handleDeleteEvent = async (idx) => {
     try {
       const eventObj = circleData.events[idx];
+      // 既存画像があればStorageから削除
+      if (eventObj && eventObj.image) {
+        await deleteImageFromStorage(eventObj.image);
+      }
+      // events配列から該当イベントのみ除外
+      const newEvents = circleData.events.filter((_, i) => i !== idx);
       await updateDoc(doc(db, 'circles', circleId), {
-        events: arrayRemove(eventObj)
+        events: newEvents
       });
-      // setCircleData(prev => ({ // useFirestoreDocは自動で更新
-      //   ...prev,
-      //   events: prev.events.filter((_, i) => i !== idx)
-      // }));
       setEditingEventIndex(null);
       Alert.alert('削除完了', 'イベントを削除しました');
+      reload && reload(); // 追加: 変更を即時反映
     } catch (e) {
       Alert.alert('エラー', 'イベントの削除に失敗しました');
     }
@@ -398,7 +425,25 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       quality: 0.8,
     });
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      setLeaderImage(result.assets[0]);
+      const asset = result.assets[0];
+      try {
+        // 既存画像があればStorageから削除
+        if (circleData.leaderImageUrl) {
+          await deleteImageFromStorage(circleData.leaderImageUrl);
+        }
+        const response = await fetch(asset.uri);
+        const blob = await response.blob();
+        const storage = getStorage();
+        const fileName = `circle_images/leaders/${circleId}_${Date.now()}`;
+        const imgRef = storageRef(storage, fileName);
+        await uploadBytes(imgRef, blob);
+        const downloadUrl = await getDownloadURL(imgRef);
+        await updateDoc(doc(db, 'circles', circleId), { leaderImageUrl: downloadUrl });
+        setLeaderImage({ uri: downloadUrl });
+        reload && reload();
+      } catch (e) {
+        Alert.alert('エラー', '代表者画像のアップロードに失敗しました');
+      }
     }
   };
 
@@ -413,6 +458,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           text: "削除", 
           onPress: async () => {
             try {
+              // 既存画像があればStorageから削除
+              if (circleData.leaderImageUrl) {
+                await deleteImageFromStorage(circleData.leaderImageUrl);
+              }
               await updateDoc(doc(db, 'circles', circleId), { leaderImageUrl: '' });
               setLeaderImage(null);
               Alert.alert('削除完了', '代表者の画像を削除しました');
@@ -428,22 +477,12 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   // 代表者情報保存
   const handleSaveLeader = async () => {
     setLeaderSaving(true);
-    let imageUrl = leaderImage && leaderImage.uri ? leaderImage.uri : '';
     try {
-      if (leaderImage && leaderImage.uri && !leaderImage.uri.startsWith('http')) {
-        const response = await fetch(leaderImage.uri);
-        const blob = await response.blob();
-        const storage = getStorage();
-        const fileName = `circle_images/leaders/${circleId}_${Date.now()}`;
-        const imgRef = storageRef(storage, fileName);
-        await uploadBytes(imgRef, blob);
-        imageUrl = await getDownloadURL(imgRef);
-      }
       await updateDoc(doc(db, 'circles', circleId), {
-        leaderImageUrl: imageUrl,
         leaderMessage: leaderMessage,
       });
-      Alert.alert('保存完了', '代表者情報を更新しました');
+      Alert.alert('保存完了', '代表者メッセージを更新しました');
+      reload && reload();
     } catch (e) {
       Alert.alert('エラー', '代表者情報の保存に失敗しました');
     } finally {
@@ -488,8 +527,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         const newImages = [...activityImages, downloadUrl];
         await updateDoc(doc(db, 'circles', circleId), { activityImages: newImages });
         setActivityImages(newImages);
-        // setCircleData(prev => ({ ...prev, activityImages: newImages })); // useFirestoreDocは自動で更新
-        Alert.alert('アップロード完了', '活動写真を追加しました');
+        reload && reload();
       } catch (e) {
         Alert.alert('エラー', '活動写真の追加に失敗しました');
       } finally {
@@ -500,10 +538,13 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   // 活動写真削除
   const handleDeleteActivityImage = async (idx) => {
     try {
+      // 既存画像があればStorageから削除
+      if (activityImages[idx]) {
+        await deleteImageFromStorage(activityImages[idx]);
+      }
       const newImages = activityImages.filter((_, i) => i !== idx);
       await updateDoc(doc(db, 'circles', circleId), { activityImages: newImages });
       setActivityImages(newImages);
-      // setCircleData(prev => ({ ...prev, activityImages: newImages })); // useFirestoreDocは自動で更新
       Alert.alert('削除完了', '活動写真を削除しました');
     } catch (e) {
       Alert.alert('エラー', '活動写真の削除に失敗しました');
@@ -521,6 +562,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     if (!result.canceled && result.assets && result.assets.length > 0) {
       setActivityUploading(true);
       try {
+        // 既存画像があればStorageから削除
+        if (activityImages[idx]) {
+          await deleteImageFromStorage(activityImages[idx]);
+        }
         const asset = result.assets[0];
         const response = await fetch(asset.uri);
         const blob = await response.blob();
@@ -533,8 +578,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         newImages[idx] = downloadUrl;
         await updateDoc(doc(db, 'circles', circleId), { activityImages: newImages });
         setActivityImages(newImages);
-        // setCircleData(prev => ({ ...prev, activityImages: newImages })); // useFirestoreDocは自動で更新
-        Alert.alert('変更完了', '活動写真を変更しました');
+        reload && reload();
       } catch (e) {
         Alert.alert('エラー', '活動写真の変更に失敗しました');
       } finally {
