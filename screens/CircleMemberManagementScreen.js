@@ -236,7 +236,7 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      <CommonHeader title="メンバー管理" />
+      <CommonHeader title="メンバー管理" showBackButton={false} />
       <SafeAreaView style={{ flex: 1 }}>
         {/* タブバー */}
         <View style={styles.tabBar}>
