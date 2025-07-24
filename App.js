@@ -43,6 +43,7 @@ import AddScheduleScreen from './screens/AddScheduleScreen';
 import CircleContactScreen from './screens/CircleContactScreen';
 import CircleMemberScreen from './screens/CircleMemberScreen';
 import CircleSettingsScreen from './screens/CircleSettingsScreen';
+import CircleMessageDetailScreen from './screens/CircleMessageDetailScreen';
 
 
 const AuthStack = createStackNavigator();
@@ -98,6 +99,7 @@ function MyPageStackScreen() {
       <MyPageStack.Screen name="MyPage" component={MyPageScreen} />
       <MyPageStack.Screen name="CircleDetail" component={CircleProfileScreen} />
       <MyPageStack.Screen name="CircleMember" component={CircleMemberScreen} />
+      <MyPageStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} />
       <MyPageStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
       <MyPageStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
       <MyPageStack.Screen name="PrivacySettings" component={PrivacySettingsScreen} />

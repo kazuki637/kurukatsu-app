@@ -173,7 +173,7 @@ export default function CircleManagementScreen({ navigation }) {
 
   return (
     <View style={styles.fullScreenContainer}>
-      <CommonHeader title="サークル管理" showBackButton onBack={() => navigation.goBack()} />
+      <CommonHeader title="サークル管理" showBackButton={false} />
       <SafeAreaView style={styles.contentSafeArea}>
         {userCircles && userCircles.length > 0 ? (
           <ScrollView style={styles.circleDetailContainer}>
