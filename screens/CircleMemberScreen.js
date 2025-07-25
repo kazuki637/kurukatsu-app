@@ -6,6 +6,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth } from '../firebaseConfig';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { FlatList, ActivityIndicator } from 'react-native';
+import Ionicons from 'react-native-vector-icons/Ionicons';
 
 export default function CircleMemberScreen({ route, navigation }) {
   const { circleId } = route.params;
@@ -17,6 +18,7 @@ export default function CircleMemberScreen({ route, navigation }) {
   ];
   const [messages, setMessages] = useState([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [imageErrorMap, setImageErrorMap] = useState({});
 
   useEffect(() => {
     const fetchCircle = async () => {
@@ -70,39 +72,48 @@ export default function CircleMemberScreen({ route, navigation }) {
               <FlatList
                 data={messages}
                 keyExtractor={item => item.id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    style={{ backgroundColor: '#f8f8f8', borderRadius: 10, padding: 14, marginBottom: 14 }}
-                    onPress={() => navigation.navigate('CircleMessageDetail', { message: { ...item, userUid: auth.currentUser.uid } })}
-                  >
-                    {/* 右上：送信日時 */}
-                    <View style={{ position: 'absolute', top: 10, right: 14 }}>
-                      <Text style={{ color: '#888', fontSize: 12 }}>
-                        {item.sentAt && item.sentAt.toDate ? item.sentAt.toDate().toLocaleString('ja-JP') : ''}
-                      </Text>
-                    </View>
-                    {/* 上部：種別＋タイトル（横並び） */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                      <Text style={{ color: '#007bff', fontSize: 18, fontWeight: 'bold' }}>
-                        {item.type === 'attendance' ? '出欠確認' : '通常連絡'}
-                      </Text>
-                      <View style={{ width: 1.5, height: 24, backgroundColor: '#d0d7de', marginHorizontal: 12, borderRadius: 1 }} />
-                      <Text style={{ color: '#222', fontSize: 18, fontWeight: 'bold' }}>
-                        {item.title}
-                      </Text>
-                    </View>
-                    {/* 下部：送信者アイコン＋送信者名 */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      {item.senderProfileImageUrl ? (
-                        <Image source={{ uri: item.senderProfileImageUrl }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }} />
-                      ) : (
-                        <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#ccc', marginRight: 10 }} />
-                      )}
-                      <Text style={{ fontWeight: 'bold', fontSize: 18 }}>{item.senderName || '不明'}</Text>
-                    </View>
-                  </TouchableOpacity>
-                )}
+                renderItem={({ item }) => {
+                  const hasImage = item.senderProfileImageUrl && item.senderProfileImageUrl.trim() !== '' && !imageErrorMap[item.id];
+                  return (
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      style={{ backgroundColor: '#f8f8f8', borderRadius: 10, padding: 14, marginBottom: 14 }}
+                      onPress={() => navigation.navigate('CircleMessageDetail', { message: { ...item, userUid: auth.currentUser.uid } })}
+                    >
+                      {/* 右上：送信日時 */}
+                      <View style={{ position: 'absolute', top: 10, right: 14 }}>
+                        <Text style={{ color: '#888', fontSize: 12 }}>
+                          {item.sentAt && item.sentAt.toDate ? item.sentAt.toDate().toLocaleString('ja-JP') : ''}
+                        </Text>
+                      </View>
+                      {/* 上部：種別＋タイトル（横並び） */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                        <Text style={{ color: '#007bff', fontSize: 18, fontWeight: 'bold' }}>
+                          {item.type === 'attendance' ? '出欠確認' : '通常連絡'}
+                        </Text>
+                        <View style={{ width: 1.5, height: 24, backgroundColor: '#d0d7de', marginHorizontal: 12, borderRadius: 1 }} />
+                        <Text style={{ color: '#222', fontSize: 18, fontWeight: 'bold' }}>
+                          {item.title}
+                        </Text>
+                      </View>
+                      {/* 下部：送信者アイコン＋送信者名 */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {hasImage ? (
+                          <Image
+                            source={{ uri: item.senderProfileImageUrl }}
+                            style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }}
+                            onError={() => setImageErrorMap(prev => ({ ...prev, [item.id]: true }))}
+                          />
+                        ) : (
+                          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#e0e0e0', marginRight: 10, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+                            <Ionicons name="person-outline" size={22} color="#aaa" />
+                          </View>
+                        )}
+                        <Text style={{ fontWeight: 'bold', fontSize: 18 }}>{item.senderName || '不明'}</Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                }}
               />
             )}
           </View>

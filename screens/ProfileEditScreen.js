@@ -29,6 +29,7 @@ export default function ProfileEditScreen(props) {
   const [profileImage, setProfileImage] = useState(null);
   const [profileImageUrl, setProfileImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -140,13 +141,33 @@ export default function ProfileEditScreen(props) {
           <View style={{ height: 16 }} />
           <View style={styles.formGroup}>
             <Text style={styles.label}>プロフィール画像（任意）</Text>
-            <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
-              {profileImage || profileImageUrl ? (
-                <Image source={{ uri: profileImage || profileImageUrl }} style={styles.profileImage} />
-              ) : (
-                <Ionicons name="person-circle-outline" size={100} color="#ccc" />
+            <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start' }}>
+              <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
+                {(profileImage && profileImage.trim() !== '' && !imageError) || (profileImageUrl && profileImageUrl.trim() !== '' && !imageError) ? (
+                  <Image
+                    source={{ uri: (profileImage && profileImage.trim() !== '') ? profileImage : profileImageUrl }}
+                    style={styles.profileImage}
+                    onError={() => setImageError(true)}
+                  />
+                ) : (
+                  <View style={[styles.profileImage, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
+                    <Ionicons name="person-outline" size={60} color="#aaa" />
+                  </View>
+                )}
+              </TouchableOpacity>
+              {((profileImage && profileImage.trim() !== '') || (profileImageUrl && profileImageUrl.trim() !== '')) && !imageError && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setProfileImage(null);
+                    setProfileImageUrl('');
+                    setImageError(false);
+                  }}
+                  style={{ marginLeft: 12, padding: 8, backgroundColor: '#fee', borderRadius: 24 }}
+                >
+                  <Ionicons name="trash-outline" size={24} color="#e74c3c" />
+                </TouchableOpacity>
               )}
-            </TouchableOpacity>
+            </View>
           </View>
           <View style={styles.formGroup}>
             <Text style={styles.label}>氏名（非公開）</Text>

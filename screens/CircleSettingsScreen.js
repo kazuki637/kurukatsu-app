@@ -130,16 +130,18 @@ export default function CircleSettingsScreen({ route, navigation }) {
           keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 40}
         >
           <ScrollView contentContainerStyle={{ padding: 20 }}>
-            <Text style={styles.title}>サークル設定</Text>
             {/* サークルアイコン画像 */}
             <Text style={styles.label}>サークルアイコン画像</Text>
-            <TouchableOpacity style={styles.circleImagePicker} onPress={pickCircleImage}>
-              {circleImage || circleImageUrl ? (
-                <Image source={{ uri: circleImage || circleImageUrl }} style={styles.circleImage} />
-              ) : (
-                <Ionicons name="image-outline" size={100} color="#ccc" />
-              )}
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: 8, marginBottom: 16 }}>
+              <TouchableOpacity style={[styles.circleImagePicker, {marginTop: 0, marginBottom: 0}]} onPress={pickCircleImage}>
+                {circleImage || circleImageUrl ? (
+                  <Image source={{ uri: circleImage || circleImageUrl }} style={styles.circleImage} />
+                ) : (
+                  <Ionicons name="image-outline" size={100} color="#ccc" />
+                )}
+              </TouchableOpacity>
+              {/* 必要ならここにゴミ箱ボタン等も追加可能 */}
+            </View>
             <Text style={styles.label}>サークル名</Text>
             <TextInput style={styles.input} value={name} onChangeText={setName} />
             <Text style={styles.label}>大学名</Text>
@@ -211,7 +213,7 @@ export default function CircleSettingsScreen({ route, navigation }) {
 
 const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, color: '#333' },
-  label: { fontSize: 15, color: '#333', marginTop: 12, marginBottom: 4 },
+  label: { fontSize: 16, color: '#333', marginTop: 12, marginBottom: 4 },
   input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, fontSize: 16, backgroundColor: '#fafafa', marginBottom: 4 },
   disabledInput: { backgroundColor: '#f0f0f0', color: '#666', borderColor: '#ddd' },
   optionButton: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 16, borderWidth: 1, borderColor: '#ccc', marginRight: 8, marginBottom: 6, backgroundColor: '#fff' },

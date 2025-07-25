@@ -260,7 +260,7 @@ export default function CircleProfileScreen({ route, navigation }) {
   const renderEventsTab = () => (
     <View style={styles.tabContent}>
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>恒例イベント</Text>
+        <Text style={styles.sectionTitle}>イベント</Text>
         {circleData.events && circleData.events.length > 0 ? (
           circleData.events.slice(0, 4).map((event, idx) => (
             <View key={idx} style={styles.eventCard}>
