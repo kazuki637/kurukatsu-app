@@ -13,6 +13,7 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
   const [searchText, setSearchText] = useState(''); // メンバー検索用
   const [requestSearchText, setRequestSearchText] = useState(''); // 入会申請検索用
   const [selectedTab, setSelectedTab] = useState('members'); // タブ状態
+  const [imageErrorMap, setImageErrorMap] = useState({});
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -277,25 +278,31 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
             <FlatList
               data={filteredMembers}
               keyExtractor={item => item.id}
-              renderItem={({ item }) => (
-                <View style={styles.memberItem}>
-                  {item.profileImageUrl ? (
-                    <Image 
-                      source={{ uri: item.profileImageUrl }} 
-                      style={styles.memberAvatar} 
-                    />
-                  ) : (
-                    <Ionicons name="person-circle-outline" size={56} color="#007bff" style={{ marginRight: 16 }} />
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.memberName}>{item.name || '氏名未設定'}</Text>
-                    <Text style={styles.memberInfo}>{item.university || ''} {item.grade || ''}</Text>
+              renderItem={({ item }) => {
+                const hasImage = item.profileImageUrl && item.profileImageUrl.trim() !== '' && !imageErrorMap[item.id];
+                return (
+                  <View style={styles.memberItem}>
+                    {hasImage ? (
+                      <Image
+                        source={{ uri: item.profileImageUrl }}
+                        style={styles.memberAvatar}
+                        onError={() => setImageErrorMap(prev => ({ ...prev, [item.id]: true }))}
+                      />
+                    ) : (
+                      <View style={[styles.memberAvatar, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
+                        <Ionicons name="person-outline" size={40} color="#aaa" />
+                      </View>
+                    )}
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.memberName}>{item.name || '氏名未設定'}</Text>
+                      <Text style={styles.memberInfo}>{item.university || ''} {item.grade || ''}</Text>
+                    </View>
+                    <TouchableOpacity style={styles.removeButton} onPress={() => handleRemove(item.id)}>
+                      <Ionicons name="remove-circle" size={36} color="#f44336" />
+                    </TouchableOpacity>
                   </View>
-                  <TouchableOpacity style={styles.removeButton} onPress={() => handleRemove(item.id)}>
-                    <Ionicons name="remove-circle" size={36} color="#f44336" />
-                  </TouchableOpacity>
-                </View>
-              )}
+                );
+              }}
               ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#666', marginTop: 40 }}>メンバーがいません</Text>}
               contentContainerStyle={{ padding: 20 }}
             />

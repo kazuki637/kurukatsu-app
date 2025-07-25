@@ -40,6 +40,7 @@ export default function MyPageScreen({ navigation }) {
   const [joinedCircles, setJoinedCircles] = useState([]);
   const [circlesLoading, setCirclesLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const [imageError, setImageError] = useState(false);
 
   // 画面がフォーカスされたときにユーザーデータをリロード
   useFocusEffect(
@@ -119,10 +120,17 @@ export default function MyPageScreen({ navigation }) {
         <ScrollView>
           <View style={styles.profileSection}>
             <View style={styles.profileImageContainerSimple}>
-              <Image
-                source={{ uri: userProfile?.profileImageUrl || 'https://via.placeholder.com/100' }}
-                style={styles.profileImage}
-              />
+              {userProfile?.profileImageUrl && userProfile.profileImageUrl.trim() !== '' && !imageError ? (
+                <Image
+                  source={{ uri: userProfile.profileImageUrl }}
+                  style={styles.profileImage}
+                  onError={() => setImageError(true)}
+                />
+              ) : (
+                <View style={[styles.profileImage, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
+                  <Ionicons name="person-outline" size={48} color="#aaa" />
+                </View>
+              )}
             </View>
             <Text style={styles.userName}>{userProfile?.nickname || 'ユーザー名'}</Text>
             {(userProfile?.isUniversityPublic && (userProfile?.university || '大学名')) || (userProfile?.isGradePublic && (userProfile?.grade || '学年')) ? (

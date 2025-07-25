@@ -21,6 +21,7 @@ export default function CircleContactScreen({ route, navigation }) {
   const [deadline, setDeadline] = useState(new Date(Date.now() + 86400000)); // 回答期限（デフォルト翌日）
   const [showDatePicker, setShowDatePicker] = useState(false);
   const maxBodyLength = 1000;
+  const [imageErrorMap, setImageErrorMap] = useState({});
 
   // メンバー一覧取得
   useEffect(() => {
@@ -256,15 +257,28 @@ export default function CircleContactScreen({ route, navigation }) {
                   (member.university ? member.university.toLowerCase().includes(keyword) : false) ||
                   (member.grade ? member.grade.toLowerCase().includes(keyword) : false)
                 );
-              }).map(member => (
-                <TouchableOpacity key={member.uid} onPress={() => handleToggleSelect(member.uid)} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                  <Ionicons name={selectedUids.includes(member.uid) ? 'checkbox' : 'square-outline'} size={22} color="#007bff" />
-                  <Image source={{ uri: member.profileImageUrl || 'https://via.placeholder.com/40' }} style={{ width: 32, height: 32, borderRadius: 16, marginLeft: 8, marginRight: 8 }} />
-                  <Text>{member.name}</Text>
-                  {member.university && <Text style={{ color: '#888', marginLeft: 8 }}>{member.university}</Text>}
-                  {member.grade && <Text style={{ color: '#888', marginLeft: 8 }}>{member.grade}</Text>}
-                </TouchableOpacity>
-              ))}
+              }).map(member => {
+                const hasImage = member.profileImageUrl && member.profileImageUrl.trim() !== '' && !imageErrorMap[member.uid];
+                return (
+                  <TouchableOpacity key={member.uid} onPress={() => handleToggleSelect(member.uid)} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                    <Ionicons name={selectedUids.includes(member.uid) ? 'checkbox' : 'square-outline'} size={22} color="#007bff" />
+                    {hasImage ? (
+                      <Image
+                        source={{ uri: member.profileImageUrl }}
+                        style={{ width: 32, height: 32, borderRadius: 16, marginLeft: 8, marginRight: 8 }}
+                        onError={() => setImageErrorMap(prev => ({ ...prev, [member.uid]: true }))}
+                      />
+                    ) : (
+                      <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#e0e0e0', marginLeft: 8, marginRight: 8, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
+                        <Ionicons name="person-outline" size={18} color="#aaa" />
+                      </View>
+                    )}
+                    <Text>{member.name}</Text>
+                    {member.university && <Text style={{ color: '#888', marginLeft: 8 }}>{member.university}</Text>}
+                    {member.grade && <Text style={{ color: '#888', marginLeft: 8 }}>{member.grade}</Text>}
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
             <TouchableOpacity style={{ backgroundColor: '#007bff', borderRadius: 8, padding: 16, alignItems: 'center', margin: 20 }} onPress={() => setModalVisible(false)}>
               <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>完了</Text>
