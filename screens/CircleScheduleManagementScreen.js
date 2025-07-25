@@ -277,7 +277,7 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const eventsRef = collection(db, 'circles', circleId, 'events');
+        const eventsRef = collection(db, 'circles', circleId, 'schedule');
         const q = query(eventsRef, orderBy('date', 'asc'));
         const snapshot = await getDocs(q);
         const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -297,7 +297,7 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
     const unsubscribe = navigation.addListener('focus', () => {
       const fetchEvents = async () => {
         try {
-          const eventsRef = collection(db, 'circles', circleId, 'events');
+          const eventsRef = collection(db, 'circles', circleId, 'schedule');
           const q = query(eventsRef, orderBy('date', 'asc'));
           const snapshot = await getDocs(q);
           const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -341,7 +341,7 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
       { text: 'キャンセル', style: 'cancel' },
       { text: '削除', style: 'destructive', onPress: async () => {
         try {
-          await deleteDoc(doc(db, 'circles', circleId, 'events', eventId));
+          await deleteDoc(doc(db, 'circles', circleId, 'schedule', eventId));
           setEvents(prev => prev.filter(e => e.id !== eventId));
         } catch (e) {
           Alert.alert('エラー', '削除に失敗しました');
