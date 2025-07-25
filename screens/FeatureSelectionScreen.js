@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, FlatList, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import CommonHeader from '../components/CommonHeader';
@@ -25,16 +25,17 @@ const FeatureSelectionScreen = ({ route, navigation }) => {
     );
   };
 
-  const handleComplete = () => {
-    if (onComplete) {
-      onComplete(selectedFeatures);
-    }
-    navigation.goBack();
-  };
+  // 戻る時にonCompleteを呼ぶ
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', () => {
+      if (onComplete) onComplete(selectedFeatures);
+    });
+    return unsubscribe;
+  }, [navigation, selectedFeatures, onComplete]);
 
   return (
     <View style={styles.fullScreenContainer}>
-      <CommonHeader title="特色選択" showBackButton onBack={() => navigation.goBack()} rightButtonLabel="完了" onRightButtonPress={handleComplete} />
+      <CommonHeader title="特徴選択" showBackButton onBack={() => navigation.goBack()} />
       <SafeAreaView style={styles.contentSafeArea}>
         <FlatList
           data={FEATURES}

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, FlatList, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import CommonHeader from '../components/CommonHeader';
@@ -28,9 +28,17 @@ const FrequencySelectionScreen = ({ route, navigation }) => {
     navigation.goBack();
   };
 
+  // 戻る時にonCompleteを呼ぶ
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', () => {
+      if (onComplete) onComplete(selectedFrequencies);
+    });
+    return unsubscribe;
+  }, [navigation, selectedFrequencies, onComplete]);
+
   return (
     <View style={styles.fullScreenContainer}>
-      <CommonHeader title="活動頻度選択" showBackButton onBack={() => navigation.goBack()} rightButtonLabel="完了" onRightButtonPress={handleComplete} />
+      <CommonHeader title="活動頻度選択" showBackButton onBack={() => navigation.goBack()} />
       <SafeAreaView style={styles.contentSafeArea}>
         <FlatList
           data={FREQUENCIES}

@@ -76,6 +76,27 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   const [welcomeSaving, setWelcomeSaving] = useState(false); // 保存中状態
   const [activityImages, setActivityImages] = useState([]); // 活動写真配列
   const [activityUploading, setActivityUploading] = useState(false);
+  // SNS・新歓LINEグループリンク用state
+  const [snsLink, setSnsLink] = useState('');
+  const [xLink, setXLink] = useState('');
+  const [shinkanLineGroupLink, setShinkanLineGroupLink] = useState('');
+  // 新歓スケジュール用state
+  const [welcomeSchedule, setWelcomeSchedule] = useState('');
+
+  // 初期値セット
+  useEffect(() => {
+    if (circleData) {
+      setSnsLink(circleData.snsLink || '');
+      setXLink(circleData.xLink || '');
+      setShinkanLineGroupLink(circleData.shinkanLineGroupLink || '');
+    }
+  }, [circleData]);
+
+  useEffect(() => {
+    if (circleData && circleData.welcome && typeof circleData.welcome.schedule === 'string') {
+      setWelcomeSchedule(circleData.welcome.schedule);
+    }
+  }, [circleData]);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -596,10 +617,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         description,
         recommendations: recommendationsInput.split(',').map(s => s.trim()).filter(Boolean),
         leaderMessage,
-        welcome: { ...(circleData.welcome || {}), conditions: welcomeConditions },
-        snsLink: circleData.snsLink,
-        xLink: circleData.xLink,
-        shinkanLineGroupLink: circleData.shinkanLineGroupLink,
+        welcome: { ...(circleData.welcome || {}), conditions: welcomeConditions, schedule: welcomeSchedule },
+        snsLink,
+        xLink,
+        shinkanLineGroupLink,
       });
       Alert.alert('保存完了', 'プロフィール情報を保存しました');
     } catch (e) {
@@ -721,8 +742,8 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 8}}>
           <RNImage source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} style={styles.snsLargeLogo} />
           <TextInput
-            value={circleData.snsLink || ''}
-            onChangeText={text => setCircleData(prev => ({ ...prev, snsLink: text }))}
+            value={snsLink}
+            onChangeText={setSnsLink}
             placeholder="Instagramリンクを入力"
             style={{flex: 1, marginLeft: 8, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', fontSize: 16}}
             autoCapitalize="none"
@@ -732,8 +753,8 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 8}}>
           <RNImage source={require('../assets/SNS-icons/X_logo-black.png')} style={styles.snsLargeLogo} />
           <TextInput
-            value={circleData.xLink || ''}
-            onChangeText={text => setCircleData(prev => ({ ...prev, xLink: text }))}
+            value={xLink}
+            onChangeText={setXLink}
             placeholder="X（旧Twitter）リンクを入力"
             style={{flex: 1, marginLeft: 8, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', fontSize: 16}}
             autoCapitalize="none"
@@ -917,8 +938,8 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         <View style={{flexDirection: 'row', alignItems: 'center'}}>
           <Ionicons name="logo-whatsapp" size={24} color="#06C755" />
           <TextInput
-            value={circleData.shinkanLineGroupLink || ''}
-            onChangeText={text => setCircleData(prev => ({ ...prev, shinkanLineGroupLink: text }))}
+            value={shinkanLineGroupLink}
+            onChangeText={setShinkanLineGroupLink}
             placeholder="LINEグループ招待リンクを入力"
             style={{flex: 1, marginLeft: 8, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', fontSize: 16}}
             autoCapitalize="none"
@@ -928,18 +949,13 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       </View>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>新歓スケジュール</Text>
-        {circleData.welcome?.schedule && circleData.welcome.schedule.length > 0 ? (
-          <View style={styles.calendarList}>
-            {circleData.welcome.schedule.map((item, idx) => (
-              <View key={idx} style={styles.calendarItem}>
-                <Text style={styles.calendarDate}>{item.date}</Text>
-                <Text style={styles.calendarEvent}>{item.event}</Text>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <Text style={styles.placeholderText}>新歓スケジュールは未設定です</Text>
-        )}
+        <TextInput
+          value={welcomeSchedule}
+          onChangeText={setWelcomeSchedule}
+          multiline
+          placeholder={"2025/4/25 新歓BBQ"}
+          style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 60, fontSize: 16, marginBottom: 8}}
+        />
       </View>
     </View>
   );

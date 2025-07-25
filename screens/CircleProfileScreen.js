@@ -248,10 +248,10 @@ export default function CircleProfileScreen({ route, navigation }) {
       )}
 
       {/* 新歓スケジュール */}
-      {circleData.schedule && (
+      {circleData.welcome && circleData.welcome.schedule && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>新歓スケジュール</Text>
-          <Text style={styles.scheduleText}>{circleData.schedule}</Text>
+          <Text style={styles.scheduleText}>{circleData.welcome.schedule}</Text>
         </View>
       )}
     </View>
@@ -297,16 +297,9 @@ export default function CircleProfileScreen({ route, navigation }) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>新歓スケジュール</Text>
         {circleData.welcome?.schedule && circleData.welcome.schedule.length > 0 ? (
-          <View style={styles.calendarList}>
-            {circleData.welcome.schedule.map((item, idx) => (
-              <View key={idx} style={styles.calendarItem}>
-                <Text style={styles.calendarDate}>{item.date}</Text>
-                <Text style={styles.calendarEvent}>{item.event}</Text>
-              </View>
-            ))}
-          </View>
+          <Text style={styles.scheduleText}>{circleData.welcome.schedule}</Text>
         ) : (
-          <Text style={styles.placeholderText}>新歓スケジュールは未設定です</Text>
+          <Text style={styles.placeholderText}>新歓スケジュールは未定です</Text>
         )}
       </View>
     </View>
