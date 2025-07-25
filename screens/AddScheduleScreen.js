@@ -18,22 +18,70 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { db } from '../firebaseConfig';
 import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
 
+// 追加: 4桁時刻入力用のカスタムコンポーネント
+function TimeInput({ value, onChange, placeholder }) {
+  // value: "hhmm" 形式の4桁または空文字
+  const inputRef = useRef(null);
+  // 入力値を4桁に制限
+  const handleChange = (text) => {
+    // 数字以外除去
+    let newText = text.replace(/[^0-9]/g, "");
+    if (newText.length > 4) newText = newText.slice(0, 4);
+    onChange(newText);
+  };
+  // バックスペース対応
+  const handleKeyPress = (e) => {
+    if (e.nativeEvent.key === 'Backspace' && value.length > 0) {
+      onChange(value.slice(0, -1));
+    }
+  };
+  // 表示用分割
+  const h1 = value[0] || '';
+  const h2 = value[1] || '';
+  const m1 = value[2] || '';
+  const m2 = value[3] || '';
+  return (
+    <TouchableOpacity
+      style={{ flexDirection: 'row', alignItems: 'center' }}
+      activeOpacity={1}
+      onPress={() => inputRef.current && inputRef.current.focus()}
+    >
+      <View style={styles.timeInputBox}><Text style={styles.timeInputText}>{h1}</Text></View>
+      <View style={styles.timeInputBox}><Text style={styles.timeInputText}>{h2}</Text></View>
+      <Text style={{ fontSize: 20, marginHorizontal: 4 }}>:</Text>
+      <View style={styles.timeInputBox}><Text style={styles.timeInputText}>{m1}</Text></View>
+      <View style={styles.timeInputBox}><Text style={styles.timeInputText}>{m2}</Text></View>
+      <TextInput
+        ref={inputRef}
+        value={value}
+        onChangeText={handleChange}
+        onKeyPress={handleKeyPress}
+        keyboardType="number-pad"
+        maxLength={4}
+        style={{ position: 'absolute', opacity: 0, width: 1, height: 1 }}
+        placeholder={placeholder}
+        blurOnSubmit={false}
+        caretHidden
+      />
+    </TouchableOpacity>
+  );
+}
+
 export default function AddScheduleScreen({ route, navigation }) {
   const { selectedDate, circleId, editMode, eventData } = route.params;
   
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [isAllDay, setIsAllDay] = useState(false);
-  const [startTime, setStartTime] = useState('');
-  const [endTime, setEndTime] = useState('');
+  // state: startTime, endTime → "hhmm"形式で管理
+  const [startTimeInput, setStartTimeInput] = useState('');
+  const [endTimeInput, setEndTimeInput] = useState('');
   const [location, setLocation] = useState('');
-  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
-  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
-  const [selectedStartTime, setSelectedStartTime] = useState(new Date());
-  const [selectedEndTime, setSelectedEndTime] = useState(new Date());
   const [selectedColor, setSelectedColor] = useState('#007bff');
   const scrollViewRef = useRef(null);
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
+  // Add: 詳細欄のref
+  // detailInputRefの定義を削除
 
   // 編集モードの場合、既存のデータを初期値として設定
   React.useEffect(() => {
@@ -41,25 +89,16 @@ export default function AddScheduleScreen({ route, navigation }) {
       setNewTitle(eventData.title || '');
       setNewDescription(eventData.description || '');
       setIsAllDay(eventData.isAllDay || false);
-      setStartTime(eventData.startTime || '');
-      setEndTime(eventData.endTime || '');
+      // startTime, endTime → "hhmm"形式に変換
+      if (eventData.startTime) {
+        setStartTimeInput(eventData.startTime.replace(':', ''));
+      }
+      if (eventData.endTime) {
+        setEndTimeInput(eventData.endTime.replace(':', ''));
+      }
       setLocation(eventData.location || '');
       setSelectedColor(eventData.color || '#007bff');
       
-      // 時間の初期値を設定
-      if (eventData.startTime) {
-        const [hours, minutes] = eventData.startTime.split(':');
-        const startDate = new Date();
-        startDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-        setSelectedStartTime(startDate);
-      }
-      
-      if (eventData.endTime) {
-        const [hours, minutes] = eventData.endTime.split(':');
-        const endDate = new Date();
-        endDate.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-        setSelectedEndTime(endDate);
-      }
     }
   }, [editMode, eventData]);
 
@@ -88,8 +127,8 @@ export default function AddScheduleScreen({ route, navigation }) {
         title: newTitle.trim(),
         date: formatDate(selectedDate),
         isAllDay: isAllDay,
-        startTime: isAllDay ? '' : startTime.trim(),
-        endTime: isAllDay ? '' : endTime.trim(),
+        startTime: isAllDay ? '' : (startTimeInput.length === 4 ? `${startTimeInput.slice(0,2)}:${startTimeInput.slice(2,4)}` : ''),
+        endTime: isAllDay ? '' : (endTimeInput.length === 4 ? `${endTimeInput.slice(0,2)}:${endTimeInput.slice(2,4)}` : ''),
         description: newDescription.trim(),
         location: location.trim(),
         color: selectedColor,
@@ -98,7 +137,7 @@ export default function AddScheduleScreen({ route, navigation }) {
 
       if (editMode === true && route.params.eventData && route.params.eventData.id) {
         // 編集モード：既存のスケジュールを更新
-        const eventRef = doc(db, 'circles', circleId, 'events', route.params.eventData.id);
+        const eventRef = doc(db, 'circles', circleId, 'schedule', route.params.eventData.id);
         
         await updateDoc(eventRef, updateData);
         Alert.alert('成功', 'スケジュールが更新されました', [
@@ -106,7 +145,7 @@ export default function AddScheduleScreen({ route, navigation }) {
         ]);
       } else {
         // 新規追加モード
-        const eventsRef = collection(db, 'circles', circleId, 'events');
+        const eventsRef = collection(db, 'circles', circleId, 'schedule');
         const newEventData = { ...updateData };
         newEventData.createdAt = new Date();
         delete newEventData.updatedAt;
@@ -168,13 +207,6 @@ export default function AddScheduleScreen({ route, navigation }) {
             value={newTitle} 
             onChangeText={setNewTitle} 
             placeholder="タイトル"
-            onFocus={() => {
-              if (!isTimePickerOpen) {
-                setTimeout(() => {
-                  scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-                }, 100);
-              }
-            }}
           />
         </View>
 
@@ -191,82 +223,26 @@ export default function AddScheduleScreen({ route, navigation }) {
 
         {/* 開始時刻 */}
         {!isAllDay && (
-                      <TouchableOpacity 
-              style={styles.timeRow}
-              onPress={() => {
-                setShowStartTimePicker(true);
-                setIsTimePickerOpen(true);
-              }}
-              activeOpacity={0.7}
-            >
+          <View style={styles.timeRow}>
             <Text style={styles.timeLabel}>開始</Text>
-            <View style={styles.timeValueContainer}>
-              <Text style={styles.timeValue}>
-                {startTime || '17:00'}
-              </Text>
-            </View>
-            {showStartTimePicker && (
-              <View style={styles.timePickerContainer}>
-                <DateTimePicker
-                  value={selectedStartTime}
-                  mode="time"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  locale="ja-JP"
-                  minuteInterval={5}
-                  onChange={(event, selectedTime) => {
-                    setShowStartTimePicker(Platform.OS === 'ios');
-                    setIsTimePickerOpen(false);
-                    if (selectedTime) {
-                      setSelectedStartTime(selectedTime);
-                      const hours = String(selectedTime.getHours()).padStart(2, '0');
-                      const minutes = String(selectedTime.getMinutes()).padStart(2, '0');
-                      setStartTime(`${hours}:${minutes}`);
-                    }
-                  }}
-                />
-              </View>
-            )}
-          </TouchableOpacity>
+            <TimeInput
+              value={startTimeInput}
+              onChange={setStartTimeInput}
+              placeholder="hhmm"
+            />
+          </View>
         )}
 
         {/* 終了時刻 */}
         {!isAllDay && (
-                      <TouchableOpacity 
-              style={styles.timeRow}
-              onPress={() => {
-                setShowEndTimePicker(true);
-                setIsTimePickerOpen(true);
-              }}
-              activeOpacity={0.7}
-            >
+          <View style={styles.timeRow}>
             <Text style={styles.timeLabel}>終了</Text>
-            <View style={styles.timeValueContainer}>
-              <Text style={styles.timeValue}>
-                {endTime || '18:00'}
-              </Text>
-            </View>
-            {showEndTimePicker && (
-              <View style={styles.timePickerContainer}>
-                <DateTimePicker
-                  value={selectedEndTime}
-                  mode="time"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  locale="ja-JP"
-                  minuteInterval={5}
-                  onChange={(event, selectedTime) => {
-                    setShowEndTimePicker(Platform.OS === 'ios');
-                    setIsTimePickerOpen(false);
-                    if (selectedTime) {
-                      setSelectedEndTime(selectedTime);
-                      const hours = String(selectedTime.getHours()).padStart(2, '0');
-                      const minutes = String(selectedTime.getMinutes()).padStart(2, '0');
-                      setEndTime(`${hours}:${minutes}`);
-                    }
-                  }}
-                />
-              </View>
-            )}
-          </TouchableOpacity>
+            <TimeInput
+              value={endTimeInput}
+              onChange={setEndTimeInput}
+              placeholder="hhmm"
+            />
+          </View>
         )}
 
         {/* 場所入力 */}
@@ -277,13 +253,6 @@ export default function AddScheduleScreen({ route, navigation }) {
             value={location}
             onChangeText={setLocation}
             placeholder="場所"
-            onFocus={() => {
-              if (!isTimePickerOpen) {
-                setTimeout(() => {
-                  scrollViewRef.current?.scrollTo({ y: 200, animated: true });
-                }, 100);
-              }
-            }}
           />
         </View>
 
@@ -324,13 +293,6 @@ export default function AddScheduleScreen({ route, navigation }) {
               placeholder="詳細"
               multiline
               numberOfLines={4}
-              onFocus={() => {
-                if (!isTimePickerOpen) {
-                  setTimeout(() => {
-                    scrollViewRef.current?.scrollTo({ y: 400, animated: true });
-                  }, 100);
-                }
-              }}
             />
           </TouchableOpacity>
         </View>
@@ -451,6 +413,7 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '500',
     width: 80,
+    marginBottom: 8, // 追加: 下余白
   },
   formInput: {
     flex: 1,
@@ -494,6 +457,23 @@ const styles = StyleSheet.create({
   footerSaveButtonText: {
     color: '#fff',
     fontSize: 18,
+    fontWeight: 'bold',
+  },
+  // 追加: 4桁分割表示用スタイル
+  timeInputBox: {
+    width: 32,
+    height: 40,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 6,
+    marginHorizontal: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fafbfc',
+  },
+  timeInputText: {
+    fontSize: 20,
+    color: '#333',
     fontWeight: 'bold',
   },
 }); 
