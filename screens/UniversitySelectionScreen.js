@@ -75,16 +75,17 @@ const UniversitySelectionScreen = ({ route, navigation }) => {
     );
   };
 
-  const handleComplete = () => {
-    if (onComplete) {
-      onComplete(selectedUniversities);
-    }
-    navigation.goBack();
-  };
+  // 戻る時にonCompleteを呼ぶ
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', () => {
+      if (onComplete) onComplete(selectedUniversities);
+    });
+    return unsubscribe;
+  }, [navigation, selectedUniversities, onComplete]);
 
   return (
     <View style={styles.fullScreenContainer}>
-      <CommonHeader title="大学選択" showBackButton onBack={() => navigation.goBack()} rightButtonLabel="完了" onRightButtonPress={handleComplete} />
+      <CommonHeader title="大学選択" showBackButton onBack={() => navigation.goBack()} />
       <SafeAreaView style={styles.contentSafeArea}>
         <View style={styles.searchBarContainer}>
           <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
