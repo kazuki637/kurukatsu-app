@@ -118,15 +118,6 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
       } catch (e) {
         Alert.alert('エラー', '申請の削除に失敗しました');
         console.error('Firestoreエラー:', e);
-        try {
-          console.log('JSON.stringify:', JSON.stringify(e));
-        } catch (jsonErr) {
-          console.log('JSON.stringifyできませんでした:', jsonErr);
-          console.log('e.message:', e.message);
-          console.log('e.code:', e.code);
-          console.log('e.name:', e.name);
-          console.log('e:', e);
-        }
       }
       // メンバー一覧を再取得
       const membersRef = collection(db, 'circles', circleId, 'members');
@@ -154,15 +145,6 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
       setMembers(membersList);
     } catch (e) {
       console.error('Error approving request:', e);
-      try {
-        console.log('外側catch節JSON.stringify:', JSON.stringify(e));
-      } catch (jsonErr) {
-        console.log('外側catch節JSON.stringifyできませんでした:', jsonErr);
-        console.log('e.message:', e.message);
-        console.log('e.code:', e.code);
-        console.log('e.name:', e.name);
-        console.log('e:', e);
-      }
       Alert.alert('エラー', '申請の許可に失敗しました');
     } finally {
       setLoading(false);
@@ -180,27 +162,9 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
         setJoinRequests(prev => prev.filter(r => r.id !== requestId));
       } catch (e) {
         console.error('Firestoreエラー:', e);
-        try {
-          console.log('JSON.stringify:', JSON.stringify(e));
-        } catch (jsonErr) {
-          console.log('JSON.stringifyできませんでした:', jsonErr);
-          console.log('e.message:', e.message);
-          console.log('e.code:', e.code);
-          console.log('e.name:', e.name);
-          console.log('e:', e);
-        }
       }
     } catch (e) {
       console.error('外側catch節に到達');
-      try {
-        console.log('外側catch節JSON.stringify:', JSON.stringify(e));
-      } catch (jsonErr) {
-        console.log('外側catch節JSON.stringifyできませんでした:', jsonErr);
-        console.log('e.message:', e.message);
-        console.log('e.code:', e.code);
-        console.log('e.name:', e.name);
-        console.log('e:', e);
-      }
       Alert.alert('エラー', '申請の却下に失敗しました');
     } finally {
       setLoading(false);

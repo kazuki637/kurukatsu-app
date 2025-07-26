@@ -73,7 +73,6 @@ const SearchResultsScreen = ({ route, navigation }) => {
   };
 
   const renderItem = ({ item, userSavedCircles, toggleSave }) => {
-    console.log("Rendering item:", item); // Add this line for debugging
     const isSaved = userSavedCircles[item.id];
     return (
     <TouchableOpacity 
