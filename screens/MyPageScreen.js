@@ -42,11 +42,15 @@ export default function MyPageScreen({ navigation }) {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [imageError, setImageError] = useState(false);
 
-  // 画面がフォーカスされたときにユーザーデータをリロード
+  // 画面がフォーカスされたときにユーザーデータをリロード（初回のみ）
   useFocusEffect(
     React.useCallback(() => {
-      reload && reload();
-    }, [reload])
+      if (isInitialLoad) {
+        setIsInitialLoad(false);
+        return;
+      }
+      // 画面がフォーカスされたときの処理（必要に応じて）
+    }, [isInitialLoad])
   );
 
   // userProfile取得後にサークル情報を取得
@@ -82,6 +86,7 @@ export default function MyPageScreen({ navigation }) {
         }
         setSavedCircles(saved);
       } catch (e) {
+        console.error('Error fetching circles:', e);
         setJoinedCircles([]);
         setSavedCircles([]);
       } finally {
@@ -89,10 +94,7 @@ export default function MyPageScreen({ navigation }) {
       }
     };
     fetchCircles();
-  }, [
-    userProfile?.joinedCircleIds && userProfile.joinedCircleIds.join(','),
-    userProfile?.favoriteCircleIds && userProfile.favoriteCircleIds.join(',')
-  ]);
+  }, [userProfile?.joinedCircleIds, userProfile?.favoriteCircleIds]);
 
   // useFocusEffectや冗長なキャッシュ・ローディング処理を削除
 

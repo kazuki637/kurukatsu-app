@@ -11,7 +11,7 @@ export default function CircleRegistrationScreen() {
   const navigation = useNavigation();
   const [circleName, setCircleName] = useState('');
   const [universityName, setUniversityName] = useState('');
-  const [description, setDescription] = useState('');
+
   const [features, setFeatures] = useState([]);
   const [frequency, setFrequency] = useState('');
   const [genderratio, setGenderratio] = useState('');
@@ -101,7 +101,12 @@ export default function CircleRegistrationScreen() {
   }, []);
 
   const handleRegister = async () => {
-    if (!circleName || !universityName || !description || !frequency || !genderratio || !genre || !members) {
+    // 必須項目バリデーション
+    if (!circleImage) {
+      Alert.alert('入力不足', 'サークルアイコンを選択してください。');
+      return;
+    }
+    if (!circleName || !universityName || !representativeName || !contactInfo || !genre || features.length === 0 || !frequency || !members || !genderratio) {
       Alert.alert('入力不足', '必須項目をすべて入力してください。');
       return;
     }
@@ -135,7 +140,7 @@ export default function CircleRegistrationScreen() {
       const circleDocRef = await addDoc(collection(db, 'circles'), {
         name: circleName,
         universityName,
-        description,
+
         features,
         frequency,
         genderratio,
@@ -148,8 +153,11 @@ export default function CircleRegistrationScreen() {
         // memberIds: [user.uid], // ← 削除
       });
 
-      // 作成者をmembersサブコレクションに追加
-      await setDoc(doc(db, 'circles', circleDocRef.id, 'members', user.uid), { joinedAt: new Date() });
+      // 作成者をmembersサブコレクションに追加（代表者として）
+      await setDoc(doc(db, 'circles', circleDocRef.id, 'members', user.uid), { 
+        joinedAt: new Date(),
+        role: 'leader' // 作成者を代表者として設定
+      });
 
       // ユーザーのjoinedCircleIdsに新しいサークルIDを追加
       const userDocRef = doc(db, 'users', user.uid);
@@ -172,7 +180,7 @@ export default function CircleRegistrationScreen() {
       // フォームをクリア
       setCircleName('');
       setUniversityName('');
-      setDescription('');
+
       setFeatures([]);
       setFrequency('');
       setGenderratio('');
@@ -244,16 +252,7 @@ export default function CircleRegistrationScreen() {
           />
         </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>サークル紹介</Text>
-          <TextInput
-            style={styles.input}
-            value={description}
-            onChangeText={setDescription}
-            placeholder="サークルの活動内容や魅力を具体的に記述してください"
-            multiline
-          />
-        </View>
+
 
         <View style={styles.inputGroup}>
           <Text style={styles.label}>ジャンル</Text>
@@ -416,7 +415,7 @@ const styles = StyleSheet.create({
     elevation: 3, 
   },
   registerButton: {
-    backgroundColor: '#28a745',
+    backgroundColor: '#007bff',
     padding: 18,
     borderRadius: 8,
     alignItems: 'center',
