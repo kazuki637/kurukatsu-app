@@ -44,6 +44,7 @@ import CircleContactScreen from './screens/CircleContactScreen';
 import CircleMemberScreen from './screens/CircleMemberScreen';
 import CircleSettingsScreen from './screens/CircleSettingsScreen';
 import CircleMessageDetailScreen from './screens/CircleMessageDetailScreen';
+import CircleManagementDetailScreen from './screens/CircleManagementDetailScreen';
 
 
 const AuthStack = createStackNavigator();
@@ -128,6 +129,7 @@ function CircleManagementStackScreen() {
     <CircleManagementStack.Navigator screenOptions={{ headerShown: false, gestureEnabled: true }}>
       <CircleManagementStack.Screen name="CircleManagementScreen" component={CircleManagementScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleRegistration" component={CircleRegistrationScreen} options={{ headerShown: false, gestureEnabled: true }} />
+      <CircleManagementStack.Screen name="CircleManagementDetail" component={CircleManagementDetailScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleProfileEdit" component={CircleProfileEditScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleSettings" component={CircleSettingsScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleMemberManagement" component={CircleMemberManagementScreen} options={{ headerShown: false, gestureEnabled: true }} />

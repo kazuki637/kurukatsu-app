@@ -149,7 +149,7 @@ const Calendar = ({ selectedDate, onDateSelect, events }) => {
             styles.dayEventItem,
             { backgroundColor: event.color || '#007bff' }
           ]}>
-            <Text style={styles.dayEventText} numberOfLines={1}>
+            <Text style={styles.dayEventText} numberOfLines={1} ellipsizeMode="clip">
               {event.title}
             </Text>
           </View>
@@ -246,8 +246,10 @@ const Calendar = ({ selectedDate, onDateSelect, events }) => {
             <View style={[
               styles.dayContent,
               isToday(day.date) && styles.todayContent,
-              isPast(day.date) && styles.pastDay
+              isPast(day.date) && styles.pastDay,
+              isSelected(day.date) && styles.selectedDayContent
             ]}>
+              {isSelected(day.date) && <View style={styles.selectedDayBorder} />}
               <Text style={[
                 styles.dayText,
                 !day.isCurrentMonth && styles.otherMonthText,
@@ -480,14 +482,7 @@ const styles = StyleSheet.create({
   // 洗練されたカレンダー関連のスタイル
   calendarContainer: {
     backgroundColor: '#fff',
-    margin: 16,
-    borderRadius: 16,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
   },
   calendarHeader: {
     flexDirection: 'row',
@@ -499,7 +494,6 @@ const styles = StyleSheet.create({
   monthButton: {
     padding: 12,
     borderRadius: 20,
-    backgroundColor: '#f8f9fa',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -561,6 +555,7 @@ const styles = StyleSheet.create({
     aspectRatio: 2/3,
     borderWidth: 0.5,
     borderColor: '#e0e0e0',
+    position: 'relative',
   },
   dayContent: {
     width: '100%',
@@ -584,15 +579,26 @@ const styles = StyleSheet.create({
   },
   selectedDay: {
     backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#007bff',
+    borderWidth: 0,
+    borderColor: 'transparent',
   },
   selectedDayContent: {
     backgroundColor: 'transparent',
+    position: 'relative',
   },
   selectedDayText: {
     color: '#007bff',
     fontWeight: '700',
+  },
+  selectedDayBorder: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderWidth: 2,
+    borderColor: '#007bff',
+    borderRadius: 2,
   },
   today: {
     backgroundColor: 'transparent',
@@ -660,29 +666,34 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-start',
     width: '100%',
+    alignItems: 'center',
   },
   dayEventItem: {
     backgroundColor: '#e8f5e8',
     borderRadius: 2,
-    paddingHorizontal: 2,
+    paddingHorizontal: 0,
     paddingVertical: 1,
     marginBottom: 1,
-    width: '100%',
+    width: '110%',
   },
   selectedDayEventItem: {
     backgroundColor: '#fff',
   },
   dayEventText: {
-    fontSize: 9,
+    fontSize: 11,
     color: '#fff',
     fontWeight: '600',
+    textAlign: 'left',
+    numberOfLines: 1,
+    ellipsizeMode: 'clip',
+    paddingRight: 2,
   },
   selectedDayEventText: {
     color: '#007bff',
     fontWeight: '700',
   },
   moreEventsText: {
-    fontSize: 8,
+    fontSize: 12,
     color: '#666',
     textAlign: 'center',
     fontStyle: 'italic',
@@ -709,10 +720,9 @@ const styles = StyleSheet.create({
   },
   eventItem: {
     backgroundColor: '#f8f9fa',
-    borderRadius: 12,
     padding: 16,
     marginBottom: 16,
-    borderLeftWidth: 4,
+    borderLeftWidth: 8,
     borderLeftColor: '#007bff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -762,14 +772,14 @@ const styles = StyleSheet.create({
   },
   editButton: {
     padding: 8,
-    marginRight: 8,
+    marginRight: 16,
     borderRadius: 6,
-    backgroundColor: '#f0f8ff',
+    backgroundColor: '#e3f2fd',
   },
   deleteButton: {
     padding: 8,
     borderRadius: 6,
-    backgroundColor: '#fff5f5',
+    backgroundColor: '#ffebee',
   },
   eventTime: {
     fontSize: 14,

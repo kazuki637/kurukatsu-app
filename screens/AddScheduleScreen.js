@@ -297,14 +297,6 @@ export default function AddScheduleScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
         </ScrollView>
-
-        {/* フッター保存ボタン */}
-        <TouchableOpacity 
-          style={styles.footerSaveButton} 
-          onPress={handleSaveEvent}
-        >
-          <Text style={styles.footerSaveButtonText}>保存</Text>
-        </TouchableOpacity>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -446,18 +438,6 @@ const styles = StyleSheet.create({
   selectedColorOption: {
     borderColor: '#333',
     borderWidth: 3,
-  },
-  footerSaveButton: {
-    backgroundColor: '#007bff',
-    margin: 16,
-    paddingVertical: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  footerSaveButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
   },
   // 追加: 4桁分割表示用スタイル
   timeInputBox: {
