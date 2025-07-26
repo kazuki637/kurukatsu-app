@@ -13,7 +13,6 @@ const LoginScreen = ({ navigation }) => {
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      console.log('User logged in successfully!');
       
     } catch (error) {
       Alert.alert('ログインエラー', error.message);

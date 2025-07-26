@@ -12,7 +12,6 @@ const SignupScreen = ({ navigation }) => {
     setLoading(true);
     try {
       await createUserWithEmailAndPassword(auth, email, password);
-      console.log('User registered successfully!');
       Alert.alert('登録完了', 'アカウントが作成されました。');
       // navigation.navigate('ProfileEdit'); ← これを削除
       // 何も遷移しない（認証状態で自動遷移）
