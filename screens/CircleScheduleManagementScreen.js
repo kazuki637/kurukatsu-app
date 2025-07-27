@@ -124,10 +124,7 @@ const Calendar = ({ selectedDate, onDateSelect, events }) => {
     setTimeout(() => setIsAnimating(false), 300);
   };
 
-  // カレンダーの初期化時に選択された日付の月を表示
-  useEffect(() => {
-    setCurrentMonth(selectedDate);
-  }, [selectedDate]);
+
 
   // イベント数の取得
   const getEventCount = (date) => {
@@ -370,7 +367,9 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
 
   const formatDateForDisplay = (date) => {
     const d = new Date(date);
-    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+    const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+    const weekday = weekdays[d.getDay()];
+    return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${weekday}）`;
   };
 
   // ローディング状態でも画面を表示し、データが取得できたら更新する
@@ -390,7 +389,7 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
           {/* 選択された日付のスケジュール */}
           <View style={styles.scheduleSection}>
             <Text style={styles.scheduleTitle}>
-              {formatDateForDisplay(selectedDate)}のスケジュール
+              {formatDateForDisplay(selectedDate)}の予定
             </Text>
             {getEventsForSelectedDate().length > 0 ? (
               getEventsForSelectedDate().map(event => (

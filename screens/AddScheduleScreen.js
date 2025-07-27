@@ -22,6 +22,8 @@ import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
 function TimeInput({ value, onChange, placeholder }) {
   // value: "hhmm" 形式の4桁または空文字
   const inputRef = useRef(null);
+  const [isFocused, setIsFocused] = useState(false);
+  
   // 入力値を4桁に制限
   const handleChange = (text) => {
     // 数字以外除去
@@ -29,33 +31,70 @@ function TimeInput({ value, onChange, placeholder }) {
     if (newText.length > 4) newText = newText.slice(0, 4);
     onChange(newText);
   };
+  
   // バックスペース対応
   const handleKeyPress = (e) => {
     if (e.nativeEvent.key === 'Backspace' && value.length > 0) {
       onChange(value.slice(0, -1));
     }
   };
+  
   // 表示用分割
   const h1 = value[0] || '';
   const h2 = value[1] || '';
   const m1 = value[2] || '';
   const m2 = value[3] || '';
+  
   return (
     <TouchableOpacity
       style={{ flexDirection: 'row', alignItems: 'center' }}
       activeOpacity={1}
       onPress={() => inputRef.current && inputRef.current.focus()}
     >
-      <View style={styles.timeInputBox}><Text style={styles.timeInputText}>{h1}</Text></View>
-      <View style={styles.timeInputBox}><Text style={styles.timeInputText}>{h2}</Text></View>
+      <View style={[
+        styles.timeInputBox,
+        isFocused && styles.timeInputBoxFocused
+      ]}>
+        <Text style={[
+          styles.timeInputText,
+          isFocused && styles.timeInputTextFocused
+        ]}>{h1}</Text>
+      </View>
+      <View style={[
+        styles.timeInputBox,
+        isFocused && styles.timeInputBoxFocused
+      ]}>
+        <Text style={[
+          styles.timeInputText,
+          isFocused && styles.timeInputTextFocused
+        ]}>{h2}</Text>
+      </View>
       <Text style={{ fontSize: 20, marginHorizontal: 4 }}>:</Text>
-      <View style={styles.timeInputBox}><Text style={styles.timeInputText}>{m1}</Text></View>
-      <View style={styles.timeInputBox}><Text style={styles.timeInputText}>{m2}</Text></View>
+      <View style={[
+        styles.timeInputBox,
+        isFocused && styles.timeInputBoxFocused
+      ]}>
+        <Text style={[
+          styles.timeInputText,
+          isFocused && styles.timeInputTextFocused
+        ]}>{m1}</Text>
+      </View>
+      <View style={[
+        styles.timeInputBox,
+        isFocused && styles.timeInputBoxFocused
+      ]}>
+        <Text style={[
+          styles.timeInputText,
+          isFocused && styles.timeInputTextFocused
+        ]}>{m2}</Text>
+      </View>
       <TextInput
         ref={inputRef}
         value={value}
         onChangeText={handleChange}
         onKeyPress={handleKeyPress}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
         keyboardType="number-pad"
         maxLength={4}
         style={{ position: 'absolute', opacity: 0, width: 1, height: 1 }}
@@ -451,9 +490,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#fafbfc',
   },
+  timeInputBoxFocused: {
+    borderColor: '#007bff',
+    borderWidth: 2,
+    backgroundColor: '#fff',
+    shadowColor: '#007bff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
   timeInputText: {
     fontSize: 20,
     color: '#333',
     fontWeight: 'bold',
+  },
+  timeInputTextFocused: {
+    color: '#007bff',
   },
 }); 
