@@ -158,6 +158,14 @@ export default function CircleProfileScreen({ route, navigation }) {
             <Text style={styles.infoValue}>{circleData.genderratio}</Text>
           </View>
         </View>
+        {/* 主な活動場所 */}
+        {circleData.activityLocation && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>主な活動場所</Text>
+            <Text style={styles.activityLocationText}>{circleData.activityLocation}</Text>
+          </View>
+        )}
+        
         {circleData.features && circleData.features.length > 0 && (
           <View style={styles.featuresContainer}>
             <Text style={styles.infoLabel}>特色</Text>
@@ -196,16 +204,20 @@ export default function CircleProfileScreen({ route, navigation }) {
 
       {/* 代表者紹介 */}
       {circleData.leaderMessage && (
-        <View style={[styles.section, styles.leaderSection]}>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>代表者からのメッセージ</Text>
-          <View style={styles.leaderRow}>
-            {circleData.leaderImageUrl && (
-              <Image source={{ uri: circleData.leaderImageUrl }} style={styles.leaderImage} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginBottom: 12 }}>
+            {circleData.leaderImageUrl ? (
+              <Image source={{ uri: circleData.leaderImageUrl }} style={{width: 72, height: 72, borderRadius: 36, backgroundColor: '#eee'}} />
+            ) : (
+              <View style={{width: 72, height: 72, borderRadius: 36, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center'}}>
+                <Ionicons name="person-outline" size={36} color="#aaa" />
+              </View>
             )}
-            <View style={styles.leaderBalloon}>
-              <Text style={styles.leaderMessage}>{circleData.leaderMessage}</Text>
-            </View>
           </View>
+          <Text style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 60, fontSize: 16, marginBottom: 8, lineHeight: 24}}>
+            {circleData.leaderMessage}
+          </Text>
         </View>
       )}
 
@@ -280,6 +292,20 @@ export default function CircleProfileScreen({ route, navigation }) {
 
   const renderWelcomeTab = () => (
     <View style={styles.tabContent}>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>入会募集状況</Text>
+        {circleData.welcome?.isRecruiting ? (
+          <View style={styles.recruitingStatusContainer}>
+            <Ionicons name="checkmark-circle" size={24} color="#28a745" />
+            <Text style={styles.recruitingStatusText}>入会募集中</Text>
+          </View>
+        ) : (
+          <View style={styles.recruitingStatusContainer}>
+            <Ionicons name="close-circle" size={24} color="#e74c3c" />
+            <Text style={styles.recruitingStatusText}>現在入会の募集はありません</Text>
+          </View>
+        )}
+      </View>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>入会条件</Text>
         <Text style={styles.description}>{circleData.welcome?.conditions || '入会条件は未設定です'}</Text>
@@ -975,5 +1001,30 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  // 入会募集状況関連のスタイル
+  recruitingStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  recruitingStatusText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 12,
+  },
+  activityLocationText: {
+    fontSize: 16,
+    color: '#333',
+    lineHeight: 24,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
   },
 });
