@@ -101,8 +101,54 @@ const SearchScreen = ({ navigation }) => {
     setSelectedGenderRatio([]);
   };
 
-  const handleSearch = () => {
-    navigation.navigate('SearchResults', { circles: filteredCircles });
+  const handleSearch = async () => {
+    try {
+      // 検索時に最新のサークルデータを取得
+      const circlesCollectionRef = collection(db, 'circles');
+      const querySnapshot = await getDocs(circlesCollectionRef);
+      const latestCircles = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // 最新データでフィルタリングを再実行
+      const latestFiltered = latestCircles.filter(circle => {
+        const searchTextLower = searchText.toLowerCase();
+        const matchesSearchText = searchText 
+          ? (circle.name?.toLowerCase().includes(searchTextLower) || 
+             circle.description?.toLowerCase().includes(searchTextLower)) 
+          : true;
+
+        const matchesUniversity = selectedUniversities.length > 0 
+          ? selectedUniversities.includes(circle.universityName) 
+          : true;
+
+        const matchesGenre = selectedGenres.length > 0 
+          ? selectedGenres.includes(circle.genre) 
+          : true;
+
+        const matchesFeatures = selectedFeatures.length > 0 
+          ? selectedFeatures.some(feature => circle.features?.includes(feature)) 
+          : true;
+          
+        const matchesFrequency = selectedFrequency.length > 0 
+          ? selectedFrequency.includes(circle.frequency) 
+          : true;
+
+        const matchesMembers = selectedMembers.length > 0 
+          ? selectedMembers.includes(circle.members) 
+          : true;
+
+        const matchesGenderRatio = selectedGenderRatio.length > 0 
+          ? selectedGenderRatio.includes(circle.genderratio) 
+          : true;
+
+        return matchesSearchText && matchesUniversity && matchesGenre && matchesFeatures && matchesFrequency && matchesMembers && matchesGenderRatio;
+      });
+      
+      navigation.navigate('SearchResults', { circles: latestFiltered });
+    } catch (error) {
+      console.error("Error fetching latest circles: ", error);
+      // エラーが発生した場合は、現在のフィルタリング結果を使用
+      navigation.navigate('SearchResults', { circles: filteredCircles });
+    }
   };
 
   const formatFilterValue = (value) => {

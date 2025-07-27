@@ -11,6 +11,7 @@ const SearchResultsScreen = ({ route, navigation }) => {
   const { circles } = route.params;
   const [user, setUser] = useState(null);
   const [userSavedCircles, setUserSavedCircles] = useState({});
+  const [showOnlyRecruiting, setShowOnlyRecruiting] = useState(false);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -38,6 +39,11 @@ const SearchResultsScreen = ({ route, navigation }) => {
       setUserSavedCircles({});
     }
   }, [user]);
+
+  // フィルタリングされたサークルリストを計算
+  const filteredCircles = showOnlyRecruiting 
+    ? circles.filter(circle => circle.welcome?.isRecruiting === true)
+    : circles;
 
   const toggleSave = async (circleId) => {
     if (!user) {
@@ -110,6 +116,22 @@ const SearchResultsScreen = ({ route, navigation }) => {
           <Text style={styles.descriptionText} numberOfLines={3}>{item.description}</Text>
         </View>
       ) : null}
+      
+      {/* 活動場所と募集中表示 */}
+      <View style={styles.infoContainer}>
+        {item.welcome?.isRecruiting === true && (
+          <View style={styles.infoItem}>
+            <Ionicons name="time" size={16} color="#666" />
+            <Text style={styles.infoText}>募集中</Text>
+          </View>
+        )}
+        {item.activityLocation && (
+          <View style={styles.infoItem}>
+            <Ionicons name="location" size={16} color="#666" />
+            <Text style={styles.infoText}>{item.activityLocation}</Text>
+          </View>
+        )}
+      </View>
     </TouchableOpacity>
   );
 };
@@ -118,19 +140,36 @@ const SearchResultsScreen = ({ route, navigation }) => {
     <View style={[styles.fullScreenContainer, { flex: 1 }]}> 
       <CommonHeader title="検索結果" showBackButton onBack={() => navigation.goBack()} />
       <SafeAreaView style={[styles.contentSafeArea, { flex: 1 }]}> 
-        {circles.length > 0 ? (
-          <FlatList
-            data={circles}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => renderItem({ item, userSavedCircles, toggleSave })}
-            contentContainerStyle={[styles.listContent, { paddingBottom: 40 }]}
-            extraData={userSavedCircles}
-          />
-        ) : (
-          <View style={styles.noResultsContainer}>
-            <Text style={styles.noResultsText}>該当するサークルは見つかりませんでした。</Text>
-          </View>
-        )}
+        <FlatList
+          data={filteredCircles}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => renderItem({ item, userSavedCircles, toggleSave })}
+          contentContainerStyle={[styles.listContent, { paddingBottom: 40 }]}
+          extraData={[userSavedCircles, showOnlyRecruiting]}
+                      ListHeaderComponent={() => (
+              <View style={styles.filterContainer}>
+                <TouchableOpacity 
+                  style={styles.filterCheckbox}
+                  onPress={() => setShowOnlyRecruiting(!showOnlyRecruiting)}
+                >
+                  <View style={[styles.checkbox, showOnlyRecruiting && styles.checkboxChecked]}>
+                    {showOnlyRecruiting && (
+                      <Ionicons name="checkmark" size={16} color="#fff" />
+                    )}
+                  </View>
+                  <Text style={styles.filterText}>入会募集中のサークルのみ表示</Text>
+                </TouchableOpacity>
+                <Text style={styles.resultCountText}>
+                  検索結果<Text style={styles.resultCountNumber}>{filteredCircles.length}</Text>件
+                </Text>
+              </View>
+            )}
+          ListEmptyComponent={() => (
+            <View style={styles.noResultsContainer}>
+              <Text style={styles.noResultsText}>該当するサークルは見つかりませんでした。</Text>
+            </View>
+          )}
+        />
       </SafeAreaView>
     </View>
   );
@@ -220,7 +259,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   descriptionContainer: {
-    marginBottom: 10,
+    marginBottom: 5,
   },
   descriptionText: {
     fontSize: 14,
@@ -231,6 +270,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    minHeight: 400,
   },
   noResultsText: {
     textAlign: 'center',
@@ -242,6 +282,60 @@ const styles = StyleSheet.create({
     aspectRatio: 16 / 9,
     borderRadius: 8,
     marginBottom: 10,
+  },
+  // フィルター関連のスタイル
+  filterContainer: {
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+  },
+  filterCheckbox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#007bff',
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  checkboxChecked: {
+    backgroundColor: '#007bff',
+  },
+  filterText: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+  },
+  resultCountText: {
+    fontSize: 14,
+    color: '#333',
+    marginTop: 15,
+    marginLeft: 0,
+  },
+  resultCountNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  infoContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 15,
+    marginTop: 8,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  infoText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 4,
   },
 });
 

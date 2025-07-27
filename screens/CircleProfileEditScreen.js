@@ -74,6 +74,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   const [leaderSaving, setLeaderSaving] = useState(false); // 保存中
   const [welcomeConditions, setWelcomeConditions] = useState(''); // 入会条件編集用
   const [welcomeSaving, setWelcomeSaving] = useState(false); // 保存中状態
+  const [isRecruiting, setIsRecruiting] = useState(false); // 入会募集状態
   const [activityImages, setActivityImages] = useState([]); // 活動写真配列
   const [activityUploading, setActivityUploading] = useState(false);
   // SNS・新歓LINEグループリンク用state
@@ -82,6 +83,8 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   const [shinkanLineGroupLink, setShinkanLineGroupLink] = useState('');
   // 新歓スケジュール用state
   const [welcomeSchedule, setWelcomeSchedule] = useState('');
+  const [activityLocation, setActivityLocation] = useState(''); // 活動場所
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // 未保存の変更があるかどうか
 
   // 初期値セット
   useEffect(() => {
@@ -97,6 +100,43 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       setWelcomeSchedule(circleData.welcome.schedule);
     }
   }, [circleData]);
+
+  useEffect(() => {
+    if (circleData) {
+      setActivityLocation(circleData.activityLocation || '');
+    }
+  }, [circleData]);
+
+  // 画面遷移時のアラート表示
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (!hasUnsavedChanges) {
+        return;
+      }
+
+      // デフォルトの遷移を防ぐ
+      e.preventDefault();
+
+      Alert.alert(
+        '未保存の変更があります',
+        '変更を保存せずに画面を離れますか？',
+        [
+          {
+            text: 'キャンセル',
+            style: 'cancel',
+            onPress: () => {},
+          },
+          {
+            text: '保存せずに離れる',
+            style: 'destructive',
+            onPress: () => navigation.dispatch(e.data.action),
+          },
+        ]
+      );
+    });
+
+    return unsubscribe;
+  }, [navigation, hasUnsavedChanges]);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -185,6 +225,9 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     }
     if (circleData && circleData.welcome && typeof circleData.welcome.conditions === 'string') {
       setWelcomeConditions(circleData.welcome.conditions);
+    }
+    if (circleData && circleData.welcome && typeof circleData.welcome.isRecruiting === 'boolean') {
+      setIsRecruiting(circleData.welcome.isRecruiting);
     }
     if (circleData && Array.isArray(circleData.activityImages)) {
       setActivityImages(circleData.activityImages);
@@ -526,6 +569,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     }
   };
 
+
+
+
+
   // 活動写真追加
   const handleAddActivityImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -608,6 +655,26 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     }
   };
 
+  // 変更を検知する関数
+  const checkForChanges = () => {
+    if (!circleData) return false;
+    
+    const hasChanges = 
+      description !== (circleData.description || '') ||
+      recommendationsInput !== (circleData.recommendations?.join(', ') || '') ||
+      leaderMessage !== (circleData.leaderMessage || '') ||
+      welcomeConditions !== (circleData.welcome?.conditions || '') ||
+      welcomeSchedule !== (circleData.welcome?.schedule || '') ||
+      snsLink !== (circleData.snsLink || '') ||
+      xLink !== (circleData.xLink || '') ||
+      shinkanLineGroupLink !== (circleData.shinkanLineGroupLink || '') ||
+      activityLocation !== (circleData.activityLocation || '') ||
+      isRecruiting !== (circleData.welcome?.isRecruiting || false);
+    
+    setHasUnsavedChanges(hasChanges);
+    return hasChanges;
+  };
+
   // 画面上部のCommonHeaderに保存ボタンを追加
   const handleHeaderSave = async () => {
     // 必要な保存処理をここにまとめて実装（例：サークル紹介、こんな人におすすめ、代表者情報、SNSリンク、入会条件など）
@@ -617,11 +684,13 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         description,
         recommendations: recommendationsInput.split(',').map(s => s.trim()).filter(Boolean),
         leaderMessage,
-        welcome: { ...(circleData.welcome || {}), conditions: welcomeConditions, schedule: welcomeSchedule },
+        welcome: { ...(circleData.welcome || {}), conditions: welcomeConditions, schedule: welcomeSchedule, isRecruiting },
         snsLink,
         xLink,
         shinkanLineGroupLink,
+        activityLocation,
       });
+      setHasUnsavedChanges(false);
       Alert.alert('保存完了', 'プロフィール情報を保存しました');
     } catch (e) {
       Alert.alert('エラー', '保存に失敗しました');
@@ -673,6 +742,20 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             <Text style={styles.infoValue}>{circleData.genderratio}</Text>
           </View>
         </View>
+        {/* 主な活動場所 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>主な活動場所</Text>
+          <TextInput
+            value={activityLocation}
+            onChangeText={(text) => {
+              setActivityLocation(text);
+              checkForChanges();
+            }}
+            placeholder="例：大学構内、○○教室、○○会館など"
+            style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', fontSize: 16, marginBottom: 8}}
+          />
+        </View>
+        
         {circleData.features && circleData.features.length > 0 && (
           <View style={styles.featuresContainer}>
             <Text style={styles.infoLabel}>特色</Text>
@@ -691,7 +774,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         <Text style={styles.sectionTitle}>サークル紹介</Text>
         <TextInput
           value={description}
-          onChangeText={setDescription}
+          onChangeText={(text) => {
+            setDescription(text);
+            checkForChanges();
+          }}
           multiline
           style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 80, fontSize: 16, marginBottom: 8}}
         />
@@ -701,7 +787,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         <Text style={styles.sectionTitle}>こんな人におすすめ</Text>
         <TextInput
           value={recommendationsInput}
-          onChangeText={setRecommendationsInput}
+          onChangeText={(text) => {
+            setRecommendationsInput(text);
+            checkForChanges();
+          }}
           multiline
           placeholder={"・新しい友達を作りたい人\n・○○が好きな人\n・○○が得意な人"}
           style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 60, fontSize: 16, marginBottom: 8}}
@@ -729,7 +818,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         </View>
         <TextInput
           value={leaderMessage}
-          onChangeText={setLeaderMessage}
+          onChangeText={(text) => {
+            setLeaderMessage(text);
+            checkForChanges();
+          }}
           multiline
           placeholder="代表者からのメッセージを入力"
           style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 60, fontSize: 16, marginBottom: 8}}
@@ -743,7 +835,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           <RNImage source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} style={styles.snsLargeLogo} />
           <TextInput
             value={snsLink}
-            onChangeText={setSnsLink}
+            onChangeText={(text) => {
+              setSnsLink(text);
+              checkForChanges();
+            }}
             placeholder="Instagramリンクを入力"
             style={{flex: 1, marginLeft: 8, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', fontSize: 16}}
             autoCapitalize="none"
@@ -754,7 +849,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           <RNImage source={require('../assets/SNS-icons/X_logo-black.png')} style={styles.snsLargeLogo} />
           <TextInput
             value={xLink}
-            onChangeText={setXLink}
+            onChangeText={(text) => {
+              setXLink(text);
+              checkForChanges();
+            }}
             placeholder="X（旧Twitter）リンクを入力"
             style={{flex: 1, marginLeft: 8, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', fontSize: 16}}
             autoCapitalize="none"
@@ -820,6 +918,15 @@ export default function CircleProfileEditScreen({ route, navigation }) {
               onChangeText={setEventTitle}
               style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginBottom: 8, backgroundColor: '#fff'}}
             />
+            <TouchableOpacity onPress={handlePickEventImage} style={{marginBottom: 8}}>
+              {eventImage ? (
+                <Image source={{ uri: eventImage.uri }} style={{width: '100%', aspectRatio: 16/9, borderRadius: 8}} />
+              ) : (
+                <View style={{width: '100%', aspectRatio: 16/9, backgroundColor: '#eee', borderRadius: 8, justifyContent: 'center', alignItems: 'center'}}>
+                  <Ionicons name="camera-outline" size={48} color="#aaa" />
+                </View>
+              )}
+            </TouchableOpacity>
             <TextInput
               placeholder="詳細"
               value={eventDetail}
@@ -827,15 +934,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
               multiline
               style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginBottom: 8, backgroundColor: '#fff', minHeight: 60}}
             />
-            <TouchableOpacity onPress={handlePickEventImage} style={{marginBottom: 8}}>
-              <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                <Ionicons name="image-outline" size={24} color="#007bff" />
-                <Text style={{marginLeft: 8, color: '#007bff'}}>画像を選択</Text>
-              </View>
-            </TouchableOpacity>
-            {eventImage && (
-              <Image source={{ uri: eventImage.uri }} style={{width: '100%', aspectRatio: 16/9, borderRadius: 8, marginBottom: 8}} />
-            )}
             <View style={{flexDirection: 'row', justifyContent: 'flex-end'}}>
               <TouchableOpacity onPress={() => setEventFormVisible(false)} style={{marginRight: 16}} disabled={eventUploading}>
                 <Text style={{color: '#666'}}>キャンセル</Text>
@@ -923,10 +1021,56 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   const renderWelcomeTab = () => (
     <View style={styles.tabContent}>
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>入会募集状況</Text>
+        <View style={styles.recruitingContainer}>
+          <View style={styles.recruitingStatusContainer}>
+            {isRecruiting ? (
+              <>
+                <Ionicons name="checkmark-circle" size={24} color="#28a745" />
+                <Text style={styles.recruitingStatusText}>入会募集中</Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="close-circle" size={24} color="#e74c3c" />
+                <Text style={styles.recruitingStatusText}>現在入会の募集はありません</Text>
+              </>
+            )}
+          </View>
+          <TouchableOpacity
+            style={[styles.toggleButton, isRecruiting && styles.toggleButtonActive]}
+            onPress={() => {
+              const newRecruitingStatus = !isRecruiting;
+              setIsRecruiting(newRecruitingStatus);
+              // 状態変更を即座に検知
+              if (!circleData) return;
+              
+              const hasChanges = 
+                description !== (circleData.description || '') ||
+                recommendationsInput !== (circleData.recommendations?.join(', ') || '') ||
+                leaderMessage !== (circleData.leaderMessage || '') ||
+                welcomeConditions !== (circleData.welcome?.conditions || '') ||
+                welcomeSchedule !== (circleData.welcome?.schedule || '') ||
+                snsLink !== (circleData.snsLink || '') ||
+                xLink !== (circleData.xLink || '') ||
+                shinkanLineGroupLink !== (circleData.shinkanLineGroupLink || '') ||
+                activityLocation !== (circleData.activityLocation || '') ||
+                newRecruitingStatus !== (circleData.welcome?.isRecruiting || false);
+              
+              setHasUnsavedChanges(hasChanges);
+            }}
+          >
+            <View style={[styles.toggleCircle, isRecruiting && styles.toggleCircleActive]} />
+          </TouchableOpacity>
+        </View>
+      </View>
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>入会条件</Text>
         <TextInput
           value={welcomeConditions}
-          onChangeText={setWelcomeConditions}
+          onChangeText={(text) => {
+            setWelcomeConditions(text);
+            checkForChanges();
+          }}
           multiline
           placeholder={"・○○経験者\n・○○大学に在籍中の方\n・大学１年生"}
           style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 60, fontSize: 16, marginBottom: 8}}
@@ -939,7 +1083,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           <Ionicons name="logo-whatsapp" size={24} color="#06C755" />
           <TextInput
             value={shinkanLineGroupLink}
-            onChangeText={setShinkanLineGroupLink}
+            onChangeText={(text) => {
+              setShinkanLineGroupLink(text);
+              checkForChanges();
+            }}
             placeholder="LINEグループ招待リンクを入力"
             style={{flex: 1, marginLeft: 8, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', fontSize: 16}}
             autoCapitalize="none"
@@ -951,7 +1098,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         <Text style={styles.sectionTitle}>新歓スケジュール</Text>
         <TextInput
           value={welcomeSchedule}
-          onChangeText={setWelcomeSchedule}
+          onChangeText={(text) => {
+            setWelcomeSchedule(text);
+            checkForChanges();
+          }}
           multiline
           placeholder={"2025/4/25 新歓BBQ"}
           style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 60, fontSize: 16, marginBottom: 8}}
@@ -1626,5 +1776,53 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  // 入会募集関連のスタイル
+  recruitingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  recruitingStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    flex: 1,
+    marginRight: 16,
+  },
+  recruitingStatusText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 12,
+  },
+  toggleButton: {
+    width: 51,
+    height: 31,
+    borderRadius: 15.5,
+    backgroundColor: '#ccc',
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  toggleButtonActive: {
+    backgroundColor: '#007bff',
+  },
+  toggleCircle: {
+    width: 27,
+    height: 27,
+    borderRadius: 13.5,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
+    elevation: 2,
+  },
+  toggleCircleActive: {
+    transform: [{ translateX: 20 }],
   },
 });
