@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, Alert, ScrollView, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { auth } from '../firebaseConfig';
 import { signOut } from 'firebase/auth';
+import CommonHeader from '../components/CommonHeader';
 
 const SettingItem = ({ label, icon, onPress, isDestructive = false }) => (
   <TouchableOpacity style={styles.settingItem} onPress={onPress}>
@@ -52,31 +53,32 @@ export default function SettingsScreen({ navigation }) {
   ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView>
-        <Text style={styles.headerTitle}>設定</Text>
-        
-        <View style={styles.section}>
-          {settingsOptions.map((item, index) => (
-            <SettingItem
-              key={index}
-              label={item.label}
-              icon={item.icon}
-              onPress={() => navigation.navigate(item.screen)}
-            />
-          ))}
-        </View>
+    <View style={styles.container}>
+      <CommonHeader title="設定" showBackButton={false} />
+      <SafeAreaView style={styles.contentSafeArea}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          <View style={styles.section}>
+            {settingsOptions.map((item, index) => (
+              <SettingItem
+                key={index}
+                label={item.label}
+                icon={item.icon}
+                onPress={() => navigation.navigate(item.screen)}
+              />
+            ))}
+          </View>
 
-        <View style={styles.section}>
-          <SettingItem
-            label="ログアウト"
-            icon="log-out-outline"
-            onPress={handleLogout}
-            isDestructive
-          />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+          <View style={styles.section}>
+            <SettingItem
+              label="ログアウト"
+              icon="log-out-outline"
+              onPress={handleLogout}
+              isDestructive
+            />
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -85,13 +87,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f2f2f7',
   },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    paddingHorizontal: 20,
+  contentSafeArea: {
+    flex: 1,
+    backgroundColor: '#f2f2f7',
+  },
+  scrollContent: {
     paddingTop: 20,
-    paddingBottom: 10,
   },
   section: {
     backgroundColor: '#fff',

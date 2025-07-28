@@ -98,11 +98,16 @@ export default function MyPageScreen({ navigation }) {
 
   // useFocusEffectや冗長なキャッシュ・ローディング処理を削除
 
-  // 初回ローディング時のみローディング画面を表示
-  if (loading && !userProfile) {
+  // 全情報取得完了までローディング画面を表示
+  if (loading || circlesLoading) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color="#007bff" style={{ flex: 1 }} />
+        <CommonHeader title="マイページ" />
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#007bff" />
+          </View>
+        </SafeAreaView>
       </View>
     );
   }
@@ -148,9 +153,7 @@ export default function MyPageScreen({ navigation }) {
           </View>
           <View style={styles.contentArea}>
             <Text style={styles.contentTitle}>所属しているサークル</Text>
-            {circlesLoading ? (
-              <ActivityIndicator size="small" color="#007bff" />
-            ) : joinedCircles.length > 0 ? (
+            {joinedCircles.length > 0 ? (
               <View style={styles.gridContainer}>
                 {joinedCircles.map(item => (
                   <TouchableOpacity key={item.id} style={styles.gridItem} onPress={() => navigation.navigate('CircleMember', { circleId: item.id })}>
@@ -165,9 +168,7 @@ export default function MyPageScreen({ navigation }) {
           </View>
           <View style={styles.contentArea}>
             <Text style={styles.contentTitle}>保存したサークル</Text>
-            {circlesLoading ? (
-              <ActivityIndicator size="small" color="#007bff" />
-            ) : savedCircles.length > 0 ? (
+            {savedCircles.length > 0 ? (
               <View style={styles.gridContainer}>
                 {savedCircles.map(item => (
                   <TouchableOpacity key={item.id} style={styles.gridItem} onPress={() => navigation.navigate('CircleDetail', { circleId: item.id })}>
@@ -188,6 +189,7 @@ export default function MyPageScreen({ navigation }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   profileSection: { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 20 },
   profileImageContainerSimple: { alignItems: 'center', marginBottom: 12 },
   profileImage: { width: 100, height: 100, borderRadius: 50 },

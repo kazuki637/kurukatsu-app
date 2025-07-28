@@ -17,6 +17,12 @@ export default function CircleManagementScreen({ navigation }) {
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      if (!currentUser) {
+        setLoading(false);
+      } else {
+        // ユーザーが認証されている場合は、権限情報取得が完了するまでローディング状態を維持
+        setLoading(true);
+      }
     });
     return unsubscribeAuth;
   }, []);
@@ -26,23 +32,29 @@ export default function CircleManagementScreen({ navigation }) {
       setLoading(false);
       return;
     }
+    
     const fetchAdminCircles = async () => {
-      setLoading(true);
-      const circlesSnapshot = await getDocs(collection(db, 'circles'));
-      const adminCircleList = [];
-      for (const circleDoc of circlesSnapshot.docs) {
-        const circleId = circleDoc.id;
-        const memberDoc = await getDoc(doc(db, 'circles', circleId, 'members', user.uid));
-        if (memberDoc.exists()) {
-          const role = memberDoc.data().role || 'member';
-          if (role === 'leader' || role === 'admin') {
-            adminCircleList.push({ id: circleId, ...circleDoc.data(), role });
+      try {
+        const circlesSnapshot = await getDocs(collection(db, 'circles'));
+        const adminCircleList = [];
+        for (const circleDoc of circlesSnapshot.docs) {
+          const circleId = circleDoc.id;
+          const memberDoc = await getDoc(doc(db, 'circles', circleId, 'members', user.uid));
+          if (memberDoc.exists()) {
+            const role = memberDoc.data().role || 'member';
+            if (role === 'leader' || role === 'admin') {
+              adminCircleList.push({ id: circleId, ...circleDoc.data(), role });
+            }
           }
         }
+        setAdminCircles(adminCircleList);
+      } catch (error) {
+        console.error('Error fetching admin circles:', error);
+      } finally {
+        setLoading(false);
       }
-      setAdminCircles(adminCircleList);
-      setLoading(false);
     };
+    
     fetchAdminCircles();
   }, [user]);
 
@@ -68,7 +80,6 @@ export default function CircleManagementScreen({ navigation }) {
         <SafeAreaView style={styles.contentSafeArea}>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#007bff" />
-            <Text>サークル情報を読み込み中...</Text>
           </View>
         </SafeAreaView>
       </View>

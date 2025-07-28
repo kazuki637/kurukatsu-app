@@ -218,15 +218,11 @@ const SearchScreen = ({ navigation }) => {
             <TouchableOpacity style={styles.clearButton} onPress={handleClearFilters}>
               <Text style={styles.clearButtonText}>リセット</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.searchButton} onPress={handleSearch} disabled={initialLoading}>
-              {initialLoading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Ionicons name="search" size={20} color="#fff" style={{ marginRight: 5 }} />
-                  <Text style={styles.searchButtonText}>この条件で検索</Text>
-                </View>
-              )}
+            <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="search" size={20} color="#fff" style={{ marginRight: 5 }} />
+                <Text style={styles.searchButtonText}>この条件で検索</Text>
+              </View>
             </TouchableOpacity>
           </View>
         </View>
