@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Image, TouchableWithoutFeedback, Keyboard, ScrollView } from 'react-native';
 import { auth } from '../firebaseConfig';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -22,61 +22,75 @@ const LoginScreen = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>ログイン</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="メールアドレス"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="パスワード"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
-      <TouchableOpacity
-        style={styles.loginButton}
-        onPress={handleLogin}
-        disabled={loading}
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <ScrollView 
+        style={styles.container}
+        contentContainerStyle={styles.scrollContainer}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        {loading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.loginButtonText}>ログイン</Text>
-        )}
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.signupButton}
-        onPress={() => navigation.navigate('Signup')}
-      >
-        <Text style={styles.signupButtonText}>新規登録はこちら</Text>
-      </TouchableOpacity>
-      {/* 開発用：オンボーディング再表示ボタン */}
-      <TouchableOpacity
-        style={{ marginTop: 30, padding: 12, backgroundColor: '#28a745', borderRadius: 8 }}
-        onPress={async () => {
-          await AsyncStorage.removeItem('seenOnboarding');
-          Alert.alert('オンボーディングフラグをリセットしました', '次回アプリ起動時にオンボーディング画面が再表示されます。');
-        }}
-      >
-        <Text style={{ color: '#fff', fontWeight: 'bold' }}>オンボーディング再表示（開発用）</Text>
-      </TouchableOpacity>
-    </View>
+        <Text style={styles.title}>ログイン</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="メールアドレス"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          returnKeyType="next"
+          blurOnSubmit={false}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="パスワード"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          returnKeyType="done"
+          onSubmitEditing={Keyboard.dismiss}
+        />
+        <TouchableOpacity
+          style={styles.loginButton}
+          onPress={handleLogin}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.loginButtonText}>ログイン</Text>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.signupButton}
+          onPress={() => navigation.navigate('Signup')}
+        >
+          <Text style={styles.signupButtonText}>新規登録はこちら</Text>
+        </TouchableOpacity>
+        {/* 開発用：オンボーディング再表示ボタン */}
+        <TouchableOpacity
+          style={{ marginTop: 30, padding: 12, backgroundColor: '#28a745', borderRadius: 8 }}
+          onPress={async () => {
+            await AsyncStorage.removeItem('seenOnboarding');
+            Alert.alert('オンボーディングフラグをリセットしました', '次回アプリ起動時にオンボーディング画面が再表示されます。');
+          }}
+        >
+          <Text style={{ color: '#fff', fontWeight: 'bold' }}>オンボーディング再表示（開発用）</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </TouchableWithoutFeedback>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  scrollContainer: {
+    flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#f5f5f5',
   },
   title: {
     fontSize: 28,

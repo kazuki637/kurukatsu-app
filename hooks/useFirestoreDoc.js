@@ -36,7 +36,9 @@ export default function useFirestoreDoc(db, docPath, options = {}) {
         setData(docData);
         cacheRef.current[docPath] = { data: docData, timestamp: now };
       } else {
+        // ドキュメントが存在しない場合はnullを設定（エラーではない）
         setData(null);
+        cacheRef.current[docPath] = { data: null, timestamp: now };
       }
     } catch (e) {
       setError(e);

@@ -111,11 +111,35 @@ export default function MyPageScreen({ navigation }) {
       </View>
     );
   }
+  
+  // エラーが発生した場合
   if (error) {
     return (
       <View style={styles.container}>
-        <Text>ユーザーデータの取得に失敗しました</Text>
-        <TouchableOpacity onPress={reload}><Text>再読み込み</Text></TouchableOpacity>
+        <CommonHeader title="マイページ" />
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={styles.loadingContainer}>
+            <Text>ユーザーデータの取得に失敗しました</Text>
+            <TouchableOpacity onPress={reload} style={{ marginTop: 10 }}>
+              <Text style={{ color: '#007bff' }}>再読み込み</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+  
+  // ユーザープロフィールが存在しない場合（新規登録直後など）
+  if (!userProfile) {
+    return (
+      <View style={styles.container}>
+        <CommonHeader title="マイページ" />
+        <SafeAreaView style={{ flex: 1 }}>
+          <View style={styles.loadingContainer}>
+            <Text>プロフィール情報を読み込み中...</Text>
+            <ActivityIndicator size="large" color="#007bff" style={{ marginTop: 10 }} />
+          </View>
+        </SafeAreaView>
       </View>
     );
   }
