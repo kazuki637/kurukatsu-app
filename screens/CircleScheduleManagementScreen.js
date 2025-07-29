@@ -8,8 +8,20 @@ import CommonHeader from '../components/CommonHeader';
 
 // 高度に洗練されたカレンダーコンポーネント
 const Calendar = ({ selectedDate, onDateSelect, events }) => {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const today = new Date();
+    return today;
+  });
   const [isAnimating, setIsAnimating] = useState(false);
+
+  // 選択された日付に基づいてカレンダーの月を更新
+  useEffect(() => {
+    if (selectedDate) {
+      const selectedYear = selectedDate.getFullYear();
+      const selectedMonth = selectedDate.getMonth();
+      setCurrentMonth(new Date(selectedYear, selectedMonth, 1));
+    }
+  }, [selectedDate]);
   
   const getDaysInMonth = (date) => {
     const year = date.getFullYear();
@@ -50,11 +62,10 @@ const Calendar = ({ selectedDate, onDateSelect, events }) => {
   };
 
   const formatDate = (date) => {
-    // タイムゾーンの影響を避けるため、ローカル日付として処理
-    const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
-    const year = localDate.getFullYear();
-    const month = String(localDate.getMonth() + 1).padStart(2, '0');
-    const day = String(localDate.getDate()).padStart(2, '0');
+    // ローカル日付として処理（タイムゾーンオフセットを引かない）
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
 
@@ -232,8 +243,8 @@ const Calendar = ({ selectedDate, onDateSelect, events }) => {
             style={[
               styles.calendarDay,
               !day.isCurrentMonth && styles.otherMonthDay,
-              isSelected(day.date) && styles.selectedDay,
               isToday(day.date) && styles.today,
+              isSelected(day.date) && styles.selectedDay,
               hasEvent(day.date) && styles.eventDay,
               isPast(day.date) && styles.pastDay
             ]}
@@ -244,7 +255,8 @@ const Calendar = ({ selectedDate, onDateSelect, events }) => {
               styles.dayContent,
               isToday(day.date) && styles.todayContent,
               isPast(day.date) && styles.pastDay,
-              isSelected(day.date) && styles.selectedDayContent
+              isSelected(day.date) && styles.selectedDayContent,
+              isToday(day.date) && isSelected(day.date) && styles.todaySelectedContent
             ]}>
               {isSelected(day.date) && <View style={styles.selectedDayBorder} />}
               <Text style={[
@@ -270,7 +282,10 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
   const { circleId } = route.params;
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState([]);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const today = new Date();
+    return today;
+  });
 
 
   useEffect(() => {
@@ -352,11 +367,10 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
   const getEventsForSelectedDate = () => {
     // メインコンポーネント内でformatDate関数を定義
     const formatDate = (date) => {
-      // タイムゾーンの影響を避けるため、ローカル日付として処理
-      const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
-      const year = localDate.getFullYear();
-      const month = String(localDate.getMonth() + 1).padStart(2, '0');
-      const day = String(localDate.getDate()).padStart(2, '0');
+      // ローカル日付として処理（タイムゾーンオフセットを引かない）
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
       return `${year}-${month}-${day}`;
     };
     
@@ -603,6 +617,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   todayContent: {
+    backgroundColor: '#e3f2fd',
+  },
+  todaySelectedContent: {
     backgroundColor: '#e3f2fd',
   },
   todayText: {

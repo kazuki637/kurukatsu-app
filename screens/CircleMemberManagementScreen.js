@@ -244,10 +244,27 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
     }
   };
 
-  const filteredMembers = members.filter(member =>
-    member.name.toLowerCase().includes(searchText.toLowerCase()) ||
-    member.university.toLowerCase().includes(searchText.toLowerCase()) ||
-    member.grade.toLowerCase().includes(searchText.toLowerCase())
+  // 役割に基づくソート関数
+  const sortMembersByRole = (memberList) => {
+    const rolePriority = {
+      'leader': 1,
+      'admin': 2,
+      'member': 3
+    };
+    
+    return memberList.sort((a, b) => {
+      const priorityA = rolePriority[a.role] || 4;
+      const priorityB = rolePriority[b.role] || 4;
+      return priorityA - priorityB;
+    });
+  };
+
+  const filteredMembers = sortMembersByRole(
+    members.filter(member =>
+      member.name.toLowerCase().includes(searchText.toLowerCase()) ||
+      member.university.toLowerCase().includes(searchText.toLowerCase()) ||
+      member.grade.toLowerCase().includes(searchText.toLowerCase())
+    )
   );
 
   const filteredRequests = joinRequests.filter(request =>
