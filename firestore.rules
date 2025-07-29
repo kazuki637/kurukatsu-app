@@ -69,6 +69,11 @@ service cloud.firestore {
       allow update, delete: if request.auth != null && 
         exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)) &&
         get(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)).data.role in ['leader', 'admin'];
+      
+      // サークルメッセージの既読情報
+      match /readStatus/{userId} {
+        allow read, create, update: if request.auth != null;
+      }
     }
   }
 } 

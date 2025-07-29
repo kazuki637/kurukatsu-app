@@ -28,6 +28,13 @@ export default function CircleContactScreen({ route, navigation }) {
     const fetchMembers = async () => {
       setLoading(true);
       try {
+        const currentUser = auth.currentUser;
+        if (!currentUser) {
+          Alert.alert('エラー', 'ユーザー情報が取得できませんでした');
+          navigation.goBack();
+          return;
+        }
+
         const membersRef = collection(db, 'circles', circleId, 'members');
         const membersSnap = await getDocs(membersRef);
         const memberUids = membersSnap.docs.map(doc => doc.id);
@@ -43,11 +50,14 @@ export default function CircleContactScreen({ route, navigation }) {
               profileImageUrl: d.profileImageUrl || '',
               university: d.university || '',
               grade: d.grade || '',
+              isCurrentUser: uid === currentUser.uid, // 自分自身かどうかのフラグ
             });
           }
         }
         setMembers(memberProfiles);
-        setSelectedUids([]);
+        
+        // 自分自身を強制選択
+        setSelectedUids([currentUser.uid]);
         setSelectAll(false);
       } catch (e) {
         Alert.alert('エラー', 'メンバー一覧の取得に失敗しました');
@@ -61,21 +71,37 @@ export default function CircleContactScreen({ route, navigation }) {
 
   // 宛先選択（全選択・個別選択）
   const handleSelectAll = () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
     if (selectAll) {
-      setSelectedUids([]);
+      // 全選択解除時は自分自身のみ選択
+      setSelectedUids([currentUser.uid]);
       setSelectAll(false);
     } else {
+      // 全選択時は全メンバーを選択
       setSelectedUids(members.map(m => m.uid));
       setSelectAll(true);
     }
   };
+  
   const handleToggleSelect = (uid) => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    // 自分自身は選択不可
+    if (uid === currentUser.uid) {
+      return;
+    }
+
     if (selectedUids.includes(uid)) {
       setSelectedUids(selectedUids.filter(id => id !== uid));
       setSelectAll(false);
     } else {
       const newSelected = [...selectedUids, uid];
       setSelectedUids(newSelected);
+      // 全選択判定（自分自身を除く）
+      const otherMembers = members.filter(m => m.uid !== currentUser.uid);
       if (newSelected.length === members.length) setSelectAll(true);
     }
   };
@@ -99,20 +125,35 @@ export default function CircleContactScreen({ route, navigation }) {
       const senderData = senderDoc.exists() ? senderDoc.data() : {};
       const senderName = senderData.name || senderData.nickname || '不明';
       const senderProfileImageUrl = senderData.profileImageUrl || '';
+      
+      // メッセージデータを準備
+      const messageData = {
+        type: messageType,
+        title,
+        body,
+        circleId,
+        sentAt: serverTimestamp(),
+        ...(messageType === 'attendance' ? { deadline: deadline.toISOString() } : {}),
+        senderUid,
+        senderName,
+        senderProfileImageUrl,
+        recipientUids: selectedUids, // 宛先ユーザーIDを追加
+      };
+      
+      // 1. サークルコレクションにメッセージを保存
+      const circleMessageRef = collection(db, 'circles', circleId, 'messages');
+      const circleMessageDoc = await addDoc(circleMessageRef, messageData);
+      const messageId = circleMessageDoc.id;
+      
+      // 2. 各宛先ユーザーのコレクションにメッセージを保存
       for (const uid of selectedUids) {
-        const msgRef = collection(db, 'users', uid, 'circleMessages');
-        await addDoc(msgRef, {
-          type: messageType,
-          title,
-          body,
-          circleId,
-          sentAt: serverTimestamp(),
-          ...(messageType === 'attendance' ? { deadline: deadline.toISOString() } : {}),
-          senderUid,
-          senderName,
-          senderProfileImageUrl,
+        const userMessageRef = collection(db, 'users', uid, 'circleMessages');
+        await addDoc(userMessageRef, {
+          ...messageData,
+          messageId: messageId, // サークルコレクションのメッセージIDを参照
         });
       }
+      
       setTitle('');
       setBody('');
       setSelectedUids([]);
@@ -129,6 +170,7 @@ export default function CircleContactScreen({ route, navigation }) {
         { cancelable: false }
       );
     } catch (e) {
+      console.error('Error sending message:', e);
       Alert.alert('エラー', 'メッセージの送信に失敗しました');
     } finally {
       setLoading(false);
@@ -164,11 +206,11 @@ export default function CircleContactScreen({ route, navigation }) {
           </TouchableOpacity>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16 }}>
             {selectedUids.length === members.length && members.length > 0 ? (
-              <Text style={{ color: '#007bff' }}>全員</Text>
+              <Text style={{ color: '#007bff' }}>全員（自分含む）</Text>
             ) : selectedUids.length > 0 ? (
-              <Text style={{ color: '#007bff' }}>選択中のメンバー（{selectedUids.length}）</Text>
+              <Text style={{ color: '#007bff' }}>選択中のメンバー（{selectedUids.length}人、自分含む）</Text>
             ) : (
-              <Text style={{ color: '#aaa' }}>未選択</Text>
+              <Text style={{ color: '#007bff' }}>自分（強制選択）</Text>
             )}
           </View>
 
@@ -259,9 +301,24 @@ export default function CircleContactScreen({ route, navigation }) {
                 );
               }).map(member => {
                 const hasImage = member.profileImageUrl && member.profileImageUrl.trim() !== '' && !imageErrorMap[member.uid];
+                const isCurrentUser = member.isCurrentUser;
+                
                 return (
-                  <TouchableOpacity key={member.uid} onPress={() => handleToggleSelect(member.uid)} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                    <Ionicons name={selectedUids.includes(member.uid) ? 'checkbox' : 'square-outline'} size={22} color="#007bff" />
+                  <TouchableOpacity 
+                    key={member.uid} 
+                    onPress={() => !isCurrentUser && handleToggleSelect(member.uid)} 
+                    style={{ 
+                      flexDirection: 'row', 
+                      alignItems: 'center', 
+                      marginBottom: 12,
+                      opacity: isCurrentUser ? 0.6 : 1 // 自分自身は薄く表示
+                    }}
+                  >
+                    <Ionicons 
+                      name={selectedUids.includes(member.uid) ? 'checkbox' : 'square-outline'} 
+                      size={22} 
+                      color={isCurrentUser ? "#ccc" : "#007bff"} // 自分自身はグレー
+                    />
                     {hasImage ? (
                       <Image
                         source={{ uri: member.profileImageUrl }}
@@ -273,9 +330,10 @@ export default function CircleContactScreen({ route, navigation }) {
                         <Ionicons name="person-outline" size={18} color="#aaa" />
                       </View>
                     )}
-                    <Text>{member.name}</Text>
+                    <Text style={{ color: isCurrentUser ? '#888' : '#333' }}>{member.name}</Text>
                     {member.university && <Text style={{ color: '#888', marginLeft: 8 }}>{member.university}</Text>}
                     {member.grade && <Text style={{ color: '#888', marginLeft: 8 }}>{member.grade}</Text>}
+                    {isCurrentUser && <Text style={{ color: '#007bff', marginLeft: 8, fontSize: 12 }}>(自分)</Text>}
                   </TouchableOpacity>
                 );
               })}
