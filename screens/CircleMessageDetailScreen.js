@@ -30,16 +30,17 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
     const membersRef = collection(db, 'circles', message.circleId, 'members');
     const membersSnap = await getDocs(membersRef);
     const memberUids = membersSnap.docs.map(doc => doc.id);
-    // 2. readsサブコレクション取得
-    const ownerUid = message.ownerUid || message.uid || message.toUid;
-    const messageId = message.id;
-    const readsRef = collection(db, 'users', ownerUid, 'circleMessages', messageId, 'reads');
-    const readsSnap = await getDocs(readsRef);
+    
+    // 2. サークルレベルでの既読情報取得
+    const messageId = message.messageId || message.id; // messageIdを優先、なければidを使用
+    const readStatusRef = collection(db, 'circles', message.circleId, 'messages', messageId, 'readStatus');
+    const readStatusSnap = await getDocs(readStatusRef);
     const readMap = {};
-    readsSnap.forEach(doc => {
+    readStatusSnap.forEach(doc => {
       const d = doc.data();
       readMap[doc.id] = d.readAt ? d.readAt.toDate() : null;
     });
+    
     // 3. プロフィール取得
     const users = [];
     for (const uid of memberUids) {
@@ -61,33 +62,35 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
   useEffect(() => {
     const registerAndFetch = async () => {
       try {
-        // 1. 既読登録
+        // 1. 既読登録（サークルレベル）
         const user = auth.currentUser;
         if (!user) {
           return;
         }
-        const userUid = message.userUid || message.uid || message.toUid;
-        const messageId = message.id;
-        if (!userUid || !messageId) {
+        const messageId = message.messageId || message.id; // messageIdを優先、なければidを使用
+        if (!message.circleId || !messageId) {
           return;
         }
-        const readRef = doc(db, 'users', userUid, 'circleMessages', messageId, 'reads', user.uid);
-        const readSnap = await getDoc(readRef);
-        if (!readSnap.exists()) {
-          await setDoc(readRef, { readAt: serverTimestamp() });
+        const readStatusRef = doc(db, 'circles', message.circleId, 'messages', messageId, 'readStatus', user.uid);
+        const readStatusSnap = await getDoc(readStatusRef);
+        if (!readStatusSnap.exists()) {
+          await setDoc(readStatusRef, { readAt: serverTimestamp() });
         }
+        
         // 2. サークルメンバー一覧取得
         const membersRef = collection(db, 'circles', message.circleId, 'members');
         const membersSnap = await getDocs(membersRef);
         const memberUids = membersSnap.docs.map(doc => doc.id);
-        // 3. readsサブコレクション取得
-        const readsRef = collection(db, 'users', userUid, 'circleMessages', messageId, 'reads');
-        const readsSnap = await getDocs(readsRef);
+        
+        // 3. サークルレベルでの既読情報取得
+        const readStatusCollectionRef = collection(db, 'circles', message.circleId, 'messages', messageId, 'readStatus');
+        const readStatusCollectionSnap = await getDocs(readStatusCollectionRef);
         const readMap = {};
-        readsSnap.forEach(doc => {
+        readStatusCollectionSnap.forEach(doc => {
           const d = doc.data();
           readMap[doc.id] = d.readAt ? d.readAt.toDate() : null;
         });
+        
         // 4. プロフィール取得
         const users = [];
         for (const uid of memberUids) {
@@ -103,7 +106,9 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
         // 5. 既読・未読で分割
         setReadUsers(users.filter(u => u.readAt));
         setUnreadUsers(users.filter(u => !u.readAt));
-      } catch (e) {}
+      } catch (e) {
+        console.error('Error in registerAndFetch:', e);
+      }
     };
     registerAndFetch();
   }, [message]);
