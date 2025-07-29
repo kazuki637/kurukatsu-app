@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, Alert, ScrollView, FlatList, ActivityIndicator, TextInput } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, Alert, ScrollView, FlatList, ActivityIndicator, TextInput, Modal } from 'react-native';
 import CommonHeader from '../components/CommonHeader';
 import { db } from '../firebaseConfig';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth } from '../firebaseConfig';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, deleteDoc, updateDoc, arrayRemove } from 'firebase/firestore';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 import { getRoleDisplayName } from '../utils/permissionUtils';
 
@@ -294,6 +294,7 @@ export default function CircleMemberScreen({ route, navigation }) {
   const [members, setMembers] = useState([]);
   const [membersLoading, setMembersLoading] = useState(false);
   const [memberSearchText, setMemberSearchText] = useState('');
+  const [leaveModalVisible, setLeaveModalVisible] = useState(false);
 
   useEffect(() => {
     const fetchCircle = async () => {
@@ -463,6 +464,43 @@ export default function CircleMemberScreen({ route, navigation }) {
       member.grade.toLowerCase().includes(memberSearchText.toLowerCase())
     )
   );
+
+  // 脱退処理
+  const handleLeave = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    // 現在のユーザーが代表者かどうかをチェック
+    const currentUserMember = members.find(member => member.id === user.uid);
+    if (currentUserMember && currentUserMember.role === 'leader') {
+      setLeaveModalVisible(false);
+      Alert.alert(
+        '脱退できません', 
+        'あなたはこのサークルの代表者です。\n代表者を引き継いだ後、脱退してください。',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    try {
+      // サークルメンバーから削除
+      await deleteDoc(doc(db, 'circles', circleId, 'members', user.uid));
+      
+      // ユーザーのjoinedCircleIdsからサークルIDを削除
+      const userDocRef = doc(db, 'users', user.uid);
+      await updateDoc(userDocRef, {
+        joinedCircleIds: arrayRemove(circleId)
+      });
+      
+      setLeaveModalVisible(false);
+      Alert.alert('脱退完了', 'サークルを脱退しました', [
+        { text: 'OK', onPress: () => navigation.goBack() }
+      ]);
+    } catch (e) {
+      console.error('Error leaving circle:', e);
+      Alert.alert('エラー', '脱退に失敗しました');
+    }
+  };
 
   // タブ切り替え用
   const renderTabContent = () => {
@@ -648,6 +686,14 @@ export default function CircleMemberScreen({ route, navigation }) {
                         <Text style={styles.memberInfo}>{item.university || ''} {item.grade || ''}</Text>
                         <Text style={styles.memberRole}>{getRoleDisplayName(item.role)}</Text>
                       </View>
+                                  {item.id === auth.currentUser?.uid && (
+              <TouchableOpacity
+                style={styles.memberLeaveButton}
+                onPress={() => setLeaveModalVisible(true)}
+              >
+                <Text style={styles.memberLeaveButtonText}>脱退する</Text>
+              </TouchableOpacity>
+            )}
                     </View>
                   );
                 }}
@@ -681,6 +727,40 @@ export default function CircleMemberScreen({ route, navigation }) {
         {/* タブ内容 */}
         {renderTabContent()}
       </SafeAreaView>
+
+      {/* 脱退確認モーダル */}
+      <Modal
+        visible={leaveModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setLeaveModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>確認</Text>
+            <Text style={styles.modalSubtitle}>
+              本当にサークルを脱退しますか？
+            </Text>
+                          <Text style={styles.modalWarning}>
+                あなたはサークルメンバーではなくなり、{'\n'}サークル情報にアクセスできなくなります
+              </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setLeaveModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>キャンセル</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.leaveButton}
+                onPress={handleLeave}
+              >
+                <Text style={styles.leaveButtonText}>脱退する</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </>
   );
 }
@@ -1055,5 +1135,87 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#007bff',
     fontWeight: 'bold',
+  },
+  memberLeaveButton: {
+    backgroundColor: '#f44336',
+    borderRadius: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginLeft: 16,
+  },
+  memberLeaveButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 24,
+    width: '80%',
+    maxWidth: 300,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 12,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 8,
+    color: '#333',
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  modalWarning: {
+    fontSize: 14,
+    color: '#f44336',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#666',
+  },
+  leaveButton: {
+    flex: 1,
+    backgroundColor: '#f44336',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  leaveButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
   },
 }); 
