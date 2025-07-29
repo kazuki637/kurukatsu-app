@@ -484,11 +484,11 @@ export default function CircleProfileScreen({ route, navigation }) {
               <Ionicons name="checkmark-circle" size={20} color="#28a745" />
               <Text style={styles.requestedButtonText}>申請済み</Text>
             </View>
-          ) : (
+          ) : circleData.welcome?.isRecruiting ? (
             <TouchableOpacity style={styles.joinButton} onPress={handleJoinRequest}>
               <Text style={styles.joinButtonText}>入会申請</Text>
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
       </SafeAreaView>
     </View>
