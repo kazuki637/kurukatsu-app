@@ -42,14 +42,15 @@ export default function MyPageScreen({ navigation }) {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [imageError, setImageError] = useState(false);
 
-  // 画面がフォーカスされたときにユーザーデータをリロード（初回のみ）
+  // 画面がフォーカスされたときにユーザーデータをリロード
   useFocusEffect(
     React.useCallback(() => {
       if (isInitialLoad) {
         setIsInitialLoad(false);
         return;
       }
-      // 画面がフォーカスされたときの処理（必要に応じて）
+      // 画面がフォーカスされたときにデータをリロード
+      reload();
     }, [isInitialLoad])
   );
 
@@ -57,7 +58,12 @@ export default function MyPageScreen({ navigation }) {
   React.useEffect(() => {
     const fetchCircles = async () => {
       if (!userProfile) return;
-      setCirclesLoading(true);
+      
+      // 初回ロード時のみローディング状態を表示
+      if (isInitialLoad) {
+        setCirclesLoading(true);
+      }
+      
       try {
         // joinedCircles
         let joined = [];
@@ -94,12 +100,12 @@ export default function MyPageScreen({ navigation }) {
       }
     };
     fetchCircles();
-  }, [userProfile?.joinedCircleIds, userProfile?.favoriteCircleIds]);
+  }, [userProfile?.joinedCircleIds, userProfile?.favoriteCircleIds, isInitialLoad]);
 
   // useFocusEffectや冗長なキャッシュ・ローディング処理を削除
 
-  // 全情報取得完了までローディング画面を表示
-  if (loading || circlesLoading) {
+  // 初回ロード時のみローディング画面を表示
+  if (loading && isInitialLoad) {
     return (
       <View style={styles.container}>
         <CommonHeader title="マイページ" />
