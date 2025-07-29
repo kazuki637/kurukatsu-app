@@ -23,6 +23,13 @@ export default function CircleContactScreen({ route, navigation }) {
   const maxBodyLength = 1000;
   const [imageErrorMap, setImageErrorMap] = useState({});
 
+  // 宛先未選択（自分だけしか選択されてない状態）かどうかを判定
+  const isOnlySelfSelected = () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return true;
+    return selectedUids.length === 1 && selectedUids.includes(currentUser.uid);
+  };
+
   // メンバー一覧取得
   useEffect(() => {
     const fetchMembers = async () => {
@@ -110,6 +117,10 @@ export default function CircleContactScreen({ route, navigation }) {
   const handleSend = async () => {
     if (!title.trim() || !body.trim() || selectedUids.length === 0) {
       Alert.alert('エラー', '全項目を入力し、宛先を選択してください');
+      return;
+    }
+    if (isOnlySelfSelected()) {
+      Alert.alert('エラー', '宛先を選択してください（自分以外のメンバーを選択してください）');
       return;
     }
     if (messageType === 'attendance' && !deadline) {
@@ -212,6 +223,11 @@ export default function CircleContactScreen({ route, navigation }) {
             ) : (
               <Text style={{ color: '#007bff' }}>自分（強制選択）</Text>
             )}
+            {isOnlySelfSelected() && (
+              <Text style={{ color: '#dc3545', fontSize: 12, marginTop: 4 }}>
+                宛先を選択してください（自分以外のメンバーを選択してください）
+              </Text>
+            )}
           </View>
 
           {/* タイトル */}
@@ -262,7 +278,16 @@ export default function CircleContactScreen({ route, navigation }) {
           )}
 
           {/* 送信ボタン */}
-          <TouchableOpacity style={{ backgroundColor: '#007bff', borderRadius: 8, padding: 16, alignItems: 'center' }} onPress={handleSend}>
+          <TouchableOpacity 
+            style={{ 
+              backgroundColor: isOnlySelfSelected() ? '#ccc' : '#007bff', 
+              borderRadius: 8, 
+              padding: 16, 
+              alignItems: 'center' 
+            }} 
+            onPress={handleSend}
+            disabled={isOnlySelfSelected()}
+          >
             <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>送信</Text>
           </TouchableOpacity>
         </ScrollView>

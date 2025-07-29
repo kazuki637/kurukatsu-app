@@ -39,8 +39,9 @@ service cloud.firestore {
          exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)) &&
          get(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)).data.role in ['leader', 'admin']);
       allow delete: if request.auth != null && 
-        exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)) &&
-        get(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)).data.role in ['leader', 'admin'];
+        (request.auth.uid == memberId || // 自分自身の削除（脱退）を許可
+         exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)).data.role in ['leader', 'admin']);
     }
 
     // サークルの入会申請
@@ -73,6 +74,15 @@ service cloud.firestore {
       // サークルメッセージの既読情報
       match /readStatus/{userId} {
         allow read, create, update: if request.auth != null;
+      }
+      
+      // サークルメッセージの出席確認情報
+      match /attendance/{userId} {
+        allow read: if request.auth != null && 
+          exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid));
+        allow create, update, delete: if request.auth != null && 
+          request.auth.uid == userId && 
+          exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid));
       }
     }
   }
