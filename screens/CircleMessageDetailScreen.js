@@ -429,12 +429,12 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
           {message.sentAt && message.sentAt.toDate ? message.sentAt.toDate().toLocaleString('ja-JP') : ''}
         </Text>
         {/* 上部：種別＋タイトル（横並び） */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16, flex: 1 }}>
           <Text style={{ color: '#007bff', fontSize: 18, fontWeight: 'bold' }}>
             {message.type === 'attendance' ? '出欠確認' : '通常連絡'}
           </Text>
           <View style={{ width: 1.5, height: 24, backgroundColor: '#d0d7de', marginHorizontal: 12, borderRadius: 1 }} />
-          <Text style={{ color: '#222', fontSize: 18, fontWeight: 'bold' }}>{message.title}</Text>
+          <Text style={{ color: '#222', fontSize: 18, fontWeight: 'bold', flex: 1 }}>{message.title}</Text>
         </View>
         {/* 送信者アイコン＋氏名 */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>

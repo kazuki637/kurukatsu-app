@@ -602,8 +602,8 @@ export default function CircleMemberScreen({ route, navigation }) {
                       style={{ backgroundColor: '#f8f8f8', borderRadius: 10, padding: 14, marginBottom: 14 }}
                       onPress={() => navigation.navigate('CircleMessageDetail', { message: { ...item, userUid: auth.currentUser.uid } })}
                     >
-                      {/* 右上：送信日時 */}
-                      <View style={{ position: 'absolute', top: 10, right: 14 }}>
+                      {/* 右下：送信日時 */}
+                      <View style={{ position: 'absolute', bottom: 10, right: 14 }}>
                         <Text style={{ color: '#888', fontSize: 12 }}>
                           {item.sentAt && item.sentAt.toDate ? item.sentAt.toDate().toLocaleString('ja-JP') : ''}
                         </Text>
@@ -614,7 +614,7 @@ export default function CircleMemberScreen({ route, navigation }) {
                           {item.type === 'attendance' ? '出欠確認' : '通常連絡'}
                         </Text>
                         <View style={{ width: 1.5, height: 24, backgroundColor: '#d0d7de', marginHorizontal: 12, borderRadius: 1 }} />
-                        <Text style={{ color: '#222', fontSize: 18, fontWeight: 'bold' }}>
+                        <Text style={{ color: '#222', fontSize: 18, fontWeight: 'bold', flex: 1 }} numberOfLines={1} ellipsizeMode="tail">
                           {item.title}
                         </Text>
                       </View>
