@@ -111,7 +111,7 @@ export default function CircleManagementScreen({ navigation }) {
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>サークルの管理ができる！</Text>
                 <Text style={styles.cardSubtitle}>
-                  {`メンバーの管理やイベントの企画など\nあなたのサークル活動をサポートします。`}
+                  {`メンバーの管理やイベントの企画など\nあなたのサークル運営をサポートします`}
                 </Text>
                 <Image 
                   source={require('../assets/CircleManagement.png')} 
