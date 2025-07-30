@@ -113,9 +113,11 @@ export default function CircleManagementScreen({ navigation }) {
                 <Text style={styles.cardSubtitle}>
                   {`メンバーの管理やイベントの企画など\nあなたのサークル活動をサポートします。`}
                 </Text>
-                <View style={styles.imagePlaceholder}>
-                  <Text style={styles.imagePlaceholderText}>[ここにイラストや写真]</Text>
-                </View>
+                <Image 
+                  source={require('../assets/CircleManagement.png')} 
+                  style={styles.circleManagementImage}
+                  resizeMode="contain"
+                />
               </View>
             </View>
             <View style={styles.createButtonContainer}>
@@ -321,17 +323,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
   },
-  imagePlaceholder: {
+  circleManagementImage: {
     width: '100%',
-    height: 200,
-    backgroundColor: '#e0e0e0',
+    height: 350,
     borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imagePlaceholderText: {
-    color: '#aaa',
-    fontSize: 18,
   },
   mainContentWrapper: {
     flex: 1,
