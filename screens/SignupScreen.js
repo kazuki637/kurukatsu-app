@@ -31,8 +31,8 @@ const SignupScreen = ({ navigation }) => {
         gender: '',
         birthday: '',
         profileImageUrl: '',
-        isUniversityPublic: false,
-        isGradePublic: false
+        isUniversityPublic: true,
+        isGradePublic: true
       });
       
       Alert.alert('登録完了', 'アカウントが作成されました。');

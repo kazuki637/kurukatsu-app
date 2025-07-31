@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { db, auth } from '../firebaseConfig';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import CommonHeader from '../components/CommonHeader';
 
@@ -35,30 +35,34 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
       setLoading(false);
       return;
     }
-    
-    const fetchCircleData = async () => {
-      setLoading(true);
+
+    setLoading(true);
+
+    // リアルタイムリスナーを設定
+    const unsubscribe = onSnapshot(doc(db, 'circles', circleId), (circleDoc) => {
       try {
-        // サークルデータを取得
-        const circleDoc = await getDoc(doc(db, 'circles', circleId));
         if (circleDoc.exists()) {
           setCircleData(circleDoc.data());
         }
 
-        // ユーザーの役割を取得
-        const memberDoc = await getDoc(doc(db, 'circles', circleId, 'members', user.uid));
-        if (memberDoc.exists()) {
-          setUserRole(memberDoc.data().role || 'member');
-        }
+        // ユーザーの役割を取得（一度だけ）
+        getDoc(doc(db, 'circles', circleId, 'members', user.uid)).then((memberDoc) => {
+          if (memberDoc.exists()) {
+            setUserRole(memberDoc.data().role || 'member');
+          }
+        });
       } catch (error) {
         console.error('Error fetching circle data:', error);
         Alert.alert('エラー', 'サークル情報の取得に失敗しました');
       } finally {
         setLoading(false);
       }
-    };
+    }, (error) => {
+      console.error('Error listening to circle:', error);
+      setLoading(false);
+    });
 
-    fetchCircleData();
+    return () => unsubscribe();
   }, [user, circleId]);
 
   if (loading) {

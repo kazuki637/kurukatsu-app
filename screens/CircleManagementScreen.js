@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, StatusBar, ActivityIndicator, Image, Alert, FlatList, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { db, auth } from '../firebaseConfig';
-import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useNavigation } from '@react-navigation/native';
 import CommonHeader from '../components/CommonHeader';
@@ -32,12 +32,12 @@ export default function CircleManagementScreen({ navigation }) {
       setLoading(false);
       return;
     }
-    
-    const fetchAdminCircles = async () => {
+
+    // リアルタイムリスナーを設定
+    const unsubscribe = onSnapshot(collection(db, 'circles'), async (snapshot) => {
       try {
-        const circlesSnapshot = await getDocs(collection(db, 'circles'));
         const adminCircleList = [];
-        for (const circleDoc of circlesSnapshot.docs) {
+        for (const circleDoc of snapshot.docs) {
           const circleId = circleDoc.id;
           const memberDoc = await getDoc(doc(db, 'circles', circleId, 'members', user.uid));
           if (memberDoc.exists()) {
@@ -53,9 +53,12 @@ export default function CircleManagementScreen({ navigation }) {
       } finally {
         setLoading(false);
       }
-    };
-    
-    fetchAdminCircles();
+    }, (error) => {
+      console.error('Error listening to circles:', error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [user]);
 
   const handleRegisterCirclePress = () => {
