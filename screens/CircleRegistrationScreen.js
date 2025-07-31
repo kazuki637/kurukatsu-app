@@ -6,6 +6,7 @@ import { db, storage, auth } from '../firebaseConfig';
 import { collection, addDoc, doc, getDoc, updateDoc, arrayUnion, setDoc } from 'firebase/firestore';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { compressCircleImage } from '../utils/imageCompression';
 
 export default function CircleRegistrationScreen() {
   const navigation = useNavigation();
@@ -31,7 +32,9 @@ export default function CircleRegistrationScreen() {
     });
 
     if (!result.canceled) {
-      setCircleImage(result.assets[0].uri);
+      const uri = result.assets[0].uri;
+      setCircleImage(uri);
+      console.log('サークル画像選択完了');
     }
   };
 
@@ -115,12 +118,20 @@ export default function CircleRegistrationScreen() {
     let imageUrl = null;
     if (circleImage) {
       try {
-        const response = await fetch(circleImage);
+        // 画像を圧縮
+        console.log('サークル画像圧縮開始...');
+        const compressedUri = await compressCircleImage(circleImage);
+        console.log('サークル画像圧縮完了');
+        
+        // 圧縮された画像をアップロード
+        const response = await fetch(compressedUri);
         const blob = await response.blob();
-        const storageRef = ref(storage, `circle_images/${Date.now()}_${circleName}`);
+        const storageRef = ref(storage, `circle_images/icons/${Date.now()}_${circleName}`);
         const uploadTask = uploadBytes(storageRef, blob);
         await uploadTask;
         imageUrl = await getDownloadURL(storageRef);
+        
+        console.log('サークル画像アップロード完了');
       } catch (error) {
         console.error("Error uploading image:", error);
         Alert.alert('画像アップロードエラー', 'サークルアイコンのアップロード中にエラーが発生しました。');
@@ -165,7 +176,7 @@ export default function CircleRegistrationScreen() {
         joinedCircleIds: arrayUnion(circleDocRef.id)
       });
 
-      Alert.alert('登録完了', 'サークル情報が正常に登録されました。あなたは自動的にこのサークルのメンバーになりました。', [
+      Alert.alert('登録完了', 'サークル情報が正常に登録されました。', [
         { text: 'OK', onPress: () => {
           navigation.dispatch(
             CommonActions.reset({

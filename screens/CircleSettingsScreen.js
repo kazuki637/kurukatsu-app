@@ -5,7 +5,9 @@ import { db, storage } from '../firebaseConfig';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import * as ImagePicker from 'expo-image-picker';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import CommonHeader from '../components/CommonHeader';
+import { compressCircleImage } from '../utils/imageCompression';
 
 const GENRES = [
   '運動系（球技）', '運動系（球技以外）', 'アウトドア系', '文化系', '芸術・芸能', '音楽系', '学問系', 'ボランティア', 'イベント', 'オールラウンド', 'その他',
@@ -34,6 +36,8 @@ export default function CircleSettingsScreen({ route, navigation }) {
   const [shinkanLineGroupLink, setShinkanLineGroupLink] = useState('');
   const [circleImage, setCircleImage] = useState(null);
   const [circleImageUrl, setCircleImageUrl] = useState('');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const fetchCircle = async () => {
@@ -67,6 +71,79 @@ export default function CircleSettingsScreen({ route, navigation }) {
     fetchCircle();
   }, [circleId]);
 
+  // 変更を検知する関数
+  const checkForChanges = () => {
+    if (!circle) return false;
+    
+    // 配列の比較を正しく行う
+    const originalFeatures = circle.features || [];
+    const currentFeatures = features || [];
+    const featuresChanged = 
+      originalFeatures.length !== currentFeatures.length ||
+      !originalFeatures.every(feature => currentFeatures.includes(feature)) ||
+      !currentFeatures.every(feature => originalFeatures.includes(feature));
+    
+    const hasChanges = 
+      name !== (circle.name || '') ||
+      genre !== (circle.genre || '') ||
+      featuresChanged ||
+      frequency !== (circle.frequency || '') ||
+      members !== (circle.members || '') ||
+      genderratio !== (circle.genderratio || '') ||
+      circleImage !== null;
+    
+    console.log('サークル設定画面: 変更検知', {
+      nameChanged: name !== (circle.name || ''),
+      genreChanged: genre !== (circle.genre || ''),
+      featuresChanged,
+      frequencyChanged: frequency !== (circle.frequency || ''),
+      membersChanged: members !== (circle.members || ''),
+      genderratioChanged: genderratio !== (circle.genderratio || ''),
+      imageChanged: circleImage !== null,
+      hasChanges
+    });
+    
+    setHasUnsavedChanges(hasChanges);
+    return hasChanges;
+  };
+
+  // 画面遷移時のアラート表示
+  useFocusEffect(
+    React.useCallback(() => {
+      const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+        if (!hasUnsavedChanges || isSaving) {
+          return;
+        }
+
+        // デフォルトの遷移を防ぐ
+        e.preventDefault();
+
+        Alert.alert(
+          '未保存の変更があります',
+          '変更を保存せずに画面を離れますか？',
+          [
+            {
+              text: 'キャンセル',
+              style: 'cancel',
+              onPress: () => {},
+            },
+            {
+              text: '保存せずに離れる',
+              style: 'destructive',
+              onPress: () => {
+                // リスナーを一時的に削除してから遷移を実行
+                unsubscribe();
+                navigation.dispatch(e.data.action);
+              },
+            },
+          ]
+        );
+      });
+
+      return unsubscribe;
+    }, [navigation, hasUnsavedChanges])
+  );
+
   const pickCircleImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -80,20 +157,39 @@ export default function CircleSettingsScreen({ route, navigation }) {
       quality: 1,
     });
     if (!result.canceled) {
-      setCircleImage(result.assets[0].uri);
+      const uri = result.assets[0].uri;
+      setCircleImage(uri);
+      setHasUnsavedChanges(true);
+      console.log('サークル設定画面: 画像選択完了');
     }
   };
 
   const handleSave = async () => {
+    setIsSaving(true);
     setLoading(true);
     try {
       let imageUrl = circleImageUrl;
       if (circleImage) {
-        const response = await fetch(circleImage);
-        const blob = await response.blob();
-        const storageRef = ref(storage, `circle_images/${circleId}`);
-        await uploadBytes(storageRef, blob);
-        imageUrl = await getDownloadURL(storageRef);
+        try {
+          // 画像を圧縮
+          console.log('サークル設定画面: 画像圧縮開始...');
+          const compressedUri = await compressCircleImage(circleImage);
+          console.log('サークル設定画面: 画像圧縮完了');
+          
+          // 圧縮された画像をアップロード
+          const response = await fetch(compressedUri);
+          const blob = await response.blob();
+          const storageRef = ref(storage, `circle_images/icons/${circleId}`);
+          await uploadBytes(storageRef, blob);
+          imageUrl = await getDownloadURL(storageRef);
+          
+          console.log('サークル設定画面: 画像アップロード完了');
+        } catch (error) {
+          console.error('サークル設定画面: 画像アップロードエラー:', error);
+          Alert.alert('エラー', 'サークルアイコンのアップロードに失敗しました');
+          setLoading(false);
+          return;
+        }
       }
       const docRef = doc(db, 'circles', circleId);
       await updateDoc(docRef, {
@@ -107,12 +203,18 @@ export default function CircleSettingsScreen({ route, navigation }) {
         genderratio,
         imageUrl,
       });
+      setHasUnsavedChanges(false);
+      setIsSaving(false);
       Alert.alert('保存完了', 'サークル設定を保存しました');
-      navigation.goBack();
+      // 少し遅延を入れてから画面遷移（アラートの表示を待つ）
+      setTimeout(() => {
+        navigation.goBack();
+      }, 100);
     } catch (e) {
       Alert.alert('エラー', 'サークル設定の保存に失敗しました');
     } finally {
       setLoading(false);
+      setIsSaving(false);
     }
   };
 
@@ -143,7 +245,10 @@ export default function CircleSettingsScreen({ route, navigation }) {
               {/* 必要ならここにゴミ箱ボタン等も追加可能 */}
             </View>
             <Text style={styles.label}>サークル名</Text>
-            <TextInput style={styles.input} value={name} onChangeText={setName} />
+            <TextInput style={styles.input} value={name} onChangeText={(text) => {
+              setName(text);
+              checkForChanges();
+            }} />
             <Text style={styles.label}>大学名</Text>
             <TextInput 
               style={[styles.input, styles.disabledInput]} 
@@ -163,7 +268,30 @@ export default function CircleSettingsScreen({ route, navigation }) {
             <Text style={styles.label}>ジャンル</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
               {GENRES.map(item => (
-                <TouchableOpacity key={item} style={[styles.optionButton, genre === item && styles.optionButtonActive]} onPress={() => setGenre(item)}>
+                <TouchableOpacity key={item} style={[styles.optionButton, genre === item && styles.optionButtonActive]} onPress={() => {
+                  const newGenre = item;
+                  setGenre(newGenre);
+                  // 状態変更を即座に検知
+                  if (!circle) return;
+                  
+                  const originalFeatures = circle.features || [];
+                  const currentFeatures = features || [];
+                  const featuresChanged = 
+                    originalFeatures.length !== currentFeatures.length ||
+                    !originalFeatures.every(feature => currentFeatures.includes(feature)) ||
+                    !currentFeatures.every(feature => originalFeatures.includes(feature));
+                  
+                  const hasChanges = 
+                    name !== (circle.name || '') ||
+                    newGenre !== (circle.genre || '') ||
+                    featuresChanged ||
+                    frequency !== (circle.frequency || '') ||
+                    members !== (circle.members || '') ||
+                    genderratio !== (circle.genderratio || '') ||
+                    circleImage !== null;
+                  
+                  setHasUnsavedChanges(hasChanges);
+                }}>
                   <Text style={[styles.optionButtonText, genre === item && styles.optionButtonTextActive]}>{item}</Text>
                 </TouchableOpacity>
               ))}
@@ -171,7 +299,29 @@ export default function CircleSettingsScreen({ route, navigation }) {
             <Text style={styles.label}>特色（複数選択可）</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
               {FEATURES.map(item => (
-                <TouchableOpacity key={item} style={[styles.optionButton, features.includes(item) && styles.optionButtonActive]} onPress={() => setFeatures(prev => prev.includes(item) ? prev.filter(f => f !== item) : [...prev, item])}>
+                <TouchableOpacity key={item} style={[styles.optionButton, features.includes(item) && styles.optionButtonActive]} onPress={() => {
+                  const newFeatures = features.includes(item) ? features.filter(f => f !== item) : [...features, item];
+                  setFeatures(newFeatures);
+                  // 状態変更を即座に検知
+                  if (!circle) return;
+                  
+                  const originalFeatures = circle.features || [];
+                  const featuresChanged = 
+                    originalFeatures.length !== newFeatures.length ||
+                    !originalFeatures.every(feature => newFeatures.includes(feature)) ||
+                    !newFeatures.every(feature => originalFeatures.includes(feature));
+                  
+                  const hasChanges = 
+                    name !== (circle.name || '') ||
+                    genre !== (circle.genre || '') ||
+                    featuresChanged ||
+                    frequency !== (circle.frequency || '') ||
+                    members !== (circle.members || '') ||
+                    genderratio !== (circle.genderratio || '') ||
+                    circleImage !== null;
+                  
+                  setHasUnsavedChanges(hasChanges);
+                }}>
                   <Text style={[styles.optionButtonText, features.includes(item) && styles.optionButtonTextActive]}>{item}</Text>
                 </TouchableOpacity>
               ))}
@@ -179,7 +329,30 @@ export default function CircleSettingsScreen({ route, navigation }) {
             <Text style={styles.label}>活動頻度</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
               {FREQUENCIES.map(item => (
-                <TouchableOpacity key={item} style={[styles.optionButton, frequency === item && styles.optionButtonActive]} onPress={() => setFrequency(item)}>
+                <TouchableOpacity key={item} style={[styles.optionButton, frequency === item && styles.optionButtonActive]} onPress={() => {
+                  const newFrequency = item;
+                  setFrequency(newFrequency);
+                  // 状態変更を即座に検知
+                  if (!circle) return;
+                  
+                  const originalFeatures = circle.features || [];
+                  const currentFeatures = features || [];
+                  const featuresChanged = 
+                    originalFeatures.length !== currentFeatures.length ||
+                    !originalFeatures.every(feature => currentFeatures.includes(feature)) ||
+                    !currentFeatures.every(feature => originalFeatures.includes(feature));
+                  
+                  const hasChanges = 
+                    name !== (circle.name || '') ||
+                    genre !== (circle.genre || '') ||
+                    featuresChanged ||
+                    newFrequency !== (circle.frequency || '') ||
+                    members !== (circle.members || '') ||
+                    genderratio !== (circle.genderratio || '') ||
+                    circleImage !== null;
+                  
+                  setHasUnsavedChanges(hasChanges);
+                }}>
                   <Text style={[styles.optionButtonText, frequency === item && styles.optionButtonTextActive]}>{item}</Text>
                 </TouchableOpacity>
               ))}
@@ -187,7 +360,30 @@ export default function CircleSettingsScreen({ route, navigation }) {
             <Text style={styles.label}>人数</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
               {MEMBERS_OPTIONS.map(item => (
-                <TouchableOpacity key={item} style={[styles.optionButton, members === item && styles.optionButtonActive]} onPress={() => setMembers(item)}>
+                <TouchableOpacity key={item} style={[styles.optionButton, members === item && styles.optionButtonActive]} onPress={() => {
+                  const newMembers = item;
+                  setMembers(newMembers);
+                  // 状態変更を即座に検知
+                  if (!circle) return;
+                  
+                  const originalFeatures = circle.features || [];
+                  const currentFeatures = features || [];
+                  const featuresChanged = 
+                    originalFeatures.length !== currentFeatures.length ||
+                    !originalFeatures.every(feature => currentFeatures.includes(feature)) ||
+                    !currentFeatures.every(feature => originalFeatures.includes(feature));
+                  
+                  const hasChanges = 
+                    name !== (circle.name || '') ||
+                    genre !== (circle.genre || '') ||
+                    featuresChanged ||
+                    frequency !== (circle.frequency || '') ||
+                    newMembers !== (circle.members || '') ||
+                    genderratio !== (circle.genderratio || '') ||
+                    circleImage !== null;
+                  
+                  setHasUnsavedChanges(hasChanges);
+                }}>
                   <Text style={[styles.optionButtonText, members === item && styles.optionButtonTextActive]}>{item}</Text>
                 </TouchableOpacity>
               ))}
@@ -195,7 +391,30 @@ export default function CircleSettingsScreen({ route, navigation }) {
             <Text style={styles.label}>男女比</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
               {GENDER_RATIO_OPTIONS.map(item => (
-                <TouchableOpacity key={item} style={[styles.optionButton, genderratio === item && styles.optionButtonActive]} onPress={() => setGenderratio(item)}>
+                <TouchableOpacity key={item} style={[styles.optionButton, genderratio === item && styles.optionButtonActive]} onPress={() => {
+                  const newGenderratio = item;
+                  setGenderratio(newGenderratio);
+                  // 状態変更を即座に検知
+                  if (!circle) return;
+                  
+                  const originalFeatures = circle.features || [];
+                  const currentFeatures = features || [];
+                  const featuresChanged = 
+                    originalFeatures.length !== currentFeatures.length ||
+                    !originalFeatures.every(feature => currentFeatures.includes(feature)) ||
+                    !currentFeatures.every(feature => originalFeatures.includes(feature));
+                  
+                  const hasChanges = 
+                    name !== (circle.name || '') ||
+                    genre !== (circle.genre || '') ||
+                    featuresChanged ||
+                    frequency !== (circle.frequency || '') ||
+                    members !== (circle.members || '') ||
+                    newGenderratio !== (circle.genderratio || '') ||
+                    circleImage !== null;
+                  
+                  setHasUnsavedChanges(hasChanges);
+                }}>
                   <Text style={[styles.optionButtonText, genderratio === item && styles.optionButtonTextActive]}>{item}</Text>
                 </TouchableOpacity>
               ))}

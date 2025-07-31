@@ -170,13 +170,13 @@ export default function MyPageScreen({ navigation }) {
               )}
             </View>
             <Text style={styles.userName}>{userProfile?.nickname || 'ユーザー名'}</Text>
-            {(userProfile?.isUniversityPublic && (userProfile?.university || '大学名')) || (userProfile?.isGradePublic && (userProfile?.grade || '学年')) ? (
+            {(userProfile?.university || userProfile?.grade) && (
               <Text style={styles.userUniversity}>
-                {userProfile?.isUniversityPublic && (userProfile?.university || '大学名')}
-                {userProfile?.isUniversityPublic && userProfile?.isGradePublic && (userProfile?.university || '大学名') && (userProfile?.grade || '学年') ? '・' : ''}
-                {userProfile?.isGradePublic && (userProfile?.grade || '学年')}
+                {userProfile?.university || ''}
+                {userProfile?.university && userProfile?.grade ? '・' : ''}
+                {userProfile?.grade || ''}
               </Text>
-            ) : null}
+            )}
             <TouchableOpacity style={styles.editProfileButton} onPress={() => navigation.navigate('ProfileEdit')}>
               <Text style={styles.editProfileButtonText}>プロフィールを編集</Text>
             </TouchableOpacity>

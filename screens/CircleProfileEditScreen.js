@@ -9,6 +9,7 @@ import CommonHeader from '../components/CommonHeader';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'; // 追加済み
 import * as ImagePicker from 'expo-image-picker'; // 追加済み
 import useFirestoreDoc from '../hooks/useFirestoreDoc';
+import { compressHeaderImage, compressCircleImage } from '../utils/imageCompression';
 
 const { width } = Dimensions.get('window');
 
@@ -276,18 +277,30 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         if (circleData.headerImageUrl) {
           await deleteImageFromStorage(circleData.headerImageUrl);
         }
+        
         const asset = result.assets[0];
-        const response = await fetch(asset.uri);
+        
+        // 画像を圧縮
+        console.log('ヘッダー画像圧縮開始...');
+        const compressedUri = await compressHeaderImage(asset.uri);
+        console.log('ヘッダー画像圧縮完了');
+        
+        // 圧縮された画像をアップロード
+        const response = await fetch(compressedUri);
         const blob = await response.blob();
         const storage = getStorage();
         const fileName = `circle_images/headers/${circleId}_${Date.now()}`;
         const imgRef = storageRef(storage, fileName);
         await uploadBytes(imgRef, blob);
         const downloadUrl = await getDownloadURL(imgRef);
+        
         // Firestoreに保存
         await updateDoc(doc(db, 'circles', circleId), { headerImageUrl: downloadUrl });
         reload && reload(); // 追加: 変更を即時反映
+        
+        console.log('ヘッダー画像アップロード完了');
       } catch (e) {
+        console.error('ヘッダー画像アップロードエラー:', e);
         Alert.alert('エラー', '画像のアップロードに失敗しました');
       } finally {
         setUploading(false);
@@ -333,13 +346,28 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     let imageUrl = '';
     try {
       if (eventImage) {
-        const response = await fetch(eventImage.uri);
-        const blob = await response.blob();
-        const storage = getStorage();
-        const fileName = `circle_images/events/${circleId}_${Date.now()}`;
-        const imgRef = storageRef(storage, fileName);
-        await uploadBytes(imgRef, blob);
-        imageUrl = await getDownloadURL(imgRef);
+        try {
+          // 画像を圧縮
+          console.log('イベント画像圧縮開始...');
+          const compressedUri = await compressHeaderImage(eventImage.uri);
+          console.log('イベント画像圧縮完了');
+          
+          // 圧縮された画像をアップロード
+          const response = await fetch(compressedUri);
+          const blob = await response.blob();
+          const storage = getStorage();
+          const fileName = `circle_images/events/${circleId}_${Date.now()}`;
+          const imgRef = storageRef(storage, fileName);
+          await uploadBytes(imgRef, blob);
+          imageUrl = await getDownloadURL(imgRef);
+          
+          console.log('イベント画像アップロード完了');
+        } catch (error) {
+          console.error('イベント画像アップロードエラー:', error);
+          Alert.alert('エラー', 'イベント画像のアップロードに失敗しました');
+          setEventUploading(false);
+          return;
+        }
       }
       // Firestoreのevents配列に追加
       const eventObj = {
@@ -398,17 +426,33 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     let imageUrl = editEventImage && editEventImage.uri ? editEventImage.uri : '';
     try {
       if (editEventImage && editEventImage.uri && !editEventImage.uri.startsWith('http')) {
-        // 既存画像があればStorageから削除
-        if (circleData.events && circleData.events[editingEventIndex] && circleData.events[editingEventIndex].image) {
-          await deleteImageFromStorage(circleData.events[editingEventIndex].image);
+        try {
+          // 既存画像があればStorageから削除
+          if (circleData.events && circleData.events[editingEventIndex] && circleData.events[editingEventIndex].image) {
+            await deleteImageFromStorage(circleData.events[editingEventIndex].image);
+          }
+          
+          // 画像を圧縮
+          console.log('イベント編集画像圧縮開始...');
+          const compressedUri = await compressHeaderImage(editEventImage.uri);
+          console.log('イベント編集画像圧縮完了');
+          
+          // 圧縮された画像をアップロード
+          const response = await fetch(compressedUri);
+          const blob = await response.blob();
+          const storage = getStorage();
+          const fileName = `circle_images/events/${circleId}_${Date.now()}`;
+          const imgRef = storageRef(storage, fileName);
+          await uploadBytes(imgRef, blob);
+          imageUrl = await getDownloadURL(imgRef);
+          
+          console.log('イベント編集画像アップロード完了');
+        } catch (error) {
+          console.error('イベント編集画像アップロードエラー:', error);
+          Alert.alert('エラー', 'イベント画像のアップロードに失敗しました');
+          setEditEventUploading(false);
+          return;
         }
-        const response = await fetch(editEventImage.uri);
-        const blob = await response.blob();
-        const storage = getStorage();
-        const fileName = `circle_images/events/${circleId}_${Date.now()}`;
-        const imgRef = storageRef(storage, fileName);
-        await uploadBytes(imgRef, blob);
-        imageUrl = await getDownloadURL(imgRef);
       }
       // 既存イベント配列を編集
       const newEvents = [...circleData.events];
@@ -495,7 +539,14 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         if (circleData.leaderImageUrl) {
           await deleteImageFromStorage(circleData.leaderImageUrl);
         }
-        const response = await fetch(asset.uri);
+        
+        // 画像を圧縮
+        console.log('代表者画像圧縮開始...');
+        const compressedUri = await compressCircleImage(asset.uri);
+        console.log('代表者画像圧縮完了');
+        
+        // 圧縮された画像をアップロード
+        const response = await fetch(compressedUri);
         const blob = await response.blob();
         const storage = getStorage();
         const fileName = `circle_images/leaders/${circleId}_${Date.now()}`;
@@ -505,7 +556,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         await updateDoc(doc(db, 'circles', circleId), { leaderImageUrl: downloadUrl });
         setLeaderImage({ uri: downloadUrl });
         reload && reload();
+        
+        console.log('代表者画像アップロード完了');
       } catch (e) {
+        console.error('代表者画像アップロードエラー:', e);
         Alert.alert('エラー', '代表者画像のアップロードに失敗しました');
       }
     }
@@ -585,7 +639,14 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       setActivityUploading(true);
       try {
         const asset = result.assets[0];
-        const response = await fetch(asset.uri);
+        
+        // 画像を圧縮
+        console.log('活動写真圧縮開始...');
+        const compressedUri = await compressHeaderImage(asset.uri);
+        console.log('活動写真圧縮完了');
+        
+        // 圧縮された画像をアップロード
+        const response = await fetch(compressedUri);
         const blob = await response.blob();
         const storage = getStorage();
         const fileName = `circle_images/activities/${circleId}_${Date.now()}`;
@@ -596,7 +657,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         await updateDoc(doc(db, 'circles', circleId), { activityImages: newImages });
         setActivityImages(newImages);
         reload && reload();
+        
+        console.log('活動写真アップロード完了');
       } catch (e) {
+        console.error('活動写真アップロードエラー:', e);
         Alert.alert('エラー', '活動写真の追加に失敗しました');
       } finally {
         setActivityUploading(false);
@@ -634,8 +698,16 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         if (activityImages[idx]) {
           await deleteImageFromStorage(activityImages[idx]);
         }
+        
         const asset = result.assets[0];
-        const response = await fetch(asset.uri);
+        
+        // 画像を圧縮
+        console.log('活動写真差し替え圧縮開始...');
+        const compressedUri = await compressHeaderImage(asset.uri);
+        console.log('活動写真差し替え圧縮完了');
+        
+        // 圧縮された画像をアップロード
+        const response = await fetch(compressedUri);
         const blob = await response.blob();
         const storage = getStorage();
         const fileName = `circle_images/activities/${circleId}_${Date.now()}`;
@@ -647,7 +719,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         await updateDoc(doc(db, 'circles', circleId), { activityImages: newImages });
         setActivityImages(newImages);
         reload && reload();
+        
+        console.log('活動写真差し替えアップロード完了');
       } catch (e) {
+        console.error('活動写真差し替えアップロードエラー:', e);
         Alert.alert('エラー', '活動写真の変更に失敗しました');
       } finally {
         setActivityUploading(false);

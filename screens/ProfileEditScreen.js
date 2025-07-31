@@ -6,9 +6,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { auth, db, storage } from '../firebaseConfig';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { useNavigation, CommonActions } from '@react-navigation/native';
+import { useNavigation, CommonActions, useFocusEffect } from '@react-navigation/native';
 import CommonHeader from '../components/CommonHeader';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import universitiesData from '../universities.json';
+import { compressProfileImage } from '../utils/imageCompression';
 
 const GRADES = ['大学1年', '大学2年', '大学3年', '大学4年', '大学院1年', '大学院2年', 'その他'];
 const GENDERS = ['男性', '女性', 'その他', '回答しない'];
@@ -20,9 +22,7 @@ export default function ProfileEditScreen(props) {
   const [name, setName] = useState(''); // 氏名（非公開）
   const [nickname, setNickname] = useState(''); // ニックネーム（公開）
   const [university, setUniversity] = useState('');
-  const [isUniversityPublic, setIsUniversityPublic] = useState(true);
   const [grade, setGrade] = useState('');
-  const [isGradePublic, setIsGradePublic] = useState(true);
   const [gender, setGender] = useState('');
   const [birthday, setBirthday] = useState(new Date(2000, 0, 1));
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -30,6 +30,54 @@ export default function ProfileEditScreen(props) {
   const [profileImageUrl, setProfileImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
+  
+  // オートコンプリート用の状態
+  const [universitySuggestions, setUniversitySuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  
+  // 未保存変更検知用の状態
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [originalData, setOriginalData] = useState(null);
+
+  // 大学名の候補をフィルタリングする関数
+  const filterUniversities = (input) => {
+    if (!input.trim()) {
+      setUniversitySuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    
+    const filtered = universitiesData.filter(uni => 
+      uni.toLowerCase().includes(input.toLowerCase())
+    ).slice(0, 10); // 最大10件まで表示
+    
+    setUniversitySuggestions(filtered);
+    setShowSuggestions(filtered.length > 0);
+  };
+
+  // 大学名が変更された時の処理
+  const handleUniversityChange = (text) => {
+    setUniversity(text);
+    
+    // 入力が空の場合は候補を非表示
+    if (!text.trim()) {
+      setUniversitySuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    
+    // 入力に応じて候補をフィルタリング
+    filterUniversities(text);
+  };
+
+  // 候補を選択した時の処理
+  const selectUniversity = (selectedUniversity) => {
+    setUniversity(selectedUniversity);
+    setUniversitySuggestions([]);
+    setShowSuggestions(false);
+    checkForChanges();
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -40,26 +88,109 @@ export default function ProfileEditScreen(props) {
         setName(d.name || '');
         setNickname(d.nickname || '');
         setUniversity(d.university || '');
-        setIsUniversityPublic(d.isUniversityPublic !== false);
         setGrade(d.grade || '');
-        setIsGradePublic(d.isGradePublic !== false);
         setGender(d.gender || '');
         setBirthday(d.birthday ? new Date(d.birthday) : new Date(2000, 0, 1));
         setProfileImageUrl(d.profileImageUrl || '');
+        
+        // 元のデータを保存
+        setOriginalData({
+          name: d.name || '',
+          nickname: d.nickname || '',
+          university: d.university || '',
+          grade: d.grade || '',
+          gender: d.gender || '',
+          birthday: d.birthday ? new Date(d.birthday) : new Date(2000, 0, 1),
+          profileImageUrl: d.profileImageUrl || '',
+        });
       } else {
         // Firestoreにデータがなければ空欄のまま（setDocしない）
         setName('');
         setNickname('');
         setUniversity('');
-        setIsUniversityPublic(true);
         setGrade('');
-        setIsGradePublic(true);
         setGender('');
         setBirthday(new Date(2000, 0, 1));
         setProfileImageUrl('');
+        
+        // 元のデータを保存
+        setOriginalData({
+          name: '',
+          nickname: '',
+          university: '',
+          grade: '',
+          gender: '',
+          birthday: new Date(2000, 0, 1),
+          profileImageUrl: '',
+        });
       }
     });
   }, [user]);
+
+  // 変更を検知する関数
+  const checkForChanges = () => {
+    if (!originalData) return false;
+    
+    const hasChanges = 
+      name !== originalData.name ||
+      nickname !== originalData.nickname ||
+      university !== originalData.university ||
+      grade !== originalData.grade ||
+      gender !== originalData.gender ||
+      birthday.getTime() !== originalData.birthday.getTime() ||
+      profileImage !== null;
+    
+    console.log('プロフィール編集画面: 変更検知', {
+      nameChanged: name !== originalData.name,
+      nicknameChanged: nickname !== originalData.nickname,
+      universityChanged: university !== originalData.university,
+      gradeChanged: grade !== originalData.grade,
+      genderChanged: gender !== originalData.gender,
+      birthdayChanged: birthday.getTime() !== originalData.birthday.getTime(),
+      imageChanged: profileImage !== null,
+      hasChanges
+    });
+    
+    setHasUnsavedChanges(hasChanges);
+    return hasChanges;
+  };
+
+  // 画面遷移時のアラート表示
+  useFocusEffect(
+    React.useCallback(() => {
+      const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+        if (!hasUnsavedChanges || isSaving) {
+          return;
+        }
+
+        // デフォルトの遷移を防ぐ
+        e.preventDefault();
+
+        Alert.alert(
+          '未保存の変更があります',
+          '変更を保存せずに画面を離れますか？',
+          [
+            {
+              text: 'キャンセル',
+              style: 'cancel',
+              onPress: () => {},
+            },
+            {
+              text: '保存せずに離れる',
+              style: 'destructive',
+              onPress: () => {
+                // リスナーを一時的に削除してから遷移を実行
+                unsubscribe();
+                navigation.dispatch(e.data.action);
+              },
+            },
+          ]
+        );
+      });
+
+      return unsubscribe;
+    }, [navigation, hasUnsavedChanges, isSaving])
+  );
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -76,21 +207,8 @@ export default function ProfileEditScreen(props) {
     if (!result.canceled) {
       const uri = result.assets[0].uri;
       setProfileImage(uri);
-      try {
-        // 即時アップロード＆Firestore更新
-        const response = await fetch(uri);
-        const blob = await response.blob();
-        const storageRef = ref(storage, `profile_images/${user.uid}`);
-        await uploadBytes(storageRef, blob);
-        const downloadUrl = await getDownloadURL(storageRef);
-        setProfileImageUrl(downloadUrl);
-        // Firestoreも即時更新
-        const userDocRef = doc(db, 'users', user.uid);
-        await updateDoc(userDocRef, { profileImageUrl: downloadUrl });
-        // 成功時のAlertは不要
-      } catch (e) {
-        Alert.alert('エラー', 'プロフィール画像のアップロードに失敗しました');
-      }
+      setHasUnsavedChanges(true);
+      console.log('プロフィール編集画面: 画像選択完了');
     }
   };
 
@@ -99,148 +217,280 @@ export default function ProfileEditScreen(props) {
       Alert.alert('エラー', '全ての必須項目を入力してください。');
       return;
     }
+    setIsSaving(true);
     setLoading(true);
     try {
-      // 画像アップロード処理はpickImageで即時実施済み
+      let imageUrl = profileImageUrl;
+      
+      // プロフィール画像のアップロード処理
+      if (profileImage) {
+        try {
+          // 画像を圧縮
+          console.log('プロフィール編集画面: 画像圧縮開始...');
+          const compressedUri = await compressProfileImage(profileImage);
+          console.log('プロフィール編集画面: 画像圧縮完了');
+          
+          // 圧縮された画像をアップロード
+          const response = await fetch(compressedUri);
+          const blob = await response.blob();
+          const storageRef = ref(storage, `profile_images/${user.uid}`);
+          await uploadBytes(storageRef, blob);
+          imageUrl = await getDownloadURL(storageRef);
+          
+          console.log('プロフィール編集画面: 画像アップロード完了');
+        } catch (error) {
+          console.error('プロフィール編集画面: 画像アップロードエラー:', error);
+          Alert.alert('エラー', 'プロフィール画像のアップロードに失敗しました');
+          setLoading(false);
+          setIsSaving(false);
+          return;
+        }
+      } else if (profileImage === null && originalData && originalData.profileImageUrl) {
+        // 画像が削除された場合、空文字列を設定
+        imageUrl = '';
+      }
+      
       const userDocRef = doc(db, 'users', user.uid);
       await setDoc(userDocRef, {
         name,
         nickname,
         university,
-        isUniversityPublic,
+        isUniversityPublic: true,
         grade,
-        isGradePublic,
+        isGradePublic: true,
         gender,
-        birthday: birthday.toISOString().split('T')[0],
-        profileImageUrl: profileImageUrl,
+        birthday: birthday.getFullYear() + '-' + 
+                 String(birthday.getMonth() + 1).padStart(2, '0') + '-' + 
+                 String(birthday.getDate()).padStart(2, '0'),
+        profileImageUrl: imageUrl,
       }, { merge: true });
+      setHasUnsavedChanges(false);
+      setIsSaving(false);
       Alert.alert('保存完了', 'プロフィールを保存しました。');
-      if (forceToHome) {
-        navigation.dispatch(
-          CommonActions.reset({
-            index: 0,
-            routes: [{ name: 'Main' }],
-          })
-        );
-      } else {
-        navigation.goBack();
-      }
+      // 少し遅延を入れてから画面遷移（アラートの表示を待つ）
+      setTimeout(() => {
+        if (forceToHome) {
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: 'Main' }],
+            })
+          );
+        } else {
+          navigation.goBack();
+        }
+      }, 100);
     } catch (error) {
       console.error('Error saving profile:', error);
       Alert.alert('エラー', 'プロフィールの保存に失敗しました。');
     } finally {
       setLoading(false);
+      setIsSaving(false);
     }
   };
 
   return (
     <View style={styles.container}>
-      <CommonHeader title="プロフィール編集" showBackButton onBack={() => navigation.goBack()} rightButtonLabel="保存" onRightButtonPress={handleSave} />
+      <CommonHeader title="プロフィール編集" rightButtonLabel="保存" onRightButtonPress={handleSave} />
       <SafeAreaView style={{ flex: 1 }} edges={['left', 'right', 'bottom']}>
-        <ScrollView contentContainerStyle={styles.bodyContent} keyboardShouldPersistTaps="handled">
-          <View style={{ height: 16 }} />
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>プロフィール画像（任意）</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start' }}>
-              <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
-                {(profileImage && profileImage.trim() !== '' && !imageError) || (profileImageUrl && profileImageUrl.trim() !== '' && !imageError) ? (
-                  <Image
-                    source={{ uri: (profileImage && profileImage.trim() !== '') ? profileImage : profileImageUrl }}
-                    style={styles.profileImage}
-                    onError={() => setImageError(true)}
-                  />
-                ) : (
-                  <View style={[styles.profileImage, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
-                    <Ionicons name="person-outline" size={60} color="#aaa" />
-                  </View>
-                )}
-              </TouchableOpacity>
-              {((profileImage && profileImage.trim() !== '') || (profileImageUrl && profileImageUrl.trim() !== '')) && !imageError && (
-                <TouchableOpacity
-                  onPress={() => {
-                    setProfileImage(null);
-                    setProfileImageUrl('');
-                    setImageError(false);
-                  }}
-                  style={{ marginLeft: 12, padding: 8, backgroundColor: '#fee', borderRadius: 24 }}
-                >
-                  <Ionicons name="trash-outline" size={24} color="#e74c3c" />
+        <ScrollView 
+          contentContainerStyle={styles.bodyContent} 
+          keyboardShouldPersistTaps="handled"
+        >
+            <View style={{ height: 16 }} />
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>プロフィール画像（任意）</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start' }}>
+                <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
+                  {(profileImage && profileImage.trim() !== '' && !imageError) || (profileImageUrl && profileImageUrl.trim() !== '' && !imageError) ? (
+                    <Image
+                      source={{ uri: (profileImage && profileImage.trim() !== '') ? profileImage : profileImageUrl }}
+                      style={styles.profileImage}
+                      onError={() => setImageError(true)}
+                    />
+                  ) : (
+                    <View style={[styles.profileImage, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
+                      <Ionicons name="person-outline" size={60} color="#aaa" />
+                    </View>
+                  )}
                 </TouchableOpacity>
-              )}
+                {((profileImage && profileImage.trim() !== '') || (profileImageUrl && profileImageUrl.trim() !== '')) && !imageError && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      setProfileImage(null);
+                      setProfileImageUrl('');
+                      setImageError(false);
+                      // 状態変更を即座に検知
+                      if (!originalData) return;
+                      
+                      const hasChanges = 
+                        name !== originalData.name ||
+                        nickname !== originalData.nickname ||
+                        university !== originalData.university ||
+                        grade !== originalData.grade ||
+                        gender !== originalData.gender ||
+                        birthday.getTime() !== originalData.birthday.getTime() ||
+                        true; // 画像が削除された場合は常に変更あり
+                      
+                      setHasUnsavedChanges(hasChanges);
+                    }}
+                    style={{ marginLeft: 12, padding: 8, backgroundColor: '#fee', borderRadius: 24 }}
+                  >
+                    <Ionicons name="trash-outline" size={24} color="#e74c3c" />
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
-          </View>
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>氏名（非公開）</Text>
-            <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="氏名" />
-          </View>
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>ニックネーム（公開）</Text>
-            <TextInput style={styles.input} value={nickname} onChangeText={setNickname} placeholder="ニックネーム" />
-          </View>
-          <View style={styles.formGroupRow}>
-            <View style={{ flex: 1 }}>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>氏名（非公開）</Text>
+              <TextInput style={styles.input} value={name} onChangeText={(text) => {
+                setName(text);
+                checkForChanges();
+              }} placeholder="氏名" />
+            </View>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>ニックネーム（公開）</Text>
+              <TextInput style={styles.input} value={nickname} onChangeText={(text) => {
+                setNickname(text);
+                checkForChanges();
+              }} placeholder="ニックネーム" />
+            </View>
+            <View style={styles.formGroup}>
               <Text style={styles.label}>大学名</Text>
-              <TextInput style={styles.input} value={university} onChangeText={setUniversity} placeholder="大学名" />
+              <View style={styles.universityInputContainer}>
+                <TextInput 
+                  style={styles.input} 
+                  value={university} 
+                  onChangeText={(text) => {
+                    handleUniversityChange(text);
+                    checkForChanges();
+                  }}
+                  placeholder="大学名" 
+                />
+              </View>
             </View>
-            <View style={styles.switchContainer}>
-              <Text style={styles.switchLabel}>公開</Text>
-              <Switch value={isUniversityPublic} onValueChange={setIsUniversityPublic} />
-            </View>
-          </View>
-          <View style={styles.formGroupRow}>
-            <View style={{ flex: 1 }}>
+            
+            {/* 大学名候補を大学名入力欄と学年選択の間に表示 */}
+            {showSuggestions && (
+              <View style={styles.suggestionsContainer}>
+                <ScrollView 
+                  style={styles.suggestionsScrollView}
+                  nestedScrollEnabled={true}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {universitySuggestions.map((item, index) => (
+                    <TouchableOpacity
+                      key={item}
+                      style={[
+                        styles.suggestionItem,
+                        index === universitySuggestions.length - 1 && { borderBottomWidth: 0 }
+                      ]}
+                      onPress={() => selectUniversity(item)}
+                    >
+                      <Text style={styles.suggestionText}>{item}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+            <View style={styles.formGroup}>
               <Text style={styles.label}>学年</Text>
               <View style={styles.selectRow}>
                 {GRADES.map(g => (
-                  <TouchableOpacity key={g} style={[styles.selectButton, grade === g && styles.selectedButton]} onPress={() => setGrade(g)}>
+                  <TouchableOpacity key={g} style={[styles.selectButton, grade === g && styles.selectedButton]} onPress={() => {
+                    const newGrade = g;
+                    setGrade(newGrade);
+                    // 状態変更を即座に検知
+                    if (!originalData) return;
+                    
+                    const hasChanges = 
+                      name !== originalData.name ||
+                      nickname !== originalData.nickname ||
+                      university !== originalData.university ||
+                      newGrade !== originalData.grade ||
+                      gender !== originalData.gender ||
+                      birthday.getTime() !== originalData.birthday.getTime() ||
+                      profileImage !== null;
+                    
+                    setHasUnsavedChanges(hasChanges);
+                  }}>
                     <Text style={[styles.selectButtonText, grade === g && styles.selectedButtonText]}>{g}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
-            <View style={styles.switchContainer}>
-              <Text style={styles.switchLabel}>公開</Text>
-              <Switch value={isGradePublic} onValueChange={setIsGradePublic} />
-            </View>
-          </View>
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>性別</Text>
-            <View style={styles.selectRow}>
-              {GENDERS.map(g => (
-                <TouchableOpacity key={g} style={[styles.selectButton, gender === g && styles.selectedButton]} onPress={() => setGender(g)}>
-                  <Text style={[styles.selectButtonText, gender === g && styles.selectedButtonText]}>{g}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>生年月日</Text>
-            <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.datePickerButton}>
-              <Text style={styles.datePickerText}>{birthday ? birthday.toLocaleDateString('ja-JP') : '生年月日を選択'}</Text>
-            </TouchableOpacity>
-            {showDatePicker && (
-              <View style={styles.datePickerContainer}>
-                <DateTimePicker
-                  value={birthday}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  locale="ja-JP"
-                  onChange={(event, selectedDate) => {
-                    setShowDatePicker(Platform.OS === 'ios');
-                    if (selectedDate) setBirthday(selectedDate);
-                  }}
-                  maximumDate={new Date()}
-                />
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>性別</Text>
+              <View style={styles.selectRow}>
+                {GENDERS.map(g => (
+                  <TouchableOpacity key={g} style={[styles.selectButton, gender === g && styles.selectedButton]} onPress={() => {
+                    const newGender = g;
+                    setGender(newGender);
+                    // 状態変更を即座に検知
+                    if (!originalData) return;
+                    
+                    const hasChanges = 
+                      name !== originalData.name ||
+                      nickname !== originalData.nickname ||
+                      university !== originalData.university ||
+                      grade !== originalData.grade ||
+                      newGender !== originalData.gender ||
+                      birthday.getTime() !== originalData.birthday.getTime() ||
+                      profileImage !== null;
+                    
+                    setHasUnsavedChanges(hasChanges);
+                  }}>
+                    <Text style={[styles.selectButtonText, gender === g && styles.selectedButtonText]}>{g}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
-            )}
-          </View>
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={loading}>
+            </View>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>生年月日</Text>
+              <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.datePickerButton}>
+                <Text style={styles.datePickerText}>{birthday ? birthday.toLocaleDateString('ja-JP') : '生年月日を選択'}</Text>
+              </TouchableOpacity>
+              {showDatePicker && (
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={birthday}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    locale="ja-JP"
+                    onChange={(event, selectedDate) => {
+                      setShowDatePicker(Platform.OS === 'ios');
+                      if (selectedDate) {
+                        const newBirthday = selectedDate;
+                        setBirthday(newBirthday);
+                        // 状態変更を即座に検知
+                        if (!originalData) return;
+                        
+                        const hasChanges = 
+                          name !== originalData.name ||
+                          nickname !== originalData.nickname ||
+                          university !== originalData.university ||
+                          grade !== originalData.grade ||
+                          gender !== originalData.gender ||
+                          newBirthday.getTime() !== originalData.birthday.getTime() ||
+                          profileImage !== null;
+                        
+                        setHasUnsavedChanges(hasChanges);
+                      }
+                    }}
+                    maximumDate={new Date()}
+                  />
+                </View>
+              )}
+            </View>
+                      <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={loading}>
             <Text style={styles.saveButtonText}>{loading ? '保存中...' : '保存する'}</Text>
           </TouchableOpacity>
           <View style={{ height: 32 }} />
         </ScrollView>
-      </SafeAreaView>
-    </View>
+        
+
+        </SafeAreaView>
+      </View>
   );
 }
 
@@ -267,4 +517,32 @@ const styles = StyleSheet.create({
   profileImage: { width: 100, height: 100, borderRadius: 50 },
   saveButton: { backgroundColor: '#007bff', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 24 },
   saveButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  // オートコンプリート関連のスタイル
+  universityInputContainer: { 
+    position: 'relative',
+    zIndex: 1,
+  },
+  suggestionsContainer: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    maxHeight: 200,
+    marginBottom: 18,
+    overflow: 'hidden',
+  },
+  suggestionsScrollView: {
+    maxHeight: 200,
+  },
+  suggestionItem: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    backgroundColor: '#fff',
+  },
+  suggestionText: {
+    fontSize: 15,
+    color: '#333',
+  },
 });
