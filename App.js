@@ -45,6 +45,7 @@ import CircleMemberScreen from './screens/CircleMemberScreen';
 import CircleSettingsScreen from './screens/CircleSettingsScreen';
 import CircleMessageDetailScreen from './screens/CircleMessageDetailScreen';
 import CircleManagementDetailScreen from './screens/CircleManagementDetailScreen';
+import CircleLeadershipTransferScreen from './screens/CircleLeadershipTransferScreen';
 
 
 const AuthStack = createStackNavigator();
@@ -136,6 +137,7 @@ function CircleManagementStackScreen() {
       <CircleManagementStack.Screen name="CircleScheduleManagement" component={CircleScheduleManagementScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="AddSchedule" component={AddScheduleScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleContact" component={CircleContactScreen} options={{ headerShown: false, gestureEnabled: true }} />
+      <CircleManagementStack.Screen name="CircleLeadershipTransfer" component={CircleLeadershipTransferScreen} options={{ headerShown: false, gestureEnabled: true }} />
     </CircleManagementStack.Navigator>
   );
 }
@@ -246,7 +248,10 @@ function AppNavigator() {
 function MainTabNavigatorWithProfileCheck() {
   const [profileChecked, setProfileChecked] = React.useState(false);
   const [needsProfile, setNeedsProfile] = React.useState(false);
-  const [user, setUser] = React.useState(auth.currentUser);
+  const [user, setUser] = React.useState(() => {
+    const currentUser = auth.currentUser;
+    return currentUser;
+  });
   const [isInitialCheck, setIsInitialCheck] = React.useState(true);
 
   React.useEffect(() => {

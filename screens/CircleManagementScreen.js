@@ -36,6 +36,13 @@ export default function CircleManagementScreen({ navigation }) {
     // リアルタイムリスナーを設定
     const unsubscribe = onSnapshot(collection(db, 'circles'), async (snapshot) => {
       try {
+        // ユーザーがログアウトしている場合は処理をスキップ
+        if (!user) {
+          setAdminCircles([]);
+          setLoading(false);
+          return;
+        }
+
         const adminCircleList = [];
         for (const circleDoc of snapshot.docs) {
           const circleId = circleDoc.id;
@@ -59,7 +66,7 @@ export default function CircleManagementScreen({ navigation }) {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user?.uid]);
 
   const handleRegisterCirclePress = () => {
     setModalVisible(true);

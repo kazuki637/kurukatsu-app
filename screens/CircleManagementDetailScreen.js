@@ -45,6 +45,13 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
           setCircleData(circleDoc.data());
         }
 
+        // ユーザーがログアウトしている場合は処理をスキップ
+        if (!user) {
+          setUserRole(null);
+          setLoading(false);
+          return;
+        }
+
         // ユーザーの役割を取得（一度だけ）
         getDoc(doc(db, 'circles', circleId, 'members', user.uid)).then((memberDoc) => {
           if (memberDoc.exists()) {
@@ -63,7 +70,7 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
     });
 
     return () => unsubscribe();
-  }, [user, circleId]);
+  }, [user?.uid, circleId]);
 
   if (loading) {
     return (
@@ -114,9 +121,9 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
       onPress: () => navigation.navigate('CircleMemberManagement', { circleId })
     },
     {
-      label: 'スケジュール管理',
-      icon: 'calendar-outline',
-      onPress: () => navigation.navigate('CircleScheduleManagement', { circleId })
+      label: '代表者を引き継ぐ',
+      icon: 'swap-horizontal-outline',
+      onPress: () => navigation.navigate('CircleLeadershipTransfer', { circleId, circleName })
     },
     {
       label: '連絡',
@@ -124,9 +131,9 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
       onPress: () => navigation.navigate('CircleContact', { circleId })
     },
     {
-      label: 'アナリティクス',
-      icon: 'stats-chart-outline',
-      onPress: () => Alert.alert('アナリティクス', '今後実装予定の機能です')
+      label: 'スケジュール',
+      icon: 'calendar-outline',
+      onPress: () => navigation.navigate('CircleScheduleManagement', { circleId })
     },
     {
       label: 'サークル設定',
@@ -173,7 +180,8 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
             <Text style={styles.subscriptionDesc}>¥0で7日間プレミアムを楽しみましょう</Text>
             <View style={styles.subscriptionFeatureRow}>
               <View style={styles.subscriptionFeature}><Ionicons name="remove-circle-outline" size={20} color="#333" /><Text style={styles.subscriptionFeatureText}>広告削除</Text></View>
-              <View style={styles.subscriptionFeature}><Ionicons name="stats-chart-outline" size={20} color="#333" /><Text style={styles.subscriptionFeatureText}>アナリティクス</Text></View>
+              <View style={styles.subscriptionFeature}><Ionicons name="calendar-outline" size={20} color="#333" /><Text style={styles.subscriptionFeatureText}>スケジュール</Text></View>
+              <View style={styles.subscriptionFeature}><Ionicons name="mail-outline" size={20} color="#333" /><Text style={styles.subscriptionFeatureText}>連絡</Text></View>
               <View style={styles.subscriptionFeature}><Ionicons name="star-outline" size={20} color="#333" /><Text style={styles.subscriptionFeatureText}>おすすめ掲載</Text></View>
             </View>
           </LinearGradient>
@@ -197,6 +205,8 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
                 ))}
               </View>
             ))}
+            
+
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -335,4 +345,5 @@ const styles = StyleSheet.create({
     marginTop: 4,
     fontWeight: '500',
   },
+
 }); 

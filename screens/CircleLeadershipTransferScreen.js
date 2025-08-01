@@ -1,0 +1,852 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  SafeAreaView, 
+  TouchableOpacity, 
+  ScrollView, 
+  Image, 
+  Alert, 
+  Modal,
+  Animated,
+  Dimensions,
+  TextInput
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { db, auth } from '../firebaseConfig';
+import { doc, getDoc, getDocs, collection, updateDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
+import CommonHeader from '../components/CommonHeader';
+
+const { width } = Dimensions.get('window');
+
+export default function CircleLeadershipTransferScreen({ route, navigation }) {
+  const { circleId, circleName } = route.params;
+  const [user, setUser] = useState(null);
+  const [currentUserData, setCurrentUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [circleData, setCircleData] = useState(null);
+  const [members, setMembers] = useState([]);
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [searchText, setSearchText] = useState('');
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [transferring, setTransferring] = useState(false);
+  
+  // アニメーション用の値
+  const [fadeAnim] = useState(new Animated.Value(0));
+  const [scaleAnim] = useState(new Animated.Value(1));
+  const [glowAnim] = useState(new Animated.Value(0));
+
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+          if (userDoc.exists()) {
+            setCurrentUserData(userDoc.data());
+          }
+        } catch (error) {
+          console.error('Error fetching current user data:', error);
+        }
+      }
+    });
+    return unsubscribeAuth;
+  }, []);
+
+  useEffect(() => {
+    if (!user || !circleId) {
+      setLoading(false);
+      return;
+    }
+
+    const fetchData = async () => {
+      try {
+        // サークルデータを取得
+        const circleDoc = await getDoc(doc(db, 'circles', circleId));
+        if (circleDoc.exists()) {
+          setCircleData(circleDoc.data());
+        }
+
+        // メンバーリストを取得
+        const membersSnapshot = await getDocs(collection(db, 'circles', circleId, 'members'));
+        const memberIds = membersSnapshot.docs.map(doc => doc.id);
+        const membersList = [];
+        
+        for (const memberId of memberIds) {
+          try {
+            const userDoc = await getDoc(doc(db, 'users', memberId));
+            const memberDoc = await getDoc(doc(db, 'circles', circleId, 'members', memberId));
+            if (userDoc.exists()) {
+              const userData = userDoc.data();
+              const memberData = memberDoc.data();
+              membersList.push({
+                id: memberId,
+                name: userData.name || userData.nickname || '氏名未設定',
+                university: userData.university || '',
+                grade: userData.grade || '',
+                email: userData.email || '',
+                profileImageUrl: userData.profileImageUrl || null,
+                role: memberData.role || 'member',
+                joinedAt: memberData.joinedAt
+              });
+            }
+          } catch (error) {
+            console.error('Error fetching user data:', error);
+          }
+        }
+        setMembers(membersList);
+
+        // フェードインアニメーション
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }).start();
+
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        Alert.alert('エラー', 'データの取得に失敗しました');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user, circleId]);
+
+  const handleMemberSelect = (member) => {
+    if (!user) return;
+    if (member.id === user.uid) {
+      Alert.alert('エラー', '自分自身に権限を引き継ぐことはできません');
+      return;
+    }
+
+    setSelectedMember(member);
+    
+    // 選択アニメーション
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 1.05,
+        duration: 150,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 150,
+        useNativeDriver: true,
+      })
+    ]).start();
+
+    // 光のアニメーション
+    Animated.timing(glowAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleTransfer = async () => {
+    if (!selectedMember || !user) return;
+
+    setShowConfirmModal(false);
+    setTransferring(true);
+
+    try {
+      // 権限移譲の処理
+      const currentLeaderRef = doc(db, 'circles', circleId, 'members', user.uid);
+      const newLeaderRef = doc(db, 'circles', circleId, 'members', selectedMember.id);
+
+      // サークルデータの代表者情報を更新（最初に実行）
+      await updateDoc(doc(db, 'circles', circleId), {
+        leaderId: selectedMember.id,
+        leaderName: selectedMember.name || selectedMember.nickname || 'Unknown'
+      });
+
+      // 新しい代表者を設定
+      await updateDoc(newLeaderRef, { role: 'leader' });
+      
+      // 現在の代表者をメンバーに変更（最後に実行）
+      await updateDoc(currentLeaderRef, { role: 'member' });
+
+      setShowCompletionModal(true);
+    } catch (error) {
+      console.error('Error transferring leadership:', error);
+      Alert.alert('エラー', '権限の引き継ぎに失敗しました');
+    } finally {
+      setTransferring(false);
+    }
+  };
+
+  const handleCompletion = () => {
+    setShowCompletionModal(false);
+    // ログアウトチェックを追加
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      navigation.navigate('CircleManagementScreen');
+    } else {
+      // ログアウトしている場合はホーム画面に遷移
+      navigation.navigate('Home');
+    }
+  };
+
+  // 検索フィルタリング
+  const filteredMembers = members.filter(member =>
+    member.name.toLowerCase().includes(searchText.toLowerCase()) ||
+    member.university.toLowerCase().includes(searchText.toLowerCase()) ||
+    member.grade.toLowerCase().includes(searchText.toLowerCase())
+  );
+
+  // 役割別にソート（代表者 → 管理者 → メンバー）
+  const sortedMembers = filteredMembers.sort((a, b) => {
+    const rolePriority = {
+      'leader': 1,
+      'admin': 2,
+      'member': 3
+    };
+    
+    const priorityA = rolePriority[a.role] || 4;
+    const priorityB = rolePriority[b.role] || 4;
+    return priorityA - priorityB;
+  });
+
+  const renderMemberItem = (member) => {
+    const isSelected = selectedMember?.id === member.id;
+    const isCurrentUser = user && member.id === user.uid;
+
+    return (
+      <Animated.View
+        key={member.id}
+        style={[
+          styles.memberItem,
+          isSelected && styles.selectedMemberItem,
+          isCurrentUser && styles.currentUserItem
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.memberTouchable}
+          onPress={() => handleMemberSelect(member)}
+          disabled={isCurrentUser}
+        >
+          <View style={styles.memberIconContainer}>
+            {member.profileImageUrl ? (
+              <Image source={{ uri: member.profileImageUrl }} style={styles.memberIcon} />
+            ) : (
+              <View style={styles.memberIconPlaceholder}>
+                <Ionicons name="person-outline" size={24} color="#ccc" />
+              </View>
+            )}
+            {isSelected && (
+              <Animated.View
+                style={[
+                  styles.glowEffect,
+                  {
+                    opacity: glowAnim,
+                    transform: [{ scale: glowAnim }]
+                  }
+                ]}
+              />
+            )}
+          </View>
+          <View style={styles.memberInfo}>
+            <Text style={styles.memberName}>
+              {member.name || member.nickname || 'Unknown'}
+              {isCurrentUser && ' (あなた)'}
+            </Text>
+            <Text style={styles.memberInfo}>
+              {member.university || ''} {member.grade || ''}
+            </Text>
+            <Text style={styles.memberRole}>
+              {member.role === 'leader' ? '代表者' : member.role === 'admin' ? '管理者' : 'メンバー'}
+            </Text>
+          </View>
+          {isSelected && (
+            <Ionicons name="checkmark-circle" size={24} color="#007bff" />
+          )}
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <CommonHeader 
+          title="代表者権限の引き継ぎ" 
+          showBackButton 
+          onBack={() => navigation.goBack()}
+          rightButton={
+            <TouchableOpacity onPress={() => setShowHelpModal(true)}>
+              <Ionicons name="help-circle-outline" size={24} color="#007bff" />
+            </TouchableOpacity>
+          }
+        />
+        <SafeAreaView style={styles.content}>
+          <View style={styles.loadingContainer}>
+            <Ionicons name="refresh" size={48} color="#007bff" />
+            <Text style={styles.loadingText}>データを読み込み中...</Text>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <CommonHeader 
+        title="代表者権限の引き継ぎ" 
+        showBackButton 
+        onBack={() => navigation.goBack()}
+        rightButton={
+          <TouchableOpacity onPress={() => setShowHelpModal(true)}>
+            <Ionicons name="help-circle-outline" size={24} color="#007bff" />
+          </TouchableOpacity>
+        }
+      />
+      <SafeAreaView style={styles.content}>
+        <Animated.View style={[styles.mainContent, { opacity: fadeAnim }]}>
+          {/* 現在の代表者表示 */}
+          <View style={styles.currentLeaderSection}>
+            <View style={styles.currentLeaderContainer}>
+              <View style={styles.currentLeaderIconContainer}>
+                {currentUserData?.profileImageUrl ? (
+                  <Image source={{ uri: currentUserData.profileImageUrl }} style={styles.currentLeaderIcon} />
+                ) : (
+                  <View style={styles.currentLeaderIconPlaceholder}>
+                    <Ionicons name="person-outline" size={32} color="#007bff" />
+                  </View>
+                )}
+              </View>
+              <View style={styles.currentLeaderInfo}>
+                <Text style={styles.currentLeaderLabel}>現在の代表者</Text>
+                <Text style={styles.currentLeaderName}>
+                  {currentUserData?.name || currentUserData?.nickname || user?.email || 'Unknown'}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* メンバーリスト */}
+          <View style={styles.membersSection}>
+            <Text style={styles.instructionText}>
+              引き継ぎ先を選んでください
+            </Text>
+            <Text style={styles.sectionTitle}>メンバー</Text>
+            
+            {/* 検索バー */}
+            <View style={styles.searchBarContainer}>
+              <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="名前・大学・学年で検索"
+                value={searchText}
+                onChangeText={setSearchText}
+                clearButtonMode="while-editing"
+              />
+            </View>
+            
+            {searchText.length > 0 && (
+              <Text style={styles.hitCountText}>
+                検索結果
+                <Text style={styles.hitCountNumber}>{filteredMembers.length}</Text>
+                件
+              </Text>
+            )}
+            
+            <ScrollView style={styles.membersList} showsVerticalScrollIndicator={false}>
+              {sortedMembers.map(renderMemberItem)}
+            </ScrollView>
+          </View>
+
+          {/* 引き継ぎボタン */}
+          <View style={styles.buttonSection}>
+            <TouchableOpacity
+              style={[
+                styles.transferButton,
+                !selectedMember && styles.transferButtonDisabled
+              ]}
+              onPress={() => setShowConfirmModal(true)}
+              disabled={!selectedMember || transferring}
+            >
+              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                <LinearGradient
+                  colors={selectedMember ? ['#007bff', '#0056b3'] : ['#ccc', '#999']}
+                  style={styles.transferButtonGradient}
+                >
+                  <Ionicons 
+                    name="swap-horizontal" 
+                    size={24} 
+                    color="#fff" 
+                  />
+                  <Text style={styles.transferButtonText}>
+                    {transferring ? '引き継ぎ中...' : 'このメンバーに引き継ぐ'}
+                  </Text>
+                </LinearGradient>
+              </Animated.View>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </SafeAreaView>
+
+      {/* ヘルプモーダル */}
+      <Modal
+        visible={showHelpModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowHelpModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.helpModal}>
+            <Text style={styles.helpModalTitle}>代表者権限の引き継ぎについて</Text>
+            <Text style={styles.helpModalText}>
+              代表者権限を引き継ぐと、あなたの役割は「メンバー」に変更されます。
+              引き継ぎ先のメンバーが新しい代表者となり、サークルの管理権限を取得します。
+            </Text>
+            <TouchableOpacity
+              style={styles.helpModalButton}
+              onPress={() => setShowHelpModal(false)}
+            >
+              <Text style={styles.helpModalButtonText}>閉じる</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 確認モーダル */}
+      <Modal
+        visible={showConfirmModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowConfirmModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmModal}>
+            <Text style={styles.confirmModalTitle}>確認</Text>
+            <Text style={styles.confirmModalText}>
+              {selectedMember?.name || selectedMember?.nickname || 'Unknown'} さんに{'\n'}
+              代表者権限を引き継ぎますか？
+            </Text>
+            <Text style={styles.confirmModalWarning}>
+              この操作は取り消すことができません。
+            </Text>
+            <View style={styles.confirmModalButtons}>
+              <TouchableOpacity
+                style={styles.confirmModalButtonCancel}
+                onPress={() => setShowConfirmModal(false)}
+              >
+                <Text style={styles.confirmModalButtonCancelText}>キャンセル</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmModalButtonConfirm}
+                onPress={handleTransfer}
+              >
+                <Text style={styles.confirmModalButtonConfirmText}>引き継ぐ</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 完了モーダル */}
+      <Modal
+        visible={showCompletionModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={handleCompletion}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.completionModal}>
+            <View style={styles.completionIconContainer}>
+              <Ionicons name="checkmark-circle" size={64} color="#28a745" />
+            </View>
+            <Text style={styles.completionModalTitle}>引き継ぎ完了</Text>
+            <Text style={styles.completionModalText}>
+              {selectedMember?.name || selectedMember?.nickname || 'Unknown'}さんに
+              引き継ぎました。
+            </Text>
+            <Text style={styles.completionModalSubText}>
+              あなたのは「メンバー」に変更されました。
+            </Text>
+            <TouchableOpacity
+              style={styles.completionModalButton}
+              onPress={handleCompletion}
+            >
+              <Text style={styles.completionModalButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+  },
+  content: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  mainContent: {
+    flex: 1,
+    padding: 20,
+  },
+  currentLeaderSection: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  currentLeaderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  currentLeaderIconContainer: {
+    position: 'relative',
+    marginRight: 16,
+  },
+  currentLeaderIcon: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+  },
+  currentLeaderIconPlaceholder: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#e3f2fd',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  leaderBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  currentLeaderInfo: {
+    flex: 1,
+  },
+  currentLeaderLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  currentLeaderName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  instructionText: {
+    fontSize: 16,
+    color: '#007bff',
+    textAlign: 'center',
+    fontWeight: '500',
+    marginBottom: 16,
+  },
+  membersSection: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
+  },
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    marginBottom: 16,
+    paddingHorizontal: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 16,
+  },
+  hitCountText: {
+    marginBottom: 10,
+    fontSize: 14,
+    color: '#666',
+  },
+  hitCountNumber: {
+    fontWeight: 'bold',
+    color: '#007bff',
+  },
+  membersList: {
+    flex: 1,
+  },
+  memberItem: {
+    marginBottom: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  selectedMemberItem: {
+    backgroundColor: '#e3f2fd',
+    borderWidth: 2,
+    borderColor: '#007bff',
+  },
+  currentUserItem: {
+    opacity: 0.5,
+  },
+  memberTouchable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+  },
+  memberIconContainer: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  memberIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  memberIconPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  glowEffect: {
+    position: 'absolute',
+    top: -4,
+    left: -4,
+    right: -4,
+    bottom: -4,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: '#007bff',
+    backgroundColor: 'transparent',
+  },
+  memberInfo: {
+    flex: 1,
+  },
+  memberName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 2,
+  },
+  memberInfo: {
+    fontSize: 15,
+    color: '#666',
+    marginBottom: 2,
+  },
+  memberRole: {
+    fontSize: 14,
+    color: '#007bff',
+    fontWeight: 'bold',
+  },
+  buttonSection: {
+    paddingHorizontal: 20,
+  },
+  transferButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  transferButtonDisabled: {
+    opacity: 0.6,
+  },
+  transferButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+  },
+  transferButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  helpModal: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 320,
+  },
+  helpModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  helpModalText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  helpModalButton: {
+    backgroundColor: '#007bff',
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  helpModalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  confirmModal: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 320,
+  },
+  confirmModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  confirmModalText: {
+    fontSize: 16,
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  confirmModalWarning: {
+    fontSize: 14,
+    color: '#dc3545',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  confirmModalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  confirmModalButtonCancel: {
+    flex: 1,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    paddingVertical: 12,
+    marginRight: 8,
+    alignItems: 'center',
+  },
+  confirmModalButtonCancelText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  confirmModalButtonConfirm: {
+    flex: 1,
+    backgroundColor: '#dc3545',
+    borderRadius: 8,
+    paddingVertical: 12,
+    marginLeft: 8,
+    alignItems: 'center',
+  },
+  confirmModalButtonConfirmText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  completionModal: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 320,
+    alignItems: 'center',
+  },
+  completionIconContainer: {
+    marginBottom: 16,
+  },
+  completionModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  completionModalText: {
+    fontSize: 16,
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  completionModalSubText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  completionModalButton: {
+    backgroundColor: '#28a745',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+  },
+  completionModalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+}); 

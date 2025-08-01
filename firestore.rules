@@ -37,7 +37,11 @@ service cloud.firestore {
       allow update: if request.auth != null && 
         (resource.data.role in ['leader', 'admin'] || 
          exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)).data.role in ['leader', 'admin']);
+         get(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)).data.role in ['leader', 'admin'] ||
+         // 代表者権限の引き継ぎを許可（他のメンバーをleaderに変更）
+         (request.auth.uid != resource.id && 
+          exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)).data.role == 'leader'));
       allow delete: if request.auth != null && 
         (request.auth.uid == memberId || // 自分自身の削除（脱退）を許可
          exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)) &&

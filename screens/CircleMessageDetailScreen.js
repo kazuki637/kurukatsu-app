@@ -96,7 +96,8 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
         }
         
         // 現在のユーザーの出席状況を取得
-        if (docSnapshot.id === auth.currentUser?.uid) {
+        const currentUser = auth.currentUser;
+        if (currentUser && docSnapshot.id === currentUser.uid) {
           currentUserStatus = data.status;
         }
       }
@@ -115,7 +116,8 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
 
   // 出席・欠席ボタンの処理
   const handleAttendance = async (status) => {
-    if (!auth.currentUser || !message.circleId || !message.id || message.type !== 'attendance') return;
+    const currentUser = auth.currentUser;
+  if (!currentUser || !message.circleId || !message.id || message.type !== 'attendance') return;
     
     // 回答期限が過ぎている場合は処理を中止
     if (isDeadlinePassed()) {
@@ -124,8 +126,14 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
     }
     
     try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        Alert.alert('エラー', 'ログインが必要です');
+        return;
+      }
+      
       const messageId = message.messageId || message.id;
-      const attendanceRef = doc(db, 'circles', message.circleId, 'messages', messageId, 'attendance', auth.currentUser.uid);
+      const attendanceRef = doc(db, 'circles', message.circleId, 'messages', messageId, 'attendance', currentUser.uid);
       
       // 同じステータスを押した場合は取り消し
       if (attendanceStatus === status) {
@@ -142,7 +150,7 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
           // 回答者一覧から削除
           setAttendanceUsers(prev => ({
             ...prev,
-            attending: prev.attending.filter(user => user.uid !== auth.currentUser.uid)
+            attending: prev.attending.filter(user => user.uid !== currentUser.uid)
           }));
         } else if (status === 'absent') {
           setAttendanceCounts(prev => ({
@@ -152,7 +160,7 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
           // 回答者一覧から削除
           setAttendanceUsers(prev => ({
             ...prev,
-            absent: prev.absent.filter(user => user.uid !== auth.currentUser.uid)
+            absent: prev.absent.filter(user => user.uid !== currentUser.uid)
           }));
         } else if (status === 'pending') {
           setAttendanceCounts(prev => ({
@@ -162,7 +170,7 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
           // 回答者一覧から削除
           setAttendanceUsers(prev => ({
             ...prev,
-            pending: prev.pending.filter(user => user.uid !== auth.currentUser.uid)
+            pending: prev.pending.filter(user => user.uid !== currentUser.uid)
           }));
         }
         
@@ -171,7 +179,6 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
       }
       
       // 新しいステータスを登録
-      const currentUser = auth.currentUser;
       const userDocRef = doc(db, 'users', currentUser.uid);
       const userDocSnap = await getDoc(userDocRef);
       const userData = userDocSnap.exists() ? userDocSnap.data() : {};
