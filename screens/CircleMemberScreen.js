@@ -124,9 +124,6 @@ const Calendar = ({ selectedDate, onDateSelect, events }) => {
   };
 
   const changeMonth = (direction) => {
-    if (isAnimating) return;
-    setIsAnimating(true);
-    
     setCurrentMonth(prev => {
       const newMonth = new Date(prev);
       if (direction > 0) {
@@ -136,8 +133,6 @@ const Calendar = ({ selectedDate, onDateSelect, events }) => {
       }
       return newMonth;
     });
-    
-    setTimeout(() => setIsAnimating(false), 300);
   };
 
   const getEventCount = (date) => {
@@ -181,9 +176,8 @@ const Calendar = ({ selectedDate, onDateSelect, events }) => {
       <View style={styles.calendarHeader}>
         <TouchableOpacity 
           onPress={() => changeMonth(-1)} 
-          style={[styles.monthButton, isAnimating && styles.disabledButton]}
+          style={styles.monthButton}
           activeOpacity={0.7}
-          disabled={isAnimating}
         >
           <Ionicons name="chevron-back" size={28} color="#007bff" />
         </TouchableOpacity>
@@ -199,9 +193,8 @@ const Calendar = ({ selectedDate, onDateSelect, events }) => {
         
         <TouchableOpacity 
           onPress={() => changeMonth(1)} 
-          style={[styles.monthButton, isAnimating && styles.disabledButton]}
+          style={styles.monthButton}
           activeOpacity={0.7}
-          disabled={isAnimating}
         >
           <Ionicons name="chevron-forward" size={28} color="#007bff" />
         </TouchableOpacity>
@@ -439,6 +432,21 @@ export default function CircleMemberScreen({ route, navigation }) {
   // 役割に基づくソート関数（自分を一番上に）
   const sortMembersByRole = (memberList) => {
     const currentUser = auth.currentUser;
+    if (!currentUser) {
+      // ログアウト時は役割順のみでソート
+      const rolePriority = {
+        'leader': 1,
+        'admin': 2,
+        'member': 3
+      };
+      
+      return memberList.sort((a, b) => {
+        const priorityA = rolePriority[a.role] || 4;
+        const priorityB = rolePriority[b.role] || 4;
+        return priorityA - priorityB;
+      });
+    }
+    
     const rolePriority = {
       'leader': 2,
       'admin': 3,
@@ -447,8 +455,8 @@ export default function CircleMemberScreen({ route, navigation }) {
     
     return memberList.sort((a, b) => {
       // 自分を一番上に
-      if (a.id === currentUser?.uid) return -1;
-      if (b.id === currentUser?.uid) return 1;
+      if (a.id === currentUser.uid) return -1;
+      if (b.id === currentUser.uid) return 1;
       
       // その他のメンバーは役割順
       const priorityA = rolePriority[a.role] || 5;
@@ -600,7 +608,12 @@ export default function CircleMemberScreen({ route, navigation }) {
                     <TouchableOpacity
                       activeOpacity={0.7}
                       style={{ backgroundColor: '#f8f8f8', borderRadius: 10, padding: 14, marginBottom: 14 }}
-                      onPress={() => navigation.navigate('CircleMessageDetail', { message: { ...item, userUid: auth.currentUser.uid } })}
+                      onPress={() => {
+                        const currentUser = auth.currentUser;
+                        if (currentUser) {
+                          navigation.navigate('CircleMessageDetail', { message: { ...item, userUid: currentUser.uid } });
+                        }
+                      }}
                     >
                       {/* 右下：送信日時 */}
                       <View style={{ position: 'absolute', bottom: 10, right: 14 }}>
@@ -686,7 +699,10 @@ export default function CircleMemberScreen({ route, navigation }) {
                         <Text style={styles.memberInfo}>{item.university || ''} {item.grade || ''}</Text>
                         <Text style={styles.memberRole}>{getRoleDisplayName(item.role)}</Text>
                       </View>
-                                  {item.id === auth.currentUser?.uid && (
+                                  {(() => {
+                                    const currentUser = auth.currentUser;
+                                    return currentUser && item.id === currentUser.uid;
+                                  })() && (
               <TouchableOpacity
                 style={styles.memberLeaveButton}
                 onPress={() => setLeaveModalVisible(true)}

@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function CommonHeader({ title, showBackButton = false, onBack, rightButtonLabel, onRightButtonPress }) {
+export default function CommonHeader({ title, showBackButton = false, onBack, rightButtonLabel, onRightButtonPress, rightButton }) {
   return (
     <View style={styles.header}>
       {showBackButton && (
@@ -11,7 +11,11 @@ export default function CommonHeader({ title, showBackButton = false, onBack, ri
         </TouchableOpacity>
       )}
       <Text style={styles.headerTitle}>{title}</Text>
-      {rightButtonLabel && (
+      {rightButton ? (
+        <View style={styles.headerRightButton}>
+          {rightButton}
+        </View>
+      ) : rightButtonLabel && (
         <TouchableOpacity onPress={onRightButtonPress} style={styles.headerRightButton}>
           <Text style={styles.rightButtonText}>{rightButtonLabel}</Text>
         </TouchableOpacity>

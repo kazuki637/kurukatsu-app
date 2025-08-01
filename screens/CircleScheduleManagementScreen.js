@@ -122,17 +122,11 @@ const Calendar = ({ selectedDate, onDateSelect, events }) => {
   };
 
   const changeMonth = (direction) => {
-    if (isAnimating) return;
-    
-    setIsAnimating(true);
     setCurrentMonth(prev => {
       const newMonth = new Date(prev);
       newMonth.setMonth(prev.getMonth() + direction);
       return newMonth;
     });
-    
-    // アニメーション完了後にフラグをリセット
-    setTimeout(() => setIsAnimating(false), 300);
   };
 
 
@@ -182,9 +176,8 @@ const Calendar = ({ selectedDate, onDateSelect, events }) => {
       <View style={styles.calendarHeader}>
         <TouchableOpacity 
           onPress={() => changeMonth(-1)} 
-          style={[styles.monthButton, isAnimating && styles.disabledButton]}
+          style={styles.monthButton}
           activeOpacity={0.7}
-          disabled={isAnimating}
         >
           <Ionicons name="chevron-back" size={28} color="#007bff" />
         </TouchableOpacity>
@@ -200,9 +193,8 @@ const Calendar = ({ selectedDate, onDateSelect, events }) => {
         
         <TouchableOpacity 
           onPress={() => changeMonth(1)} 
-          style={[styles.monthButton, isAnimating && styles.disabledButton]}
+          style={styles.monthButton}
           activeOpacity={0.7}
-          disabled={isAnimating}
         >
           <Ionicons name="chevron-forward" size={28} color="#007bff" />
         </TouchableOpacity>
@@ -390,7 +382,7 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      <CommonHeader title="スケジュール管理" />
+      <CommonHeader title="スケジュール" />
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView>
           {/* カレンダー */}

@@ -130,6 +130,10 @@ export default function CircleContactScreen({ route, navigation }) {
     setLoading(true);
     try {
       const sender = auth.currentUser;
+      if (!sender) {
+        Alert.alert('エラー', 'ログインが必要です');
+        return;
+      }
       const senderUid = sender.uid;
       // Firestoreからプロフィール情報も取得
       const senderDoc = await getDoc(doc(db, 'users', senderUid));
