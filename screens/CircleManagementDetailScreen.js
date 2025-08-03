@@ -108,39 +108,49 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
     );
   }
 
-  // 管理ボタンのリストを6セル分に（5個＋1空セル）
-  const managementButtonsGrid = [
-    {
-      label: 'プロフィール編集',
-      icon: 'create-outline',
-      onPress: () => navigation.navigate('CircleProfileEdit', { circleId })
-    },
-    {
-      label: 'メンバー管理',
-      icon: 'people-outline',
-      onPress: () => navigation.navigate('CircleMemberManagement', { circleId })
-    },
-    {
-      label: '代表者を引き継ぐ',
-      icon: 'swap-horizontal-outline',
-      onPress: () => navigation.navigate('CircleLeadershipTransfer', { circleId, circleName })
-    },
-    {
-      label: '連絡',
-      icon: 'mail-outline',
-      onPress: () => navigation.navigate('CircleContact', { circleId })
-    },
-    {
-      label: 'スケジュール',
-      icon: 'calendar-outline',
-      onPress: () => navigation.navigate('CircleScheduleManagement', { circleId })
-    },
-    {
-      label: 'サークル設定',
-      icon: 'settings-outline',
-      onPress: () => navigation.navigate('CircleSettings', { circleId })
-    },
-  ];
+  // 管理ボタンのリスト（代表者のみ「代表者を引き継ぐ」ボタンを表示）
+  const getManagementButtonsGrid = () => {
+    const baseButtons = [
+      {
+        label: 'プロフィール編集',
+        icon: 'create-outline',
+        onPress: () => navigation.navigate('CircleProfileEdit', { circleId })
+      },
+      {
+        label: 'メンバー管理',
+        icon: 'people-outline',
+        onPress: () => navigation.navigate('CircleMemberManagement', { circleId })
+      },
+      {
+        label: '連絡',
+        icon: 'mail-outline',
+        onPress: () => navigation.navigate('CircleContact', { circleId })
+      },
+      {
+        label: 'スケジュール',
+        icon: 'calendar-outline',
+        onPress: () => navigation.navigate('CircleScheduleManagement', { circleId })
+      },
+      {
+        label: 'サークル設定',
+        icon: 'settings-outline',
+        onPress: () => navigation.navigate('CircleSettings', { circleId })
+      }
+    ];
+
+    // 代表者のみ「代表者を引き継ぐ」ボタンを追加
+    if (userRole === 'leader') {
+      baseButtons.splice(2, 0, {
+        label: '代表者を引き継ぐ',
+        icon: 'swap-horizontal-outline',
+        onPress: () => navigation.navigate('CircleLeadershipTransfer', { circleId, circleName })
+      });
+    }
+
+    return baseButtons;
+  };
+
+  const managementButtonsGrid = getManagementButtonsGrid();
 
   return (
     <View style={styles.fullScreenContainer}>
@@ -175,11 +185,15 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
               <MaterialCommunityIcons name="crown-outline" size={24} color="#ffb300" style={{ marginRight: 8 }} />
               <Text style={styles.subscriptionTitle}>プレミアム</Text>
               <View style={{ flex: 1 }} />
-              <TouchableOpacity style={styles.subscriptionButton}><Text style={styles.subscriptionButtonText}>無料で体験する</Text></TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.subscriptionButton}
+                onPress={() => navigation.navigate('Subscription', { circleId, circleName })}
+              >
+                <Text style={styles.subscriptionButtonText}>無料で体験する</Text>
+              </TouchableOpacity>
             </View>
             <Text style={styles.subscriptionDesc}>¥0で7日間プレミアムを楽しみましょう</Text>
             <View style={styles.subscriptionFeatureRow}>
-              <View style={styles.subscriptionFeature}><Ionicons name="remove-circle-outline" size={20} color="#333" /><Text style={styles.subscriptionFeatureText}>広告削除</Text></View>
               <View style={styles.subscriptionFeature}><Ionicons name="calendar-outline" size={20} color="#333" /><Text style={styles.subscriptionFeatureText}>スケジュール</Text></View>
               <View style={styles.subscriptionFeature}><Ionicons name="mail-outline" size={20} color="#333" /><Text style={styles.subscriptionFeatureText}>連絡</Text></View>
               <View style={styles.subscriptionFeature}><Ionicons name="star-outline" size={20} color="#333" /><Text style={styles.subscriptionFeatureText}>おすすめ掲載</Text></View>

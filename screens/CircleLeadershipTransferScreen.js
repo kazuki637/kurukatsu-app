@@ -157,14 +157,24 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
     setTransferring(true);
 
     try {
+      // 新しい代表者のユーザー情報を取得
+      const newLeaderUserDoc = await getDoc(doc(db, 'users', selectedMember.id));
+      const newLeaderUserData = newLeaderUserDoc.exists() ? newLeaderUserDoc.data() : {};
+
       // 権限移譲の処理
       const currentLeaderRef = doc(db, 'circles', circleId, 'members', user.uid);
       const newLeaderRef = doc(db, 'circles', circleId, 'members', selectedMember.id);
 
-      // サークルデータの代表者情報を更新（最初に実行）
+      // サークルデータの代表者情報を更新（新しい代表者の情報で更新）
       await updateDoc(doc(db, 'circles', circleId), {
         leaderId: selectedMember.id,
-        leaderName: selectedMember.name || selectedMember.nickname || 'Unknown'
+        leaderName: selectedMember.name || selectedMember.nickname || 'Unknown',
+        // 新しい代表者の大学名と連絡先を更新
+        universityName: newLeaderUserData.university || '',
+        leaderContact: newLeaderUserData.email || '',
+        contactInfo: newLeaderUserData.email || '', // contactInfoも更新
+        // 代表者のプロフィール画像も更新（存在する場合）
+        leaderImageUrl: newLeaderUserData.profileImageUrl || null
       });
 
       // 新しい代表者を設定
@@ -298,7 +308,7 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
   return (
     <View style={styles.container}>
       <CommonHeader 
-        title="代表者権限の引き継ぎ" 
+        title="代表者を引き継ぐ" 
         showBackButton 
         onBack={() => navigation.goBack()}
         rightButton={

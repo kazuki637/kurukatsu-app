@@ -35,8 +35,19 @@ const SignupScreen = ({ navigation }) => {
         isGradePublic: true
       });
       
-      Alert.alert('登録完了', 'アカウントが作成されました。');
-      // 認証状態で自動遷移
+      Alert.alert(
+        '登録完了', 
+        'アカウントが作成されました。',
+        [
+          {
+            text: '次へ',
+            onPress: () => {
+              // プロフィール編集画面に遷移
+              navigation.navigate('ProfileEdit', { fromSignup: true });
+            }
+          }
+        ]
+      );
     } catch (error) {
       Alert.alert('登録エラー', error.message);
     } finally {

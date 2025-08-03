@@ -5,7 +5,7 @@ import { db } from '../firebaseConfig';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth } from '../firebaseConfig';
 import { collection, query, where, orderBy, getDocs, deleteDoc, updateDoc, arrayRemove } from 'firebase/firestore';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { Ionicons } from '@expo/vector-icons';
 import { getRoleDisplayName } from '../utils/permissionUtils';
 
 // 高度に洗練されたカレンダーコンポーネント

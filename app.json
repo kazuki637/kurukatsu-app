@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "KurukatsuApp",
-    "slug": "KurukatsuApp",
+    "slug": "kurukatsu-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,18 +14,38 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.kurukatsu.app"
+      "bundleIdentifier": "com.kurukatsu.app",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.kurukatsu.app",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "plugins": []
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "写真を選択するためにカメラロールへのアクセスが必要です。",
+          "cameraPermission": "写真を撮影するためにカメラへのアクセスが必要です。"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "70457aa6-c594-49fc-a494-a6ce6c8636b4"
+      }
+    },
+    "owner": "kazuki637"
   }
 }
