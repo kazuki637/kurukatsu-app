@@ -46,6 +46,7 @@ import CircleSettingsScreen from './screens/CircleSettingsScreen';
 import CircleMessageDetailScreen from './screens/CircleMessageDetailScreen';
 import CircleManagementDetailScreen from './screens/CircleManagementDetailScreen';
 import CircleLeadershipTransferScreen from './screens/CircleLeadershipTransferScreen';
+import SubscriptionScreen from './screens/SubscriptionScreen';
 
 
 const AuthStack = createStackNavigator();
@@ -63,6 +64,7 @@ function AuthStackScreen() {
     <AuthStack.Navigator screenOptions={{ headerShown: false }}>
       <AuthStack.Screen name="Login" component={LoginScreen} />
       <AuthStack.Screen name="Signup" component={SignupScreen} />
+      <AuthStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
     </AuthStack.Navigator>
   );
 }
@@ -138,6 +140,7 @@ function CircleManagementStackScreen() {
       <CircleManagementStack.Screen name="AddSchedule" component={AddScheduleScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleContact" component={CircleContactScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleLeadershipTransfer" component={CircleLeadershipTransferScreen} options={{ headerShown: false, gestureEnabled: true }} />
+      <CircleManagementStack.Screen name="Subscription" component={SubscriptionScreen} options={{ headerShown: false, gestureEnabled: true }} />
     </CircleManagementStack.Navigator>
   );
 }
@@ -193,6 +196,10 @@ function ProfileEditScreenModal() {
     </View>
   );
 }
+
+
+
+
 
 // Root Stack Navigator (for modals and initial auth flow)
 function AppNavigator() {

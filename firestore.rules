@@ -90,4 +90,4 @@ service cloud.firestore {
       }
     }
   }
-} 
+} ｓ

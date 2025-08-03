@@ -5,19 +5,21 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db, storage } from '../firebaseConfig';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { useNavigation, CommonActions, useFocusEffect } from '@react-navigation/native';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { useNavigation, useRoute, CommonActions, useFocusEffect } from '@react-navigation/native';
 import CommonHeader from '../components/CommonHeader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import universitiesData from '../universities.json';
 import { compressProfileImage } from '../utils/imageCompression';
+
 
 const GRADES = ['大学1年', '大学2年', '大学3年', '大学4年', '大学院1年', '大学院2年', 'その他'];
 const GENDERS = ['男性', '女性', 'その他', '回答しない'];
 
 export default function ProfileEditScreen(props) {
   const navigation = useNavigation();
-  const forceToHome = props.forceToHome || false;
+  const route = useRoute();
+  const forceToHome = route.params?.fromSignup ? false : (props.forceToHome || false);
   const user = auth.currentUser;
   const [name, setName] = useState(''); // 氏名（非公開）
   const [nickname, setNickname] = useState(''); // ニックネーム（公開）
@@ -30,6 +32,10 @@ export default function ProfileEditScreen(props) {
   const [profileImageUrl, setProfileImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
+  
+  // 学生証関連の状態
+  const [studentIdImage, setStudentIdImage] = useState(null);
+  const [studentIdUrl, setStudentIdUrl] = useState('');
   
   // オートコンプリート用の状態
   const [universitySuggestions, setUniversitySuggestions] = useState([]);
@@ -92,6 +98,7 @@ export default function ProfileEditScreen(props) {
         setGender(d.gender || '');
         setBirthday(d.birthday ? new Date(d.birthday) : new Date(2000, 0, 1));
         setProfileImageUrl(d.profileImageUrl || '');
+        setStudentIdUrl(d.studentIdUrl || '');
         
         // 元のデータを保存
         setOriginalData({
@@ -102,6 +109,7 @@ export default function ProfileEditScreen(props) {
           gender: d.gender || '',
           birthday: d.birthday ? new Date(d.birthday) : new Date(2000, 0, 1),
           profileImageUrl: d.profileImageUrl || '',
+          studentIdUrl: d.studentIdUrl || '',
         });
       } else {
         // Firestoreにデータがなければ空欄のまま（setDocしない）
@@ -112,16 +120,19 @@ export default function ProfileEditScreen(props) {
         setGender('');
         setBirthday(new Date(2000, 0, 1));
         setProfileImageUrl('');
+        setStudentIdUrl('');
         
         // 元のデータを保存
         setOriginalData({
           name: '',
           nickname: '',
           university: '',
+          university: '',
           grade: '',
           gender: '',
           birthday: new Date(2000, 0, 1),
           profileImageUrl: '',
+          studentIdUrl: '',
         });
       }
     });
@@ -138,7 +149,8 @@ export default function ProfileEditScreen(props) {
       grade !== originalData.grade ||
       gender !== originalData.gender ||
       birthday.getTime() !== originalData.birthday.getTime() ||
-      profileImage !== null;
+      profileImage !== null ||
+      studentIdImage !== null;
     
     console.log('プロフィール編集画面: 変更検知', {
       nameChanged: name !== originalData.name,
@@ -148,6 +160,7 @@ export default function ProfileEditScreen(props) {
       genderChanged: gender !== originalData.gender,
       birthdayChanged: birthday.getTime() !== originalData.birthday.getTime(),
       imageChanged: profileImage !== null,
+      studentIdChanged: studentIdImage !== null,
       hasChanges
     });
     
@@ -212,6 +225,93 @@ export default function ProfileEditScreen(props) {
     }
   };
 
+  // 学生証撮影
+  const handleStudentIdCapture = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('許可が必要です', '学生証を撮影するには、カメラへのアクセス許可が必要です。');
+      return;
+    }
+    
+    let result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [3, 2], // 学生証に適した長方形の比率
+      quality: 0.8,
+    });
+    
+    if (!result.canceled) {
+      const uri = result.assets[0].uri;
+      setStudentIdImage(uri);
+      checkForChanges();
+    }
+  };
+
+  // 学生証アップロード
+  const handleStudentIdUpload = async () => {
+    if (!studentIdImage) return;
+    
+    try {
+      setLoading(true);
+      const response = await fetch(studentIdImage);
+      const blob = await response.blob();
+      
+      const storageRef = ref(storage, `student_ids/${user.uid}_${Date.now()}.jpg`);
+      await uploadBytes(storageRef, blob);
+      const downloadURL = await getDownloadURL(storageRef);
+      
+      setStudentIdUrl(downloadURL);
+      setStudentIdImage(null);
+      
+      // Firestoreに保存
+      await updateDoc(doc(db, 'users', user.uid), {
+        studentIdUrl: downloadURL
+      });
+      
+      Alert.alert('成功', '学生証がアップロードされました。');
+    } catch (error) {
+      console.error('学生証アップロードエラー:', error);
+      Alert.alert('エラー', '学生証のアップロードに失敗しました。');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 学生証削除
+  const handleDeleteStudentId = async () => {
+    Alert.alert(
+      '確認',
+      '学生証を削除しますか？',
+      [
+        { text: 'キャンセル', style: 'cancel' },
+        {
+          text: '削除',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (studentIdUrl) {
+                const storageRef = ref(storage, studentIdUrl);
+                await deleteObject(storageRef);
+              }
+              setStudentIdUrl('');
+              setStudentIdImage(null);
+              checkForChanges();
+              
+              await updateDoc(doc(db, 'users', user.uid), {
+                studentIdUrl: ''
+              });
+              
+              Alert.alert('成功', '学生証が削除されました。');
+            } catch (error) {
+              console.error('学生証削除エラー:', error);
+              Alert.alert('エラー', '学生証の削除に失敗しました。');
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const handleSave = async () => {
     if (!name.trim() || !nickname.trim() || !university.trim() || !grade || !gender || !birthday) {
       Alert.alert('エラー', '全ての必須項目を入力してください。');
@@ -270,6 +370,14 @@ export default function ProfileEditScreen(props) {
       // 少し遅延を入れてから画面遷移（アラートの表示を待つ）
       setTimeout(() => {
         if (forceToHome) {
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: 'Main' }],
+            })
+          );
+        } else if (route.params?.fromSignup) {
+          // 新規登録からの場合はメイン画面に遷移
           navigation.dispatch(
             CommonActions.reset({
               index: 0,
@@ -472,7 +580,8 @@ export default function ProfileEditScreen(props) {
                           grade !== originalData.grade ||
                           gender !== originalData.gender ||
                           newBirthday.getTime() !== originalData.birthday.getTime() ||
-                          profileImage !== null;
+                          profileImage !== null ||
+                          studentIdImage !== null;
                         
                         setHasUnsavedChanges(hasChanges);
                       }
@@ -482,12 +591,60 @@ export default function ProfileEditScreen(props) {
                 </View>
               )}
             </View>
+            
+            {/* 学生証登録 */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>学生証登録</Text>
+              <View style={styles.studentIdContainer}>
+                {studentIdUrl ? (
+                  <View style={styles.studentIdImageContainer}>
+                    <Image source={{ uri: studentIdUrl }} style={styles.studentIdImage} />
+                    <TouchableOpacity
+                      onPress={handleDeleteStudentId}
+                      style={styles.deleteStudentIdButton}
+                    >
+                      <Ionicons name="trash-outline" size={20} color="#e74c3c" />
+                    </TouchableOpacity>
+                  </View>
+                ) : studentIdImage ? (
+                  <View style={styles.studentIdPreviewContainer}>
+                    <Image source={{ uri: studentIdImage }} style={styles.studentIdImage} />
+                    <View style={styles.studentIdPreviewButtons}>
+                      <TouchableOpacity
+                        onPress={handleStudentIdUpload}
+                        style={styles.uploadStudentIdButton}
+                        disabled={loading}
+                      >
+                        <Text style={styles.uploadStudentIdButtonText}>
+                          {loading ? 'アップロード中...' : 'アップロード'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => setStudentIdImage(null)}
+                        style={styles.cancelStudentIdButton}
+                      >
+                        <Text style={styles.cancelStudentIdButtonText}>キャンセル</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    onPress={handleStudentIdCapture}
+                    style={styles.captureStudentIdButton}
+                  >
+                    <Ionicons name="camera" size={24} color="#007bff" />
+                    <Text style={styles.captureStudentIdButtonText}>学生証を撮影</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
                       <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={loading}>
             <Text style={styles.saveButtonText}>{loading ? '保存中...' : '保存する'}</Text>
           </TouchableOpacity>
           <View style={{ height: 32 }} />
         </ScrollView>
         
+
 
         </SafeAreaView>
       </View>
@@ -544,5 +701,58 @@ const styles = StyleSheet.create({
   suggestionText: {
     fontSize: 15,
     color: '#333',
+  },
+  // 学生証関連のスタイル
+  studentIdContainer: { marginTop: 4 },
+  studentIdImageContainer: { position: 'relative' },
+  studentIdImage: { width: '100%', height: 200, borderRadius: 8, resizeMode: 'contain' },
+  deleteStudentIdButton: { 
+    position: 'absolute', 
+    top: 8, 
+    right: 8, 
+    backgroundColor: 'rgba(255,255,255,0.9)', 
+    borderRadius: 20, 
+    padding: 8 
+  },
+  studentIdPreviewContainer: { marginTop: 4 },
+  studentIdPreviewButtons: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    marginTop: 8 
+  },
+  uploadStudentIdButton: { 
+    flex: 1, 
+    backgroundColor: '#007bff', 
+    padding: 12, 
+    borderRadius: 8, 
+    alignItems: 'center', 
+    marginRight: 8 
+  },
+  uploadStudentIdButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  cancelStudentIdButton: { 
+    flex: 1, 
+    backgroundColor: '#6c757d', 
+    padding: 12, 
+    borderRadius: 8, 
+    alignItems: 'center', 
+    marginLeft: 8 
+  },
+  cancelStudentIdButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  captureStudentIdButton: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    borderWidth: 2, 
+    borderColor: '#007bff', 
+    borderStyle: 'dashed', 
+    borderRadius: 8, 
+    padding: 20, 
+    backgroundColor: '#f8f9fa' 
+  },
+  captureStudentIdButtonText: { 
+    color: '#007bff', 
+    fontSize: 16, 
+    fontWeight: 'bold', 
+    marginLeft: 8 
   },
 });
