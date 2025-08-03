@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, Scro
 import { Ionicons } from '@expo/vector-icons';
 import { db } from '../firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
+import { useFocusEffect } from '@react-navigation/native';
 
 const SearchScreen = ({ navigation }) => {
   const [searchText, setSearchText] = useState('');
@@ -17,24 +18,26 @@ const SearchScreen = ({ navigation }) => {
   const [filteredCircles, setFilteredCircles] = useState([]);
   const [initialLoading, setInitialLoading] = useState(true);
 
-  // 1. Fetch all circles once on component mount
-  useEffect(() => {
-    const fetchAllCircles = async () => {
-      try {
-        const circlesCollectionRef = collection(db, 'circles');
-        const querySnapshot = await getDocs(circlesCollectionRef);
-        const circles = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setAllCircles(circles);
-        setFilteredCircles(circles); // Initially, all circles are shown
-      } catch (error) {
-        console.error("Error fetching all circles: ", error);
-        alert('サークル情報の取得に失敗しました。');
-      } finally {
-        setInitialLoading(false);
-      }
-    };
-    fetchAllCircles();
-  }, []);
+  // 1. Fetch all circles when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchAllCircles = async () => {
+        try {
+          const circlesCollectionRef = collection(db, 'circles');
+          const querySnapshot = await getDocs(circlesCollectionRef);
+          const circles = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setAllCircles(circles);
+          setFilteredCircles(circles); // Initially, all circles are shown
+        } catch (error) {
+          console.error("Error fetching all circles: ", error);
+          alert('サークル情報の取得に失敗しました。');
+        } finally {
+          setInitialLoading(false);
+        }
+      };
+      fetchAllCircles();
+    }, [])
+  );
 
   // 2. Re-filter circles whenever a filter changes
   useEffect(() => {
@@ -44,7 +47,9 @@ const SearchScreen = ({ navigation }) => {
       const searchTextLower = searchText.toLowerCase();
       const matchesSearchText = searchText 
         ? (circle.name?.toLowerCase().includes(searchTextLower) || 
-           circle.description?.toLowerCase().includes(searchTextLower)) 
+           circle.description?.toLowerCase().includes(searchTextLower) ||
+           circle.activityLocation?.toLowerCase().includes(searchTextLower) ||
+           circle.universityName?.toLowerCase().includes(searchTextLower)) 
         : true;
 
       const matchesUniversity = selectedUniversities.length > 0 
@@ -113,7 +118,9 @@ const SearchScreen = ({ navigation }) => {
         const searchTextLower = searchText.toLowerCase();
         const matchesSearchText = searchText 
           ? (circle.name?.toLowerCase().includes(searchTextLower) || 
-             circle.description?.toLowerCase().includes(searchTextLower)) 
+             circle.description?.toLowerCase().includes(searchTextLower) ||
+             circle.activityLocation?.toLowerCase().includes(searchTextLower) ||
+             circle.universityName?.toLowerCase().includes(searchTextLower)) 
           : true;
 
         const matchesUniversity = selectedUniversities.length > 0 
@@ -192,7 +199,7 @@ const SearchScreen = ({ navigation }) => {
           <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="サークル名、活動内容などキーワード入力"
+            placeholder="サークル名、活動内容、キーワード"
             value={searchText}
             onChangeText={setSearchText}
           />

@@ -74,26 +74,40 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
 
   if (loading) {
     return (
-      <View style={styles.fullScreenContainer}>
-        <CommonHeader title={circleName || "サークル管理"} showBackButton onBack={() => navigation.goBack()} />
+      <LinearGradient
+        colors={['#1e3a8a', '#3b82f6', '#60a5fa']}
+        style={styles.fullScreenContainer}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>{circleName || "サークル管理"}</Text>
+        </View>
         <SafeAreaView style={styles.contentSafeArea}>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#007bff" />
-            <Text>サークル情報を読み込み中...</Text>
+            <ActivityIndicator size="large" color="#fff" />
+            <Text style={{ color: '#fff', marginTop: 10 }}>サークル情報を読み込み中...</Text>
           </View>
         </SafeAreaView>
-      </View>
+      </LinearGradient>
     );
   }
 
   if (!user) {
     return (
-      <View style={styles.fullScreenContainer}>
-        <CommonHeader title={circleName || "サークル管理"} showBackButton onBack={() => navigation.goBack()} />
+      <LinearGradient
+        colors={['#1e3a8a', '#3b82f6', '#60a5fa']}
+        style={styles.fullScreenContainer}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>{circleName || "サークル管理"}</Text>
+        </View>
         <SafeAreaView style={styles.contentSafeArea}>
-          <Text style={{ textAlign: 'center', marginTop: 40 }}>ログインしてください</Text>
+          <Text style={{ textAlign: 'center', marginTop: 40, color: '#fff' }}>ログインしてください</Text>
         </SafeAreaView>
-      </View>
+      </LinearGradient>
     );
   }
 
@@ -153,8 +167,15 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
   const managementButtonsGrid = getManagementButtonsGrid();
 
   return (
-    <View style={styles.fullScreenContainer}>
-      <CommonHeader title={circleName || "サークル管理"} showBackButton onBack={() => navigation.goBack()} />
+    <LinearGradient
+      colors={['#1e3a8a', '#3b82f6', '#60a5fa']}
+      style={styles.fullScreenContainer}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+    >
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>{circleName || "サークル管理"}</Text>
+      </View>
       <SafeAreaView style={styles.contentSafeArea}>
         <ScrollView style={styles.circleDetailContainer}>
           {/* サークル情報：アイコン＋サークル名・ジャンル（横並び） */}
@@ -224,14 +245,35 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
           </View>
         </ScrollView>
       </SafeAreaView>
-    </View>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#1e3a8a',
+  },
+  header: {
+    width: '100%',
+    height: 115,
+    paddingTop: StatusBar.currentHeight,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+    position: 'absolute',
+    bottom: 10,
+    left: 0,
+    right: 0,
+    textAlign: 'center',
   },
   contentSafeArea: {
     flex: 1,
@@ -243,7 +285,6 @@ const styles = StyleSheet.create({
   },
   circleDetailContainer: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
   },
   circleInfoRow: {
     flexDirection: 'row',
@@ -274,32 +315,32 @@ const styles = StyleSheet.create({
   circleInfoName: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#222',
+    color: '#fff',
   },
   circleInfoSub: {
     fontSize: 13,
-    color: '#888',
+    color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 4,
   },
   subscriptionCard: {
-    backgroundColor: '#e0f7fa',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 16,
     padding: 16,
     marginHorizontal: 16,
     marginBottom: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   subscriptionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#111',
+    color: '#1e3a8a',
   },
   subscriptionButton: {
-    backgroundColor: '#111',
+    backgroundColor: '#1e3a8a',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 4,
@@ -311,7 +352,7 @@ const styles = StyleSheet.create({
   },
   subscriptionDesc: {
     fontSize: 13,
-    color: '#333',
+    color: '#1e3a8a',
     marginTop: 8,
     marginBottom: 8,
   },
@@ -326,7 +367,7 @@ const styles = StyleSheet.create({
   },
   subscriptionFeatureText: {
     fontSize: 12,
-    color: '#333',
+    color: '#1e3a8a',
     marginTop: 2,
   },
   managementGridSection: {
@@ -342,19 +383,19 @@ const styles = StyleSheet.create({
   managementGridItem3col: {
     width: BUTTON_SIZE_3COL,
     height: BUTTON_SIZE_3COL,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   managementGridItemText: {
     fontSize: 10,
-    color: '#333',
+    color: '#1e3a8a',
     textAlign: 'center',
     marginTop: 4,
     fontWeight: '500',

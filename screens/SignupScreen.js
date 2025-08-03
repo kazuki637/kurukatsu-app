@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, TouchableWithoutFeedback, Keyboard, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, TouchableWithoutFeedback, Keyboard, ScrollView, Image } from 'react-native';
 import { auth, db } from '../firebaseConfig';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
@@ -25,7 +25,6 @@ const SignupScreen = ({ navigation }) => {
         favoriteCircleIds: [],
         // プロフィール情報は後で設定
         name: '',
-        nickname: '',
         university: '',
         grade: '',
         gender: '',
@@ -63,7 +62,11 @@ const SignupScreen = ({ navigation }) => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>新規登録</Text>
+        <Image 
+          source={require('../assets/icon.png')} 
+          style={styles.appIcon}
+        />
+        <Text style={styles.title}>クルカツへようこそ！</Text>
         <TextInput
           style={styles.input}
           placeholder="メールアドレス"
@@ -94,6 +97,9 @@ const SignupScreen = ({ navigation }) => {
             <Text style={styles.registerButtonText}>登録</Text>
           )}
         </TouchableOpacity>
+        <Text style={styles.termsText}>
+          続行することでクルカツの利用規約に同意し、クルカツのプライバシーポリシーを読んだものとみなされます。
+        </Text>
         <TouchableOpacity
           style={styles.loginLinkButton}
           onPress={() => navigation.navigate('Login')}
@@ -154,7 +160,22 @@ const styles = StyleSheet.create({
   },
   loginLinkButtonText: {
     color: '#007bff',
-    fontSize: 16,
+    fontSize: 18,
+  },
+  appIcon: {
+    width: 100,
+    height: 100,
+    marginBottom: 20,
+    borderRadius: 20,
+  },
+  termsText: {
+    color: '#666',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 0,
+    marginBottom: 20,
+    paddingHorizontal: 20,
+    lineHeight: 16,
   },
 });
 

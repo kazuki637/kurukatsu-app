@@ -75,6 +75,8 @@ function HomeStackScreen() {
     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
       <HomeStack.Screen name="Home" component={HomeScreen} />
       <HomeStack.Screen name="CircleDetail" component={CircleProfileScreen} />
+      <HomeStack.Screen name="CircleMember" component={CircleMemberScreen} />
+      <HomeStack.Screen name="SearchResults" component={SearchResultsScreen} />
     </HomeStack.Navigator>
   );
 }
@@ -141,6 +143,7 @@ function CircleManagementStackScreen() {
       <CircleManagementStack.Screen name="CircleContact" component={CircleContactScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleLeadershipTransfer" component={CircleLeadershipTransferScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="Subscription" component={SubscriptionScreen} options={{ headerShown: false, gestureEnabled: true }} />
+      <CircleManagementStack.Screen name="CircleMember" component={CircleMemberScreen} options={{ headerShown: false, gestureEnabled: true }} />
     </CircleManagementStack.Navigator>
   );
 }
@@ -278,12 +281,12 @@ function MainTabNavigatorWithProfileCheck() {
       try {
         const userDocRef = doc(db, 'users', user.uid);
         const docSnap = await getDoc(userDocRef);
-        // プロフィール未設定（name, nickname, university, grade, gender, birthdayのいずれか未入力）なら強制
+        // プロフィール未設定（name, university, grade, gender, birthdayのいずれか未入力）なら強制
         if (!docSnap.exists()) {
           setNeedsProfile(true);
         } else {
           const d = docSnap.data();
-          if (!d.name || !d.nickname || !d.university || !d.grade || !d.gender || !d.birthday) {
+          if (!d.name || !d.university || !d.grade || !d.gender || !d.birthday) {
             setNeedsProfile(true);
           } else {
             setNeedsProfile(false);

@@ -169,7 +169,7 @@ export default function MyPageScreen({ navigation }) {
                 </View>
               )}
             </View>
-            <Text style={styles.userName}>{userProfile?.nickname || 'ユーザー名'}</Text>
+            <Text style={styles.userName}>{userProfile?.name || 'ユーザー名'}</Text>
             {(userProfile?.university || userProfile?.grade) && (
               <Text style={styles.userUniversity}>
                 {userProfile?.university || ''}
@@ -182,33 +182,65 @@ export default function MyPageScreen({ navigation }) {
             </TouchableOpacity>
           </View>
           <View style={styles.contentArea}>
-            <Text style={styles.contentTitle}>所属しているサークル</Text>
+            <Text style={styles.sectionTitle}>所属しているサークル</Text>
             {joinedCircles.length > 0 ? (
-              <View style={styles.gridContainer}>
-                {joinedCircles.map(item => (
-                  <TouchableOpacity key={item.id} style={styles.gridItem} onPress={() => navigation.navigate('CircleMember', { circleId: item.id })}>
-                    <Image source={{ uri: item.imageUrl || 'https://via.placeholder.com/150' }} style={styles.gridImage} />
-                    <Text style={styles.gridItemText} numberOfLines={1}>{item.name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              joinedCircles.map((circle, index) => (
+                <TouchableOpacity 
+                  key={circle.id} 
+                  style={styles.circleCardContainer}
+                  onPress={() => navigation.navigate('CircleMember', { circleId: circle.id })}
+                >
+                  <View style={styles.circleCard}>
+                    <Image 
+                      source={{ uri: circle.imageUrl || 'https://via.placeholder.com/60' }} 
+                      style={styles.circleImage}
+                    />
+                    <View style={styles.circleInfo}>
+                      <Text style={styles.circleCategory}>サークル | {circle.genre || 'その他'}</Text>
+                      <Text style={styles.circleName}>{circle.name}</Text>
+                      <Text style={styles.circleEvent}>{circle.universityName || '大学名未設定'}</Text>
+                    </View>
+                    <TouchableOpacity style={styles.bookmarkButton}>
+                      <Ionicons name="chevron-forward" size={20} color="#007bff" />
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              ))
             ) : (
-              <Text style={styles.emptyMessage}>所属サークルはまだありません。</Text>
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>所属しているサークルはありません</Text>
+                <Text style={styles.emptySubText}>サークルに参加して活動を始めましょう</Text>
+              </View>
             )}
           </View>
           <View style={styles.contentArea}>
-            <Text style={styles.contentTitle}>保存したサークル</Text>
+            <Text style={styles.sectionTitle}>いいね！したサークル</Text>
             {savedCircles.length > 0 ? (
-              <View style={styles.gridContainer}>
-                {savedCircles.map(item => (
-                  <TouchableOpacity key={item.id} style={styles.gridItem} onPress={() => navigation.navigate('CircleDetail', { circleId: item.id })}>
-                    <Image source={{ uri: item.imageUrl || 'https://via.placeholder.com/150' }} style={styles.gridImage} />
-                    <Text style={styles.gridItemText} numberOfLines={1}>{item.name}</Text>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.popularCirclesScrollContainer}
+                style={styles.popularCirclesScrollView}
+              >
+                {savedCircles.map((circle, index) => (
+                  <TouchableOpacity 
+                    key={circle.id} 
+                    style={styles.popularCircleCard}
+                    onPress={() => navigation.navigate('CircleDetail', { circleId: circle.id })}
+                  >
+                    <Image 
+                      source={{ uri: circle.imageUrl || 'https://via.placeholder.com/80' }} 
+                      style={styles.popularCircleImage}
+                    />
+                    <Text style={styles.popularCircleName}>{circle.name}</Text>
                   </TouchableOpacity>
                 ))}
-              </View>
+              </ScrollView>
             ) : (
-              <Text style={styles.emptyMessage}>保存したサークルはまだありません。</Text>
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>いいね！したサークルはありません</Text>
+                <Text style={styles.emptySubText}>気になるサークルを保存しましょう</Text>
+              </View>
             )}
           </View>
         </ScrollView>
@@ -227,11 +259,97 @@ const styles = StyleSheet.create({
   userUniversity: { fontSize: 16, color: '#666', marginTop: 4 },
   editProfileButton: { marginTop: 15, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, paddingVertical: 8, alignItems: 'center', paddingHorizontal: 24 },
   editProfileButtonText: { color: '#333', fontWeight: 'bold', fontSize: 14 },
-  contentArea: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
+  contentArea: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
   contentTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15 },
+  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 15 },
   gridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   gridItem: { width: (Dimensions.get('window').width - 20 * 3) / 2, marginBottom: 20 },
   gridImage: { width: '100%', height: (Dimensions.get('window').width - 20 * 3) / 2, borderRadius: 12, backgroundColor: '#e0e0e0' },
   gridItemText: { marginTop: 8, fontSize: 14, fontWeight: '600', textAlign: 'center' },
-  emptyMessage: { textAlign: 'center', color: '#666', marginTop: 20 }
+  emptyMessage: { textAlign: 'center', color: '#666', marginTop: 20 },
+  // 人気のサークル（横スクロール）
+  popularCirclesScrollView: {
+    marginHorizontal: -20,
+  },
+  popularCirclesScrollContainer: {
+    paddingLeft: 20,
+    paddingRight: 20,
+  },
+  popularCircleCard: {
+    alignItems: 'center',
+    width: 100,
+    marginRight: 15,
+  },
+  popularCircleImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 8,
+  },
+  popularCircleName: {
+    fontSize: 12,
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  // サークルカードスタイル（ホーム画面と同じ）
+  circleCardContainer: {
+    marginBottom: 12,
+  },
+  circleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  circleImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 15,
+  },
+  circleInfo: {
+    flex: 1,
+  },
+  circleCategory: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  circleName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  circleEvent: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  bookmarkButton: {
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 30,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 8,
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: '#999',
+  },
 });

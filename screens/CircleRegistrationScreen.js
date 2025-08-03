@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, SafeAreaView, Alert, Image, ActivityIndicator, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { db, storage, auth } from '../firebaseConfig';
 import { collection, addDoc, doc, getDoc, updateDoc, arrayUnion, setDoc } from 'firebase/firestore';
@@ -207,7 +208,12 @@ export default function CircleRegistrationScreen() {
   };
 
   return (
-    <View style={styles.fullScreenContainer}>
+    <LinearGradient
+      colors={['#1e3a8a', '#3b82f6', '#60a5fa']}
+      style={styles.fullScreenContainer}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+    >
       <View style={styles.header}>
         <Text style={styles.headerTitle}>サークル登録</Text>
       </View>
@@ -355,7 +361,7 @@ export default function CircleRegistrationScreen() {
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
-    </View>
+    </LinearGradient>
   );
 }
 
@@ -376,15 +382,15 @@ const styles = StyleSheet.create({
   },
   fullScreenContainer: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#1e3a8a',
   },
   header: {
     width: '100%',
-    height: 115, // ヘッダーの縦幅を調整
-    paddingTop: StatusBar.currentHeight, // ステータスバーの高さ分を確保
-    backgroundColor: '#fff',
+    height: 115,
+    paddingTop: StatusBar.currentHeight,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
@@ -392,9 +398,9 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#fff',
     position: 'absolute',
-    bottom: 10, // ヘッダー下部からの距離を調整
+    bottom: 10,
     left: 0,
     right: 0,
     textAlign: 'center',
@@ -409,21 +415,21 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 8,
-    color: '#333', 
+    color: '#fff', 
   },
   input: {
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 12, 
     paddingVertical: 14, 
     paddingHorizontal: 16, 
     fontSize: 16,
     shadowColor: '#000', 
     shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.05, 
-    shadowRadius: 4, 
-    elevation: 3, 
+    shadowOpacity: 0.1, 
+    shadowRadius: 8, 
+    elevation: 5, 
   },
   registerButton: {
     backgroundColor: '#007bff',
@@ -446,21 +452,23 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   optionButton: {
-    backgroundColor: '#e0e0e0',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 20,
     paddingVertical: 8,
     paddingHorizontal: 15,
     margin: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   optionButtonActive: {
-    backgroundColor: '#007bff',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
   },
   optionButtonText: {
-    color: '#333',
+    color: '#fff',
     fontSize: 14,
   },
   optionButtonTextActive: {
-    color: '#fff',
+    color: '#1e3a8a',
   },
   selectionItem: {
     flexDirection: 'row',
@@ -501,11 +509,11 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   
 });

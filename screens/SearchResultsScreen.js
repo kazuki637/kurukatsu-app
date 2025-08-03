@@ -118,20 +118,22 @@ const SearchResultsScreen = ({ route, navigation }) => {
       ) : null}
       
       {/* 活動場所と募集中表示 */}
-      <View style={styles.infoContainer}>
-        {item.welcome?.isRecruiting === true && (
-          <View style={styles.infoItem}>
-            <Ionicons name="time" size={16} color="#666" />
-            <Text style={styles.infoText}>募集中</Text>
-          </View>
-        )}
-        {item.activityLocation && (
-          <View style={styles.infoItem}>
-            <Ionicons name="location" size={16} color="#666" />
-            <Text style={styles.infoText}>{item.activityLocation}</Text>
-          </View>
-        )}
-      </View>
+      {(item.welcome?.isRecruiting === true || item.activityLocation) && (
+        <View style={styles.infoContainer}>
+          {item.welcome?.isRecruiting === true && (
+            <View style={styles.infoItem}>
+              <Ionicons name="time" size={16} color="#666" />
+              <Text style={styles.infoText}>募集中</Text>
+            </View>
+          )}
+          {item.activityLocation && (
+            <View style={styles.infoItem}>
+              <Ionicons name="location" size={16} color="#666" />
+              <Text style={styles.infoText}>{item.activityLocation}</Text>
+            </View>
+          )}
+        </View>
+      )}
     </TouchableOpacity>
   );
 };

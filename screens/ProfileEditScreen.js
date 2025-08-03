@@ -19,10 +19,9 @@ const GENDERS = ['男性', '女性', 'その他', '回答しない'];
 export default function ProfileEditScreen(props) {
   const navigation = useNavigation();
   const route = useRoute();
-  const forceToHome = route.params?.fromSignup ? false : (props.forceToHome || false);
+  const forceToHome = props.forceToHome || false;
   const user = auth.currentUser;
   const [name, setName] = useState(''); // 氏名（非公開）
-  const [nickname, setNickname] = useState(''); // ニックネーム（公開）
   const [university, setUniversity] = useState('');
   const [grade, setGrade] = useState('');
   const [gender, setGender] = useState('');
@@ -92,7 +91,6 @@ export default function ProfileEditScreen(props) {
       if (docSnap.exists()) {
         const d = docSnap.data();
         setName(d.name || '');
-        setNickname(d.nickname || '');
         setUniversity(d.university || '');
         setGrade(d.grade || '');
         setGender(d.gender || '');
@@ -103,7 +101,6 @@ export default function ProfileEditScreen(props) {
         // 元のデータを保存
         setOriginalData({
           name: d.name || '',
-          nickname: d.nickname || '',
           university: d.university || '',
           grade: d.grade || '',
           gender: d.gender || '',
@@ -114,7 +111,6 @@ export default function ProfileEditScreen(props) {
       } else {
         // Firestoreにデータがなければ空欄のまま（setDocしない）
         setName('');
-        setNickname('');
         setUniversity('');
         setGrade('');
         setGender('');
@@ -125,8 +121,6 @@ export default function ProfileEditScreen(props) {
         // 元のデータを保存
         setOriginalData({
           name: '',
-          nickname: '',
-          university: '',
           university: '',
           grade: '',
           gender: '',
@@ -144,7 +138,6 @@ export default function ProfileEditScreen(props) {
     
     const hasChanges = 
       name !== originalData.name ||
-      nickname !== originalData.nickname ||
       university !== originalData.university ||
       grade !== originalData.grade ||
       gender !== originalData.gender ||
@@ -154,7 +147,6 @@ export default function ProfileEditScreen(props) {
     
     console.log('プロフィール編集画面: 変更検知', {
       nameChanged: name !== originalData.name,
-      nicknameChanged: nickname !== originalData.nickname,
       universityChanged: university !== originalData.university,
       gradeChanged: grade !== originalData.grade,
       genderChanged: gender !== originalData.gender,
@@ -313,7 +305,7 @@ export default function ProfileEditScreen(props) {
   };
 
   const handleSave = async () => {
-    if (!name.trim() || !nickname.trim() || !university.trim() || !grade || !gender || !birthday) {
+    if (!name.trim() || !university.trim() || !grade || !gender || !birthday) {
       Alert.alert('エラー', '全ての必須項目を入力してください。');
       return;
     }
@@ -353,7 +345,6 @@ export default function ProfileEditScreen(props) {
       const userDocRef = doc(db, 'users', user.uid);
       await setDoc(userDocRef, {
         name,
-        nickname,
         university,
         isUniversityPublic: true,
         grade,
@@ -369,15 +360,16 @@ export default function ProfileEditScreen(props) {
       Alert.alert('保存完了', 'プロフィールを保存しました。');
       // 少し遅延を入れてから画面遷移（アラートの表示を待つ）
       setTimeout(() => {
-        if (forceToHome) {
+        if (route.params?.fromSignup) {
+          // 新規登録からの場合はメイン画面に遷移
           navigation.dispatch(
             CommonActions.reset({
               index: 0,
               routes: [{ name: 'Main' }],
             })
           );
-        } else if (route.params?.fromSignup) {
-          // 新規登録からの場合はメイン画面に遷移
+        } else if (forceToHome) {
+          // 強制ホーム遷移の場合
           navigation.dispatch(
             CommonActions.reset({
               index: 0,
@@ -400,14 +392,14 @@ export default function ProfileEditScreen(props) {
   return (
     <View style={styles.container}>
       <CommonHeader title="プロフィール編集" rightButtonLabel="保存" onRightButtonPress={handleSave} />
-      <SafeAreaView style={{ flex: 1 }} edges={['left', 'right', 'bottom']}>
+      <SafeAreaView style={{ flex: 1 }} edges={['left', 'right']}>
         <ScrollView 
           contentContainerStyle={styles.bodyContent} 
           keyboardShouldPersistTaps="handled"
         >
             <View style={{ height: 16 }} />
             <View style={styles.formGroup}>
-              <Text style={styles.label}>プロフィール画像（任意）</Text>
+              <Text style={styles.label}>プロフィール画像<Text style={styles.optional}>(任意)</Text></Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start' }}>
                 <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
                   {(profileImage && profileImage.trim() !== '' && !imageError) || (profileImageUrl && profileImageUrl.trim() !== '' && !imageError) ? (
@@ -433,7 +425,6 @@ export default function ProfileEditScreen(props) {
                       
                       const hasChanges = 
                         name !== originalData.name ||
-                        nickname !== originalData.nickname ||
                         university !== originalData.university ||
                         grade !== originalData.grade ||
                         gender !== originalData.gender ||
@@ -450,21 +441,15 @@ export default function ProfileEditScreen(props) {
               </View>
             </View>
             <View style={styles.formGroup}>
-              <Text style={styles.label}>氏名（非公開）</Text>
+              <Text style={styles.label}>氏名<Text style={styles.required}>*</Text></Text>
               <TextInput style={styles.input} value={name} onChangeText={(text) => {
                 setName(text);
                 checkForChanges();
               }} placeholder="氏名" />
             </View>
+
             <View style={styles.formGroup}>
-              <Text style={styles.label}>ニックネーム（公開）</Text>
-              <TextInput style={styles.input} value={nickname} onChangeText={(text) => {
-                setNickname(text);
-                checkForChanges();
-              }} placeholder="ニックネーム" />
-            </View>
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>大学名</Text>
+              <Text style={styles.label}>大学名<Text style={styles.required}>*</Text></Text>
               <View style={styles.universityInputContainer}>
                 <TextInput 
                   style={styles.input} 
@@ -502,7 +487,7 @@ export default function ProfileEditScreen(props) {
               </View>
             )}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>学年</Text>
+              <Text style={styles.label}>学年<Text style={styles.required}>*</Text></Text>
               <View style={styles.selectRow}>
                 {GRADES.map(g => (
                   <TouchableOpacity key={g} style={[styles.selectButton, grade === g && styles.selectedButton]} onPress={() => {
@@ -513,7 +498,6 @@ export default function ProfileEditScreen(props) {
                     
                     const hasChanges = 
                       name !== originalData.name ||
-                      nickname !== originalData.nickname ||
                       university !== originalData.university ||
                       newGrade !== originalData.grade ||
                       gender !== originalData.gender ||
@@ -528,7 +512,7 @@ export default function ProfileEditScreen(props) {
               </View>
             </View>
             <View style={styles.formGroup}>
-              <Text style={styles.label}>性別</Text>
+              <Text style={styles.label}>性別<Text style={styles.required}>*</Text></Text>
               <View style={styles.selectRow}>
                 {GENDERS.map(g => (
                   <TouchableOpacity key={g} style={[styles.selectButton, gender === g && styles.selectedButton]} onPress={() => {
@@ -539,7 +523,6 @@ export default function ProfileEditScreen(props) {
                     
                     const hasChanges = 
                       name !== originalData.name ||
-                      nickname !== originalData.nickname ||
                       university !== originalData.university ||
                       grade !== originalData.grade ||
                       newGender !== originalData.gender ||
@@ -575,7 +558,6 @@ export default function ProfileEditScreen(props) {
                         
                         const hasChanges = 
                           name !== originalData.name ||
-                          nickname !== originalData.nickname ||
                           university !== originalData.university ||
                           grade !== originalData.grade ||
                           gender !== originalData.gender ||
@@ -592,9 +574,9 @@ export default function ProfileEditScreen(props) {
               )}
             </View>
             
-            {/* 学生証登録 */}
+            {/* 学生証認証 */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>学生証登録</Text>
+              <Text style={styles.label}>学生証認証<Text style={styles.optional}>(任意)</Text></Text>
               <View style={styles.studentIdContainer}>
                 {studentIdUrl ? (
                   <View style={styles.studentIdImageContainer}>
@@ -633,7 +615,7 @@ export default function ProfileEditScreen(props) {
                     style={styles.captureStudentIdButton}
                   >
                     <Ionicons name="camera" size={24} color="#007bff" />
-                    <Text style={styles.captureStudentIdButtonText}>学生証を撮影</Text>
+                    <Text style={styles.captureStudentIdButtonText}>学生証を認証</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -754,5 +736,13 @@ const styles = StyleSheet.create({
     fontSize: 16, 
     fontWeight: 'bold', 
     marginLeft: 8 
+  },
+  required: {
+    color: '#e74c3c',
+    fontWeight: 'bold',
+  },
+  optional: {
+    color: '#666',
+    fontSize: 14,
   },
 });

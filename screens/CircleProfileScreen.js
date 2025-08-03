@@ -392,7 +392,7 @@ export default function CircleProfileScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <CommonHeader title="サークル詳細" showBackButton onBack={() => navigation.goBack()} />
+              <CommonHeader title={circleData && circleData.name ? circleData.name : 'サークル詳細'} showBackButton onBack={() => navigation.goBack()} />
       
       <ScrollView 
         style={styles.scrollView}
@@ -465,12 +465,12 @@ export default function CircleProfileScreen({ route, navigation }) {
         <View style={styles.actionButtons}>
           <TouchableOpacity style={styles.favoriteButton} onPress={toggleFavorite}>
             <Ionicons 
-              name={isFavorite ? "bookmark" : "bookmark-outline"} 
+              name={isFavorite ? "heart" : "heart-outline"} 
               size={24} 
-              color={isFavorite ? "gold" : "#666"} 
+              color={isFavorite ? "#ff6b9d" : "#666"} 
             />
             <Text style={[styles.favoriteButtonText, isFavorite && styles.favoriteButtonTextActive]}>
-              {isFavorite ? "保存済み" : "保存"}
+              {isFavorite ? "いいね！済み" : "いいね！"}
             </Text>
           </TouchableOpacity>
           
