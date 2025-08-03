@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, StatusBar, ActivityIndicator, Image, Alert, FlatList, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { db, auth } from '../firebaseConfig';
 import { collection, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -82,36 +83,51 @@ export default function CircleManagementScreen({ navigation }) {
   };
 
   if (loading) {
-    return (
-      <View style={styles.fullScreenContainer}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>サークル管理</Text>
-        </View>
-        <SafeAreaView style={styles.contentSafeArea}>
+      return (
+    <LinearGradient
+      colors={['#1e3a8a', '#3b82f6', '#60a5fa']}
+      style={styles.fullScreenContainer}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+    >
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>サークル管理</Text>
+      </View>
+      <SafeAreaView style={styles.contentSafeArea}>
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#007bff" />
           </View>
         </SafeAreaView>
-      </View>
+      </LinearGradient>
     );
   }
 
   if (!user) {
     return (
-      <View style={styles.fullScreenContainer}>
+      <LinearGradient
+        colors={['#1e3a8a', '#3b82f6', '#60a5fa']}
+        style={styles.fullScreenContainer}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>サークル管理</Text>
         </View>
         <SafeAreaView style={styles.contentSafeArea}>
-          <Text style={{ textAlign: 'center', marginTop: 40 }}>ログインしてください</Text>
+          <Text style={{ textAlign: 'center', marginTop: 40, color: '#fff' }}>ログインしてください</Text>
         </SafeAreaView>
-      </View>
+      </LinearGradient>
     );
   }
 
   if (adminCircles.length === 0) {
     return (
-      <View style={styles.fullScreenContainer}>
+      <LinearGradient
+        colors={['#1e3a8a', '#3b82f6', '#60a5fa']}
+        style={styles.fullScreenContainer}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
         <View style={styles.header}>
           <Text style={styles.headerTitle}>サークル管理</Text>
         </View>
@@ -191,7 +207,7 @@ export default function CircleManagementScreen({ navigation }) {
             </View>
           </View>
         </Modal>
-      </View>
+      </LinearGradient>
     );
   }
 
@@ -217,8 +233,15 @@ export default function CircleManagementScreen({ navigation }) {
   );
 
   return (
-    <View style={styles.fullScreenContainer}>
-      <CommonHeader title="サークル管理" showBackButton={false} />
+    <LinearGradient
+      colors={['#1e3a8a', '#3b82f6', '#60a5fa']}
+      style={styles.fullScreenContainer}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+    >
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>サークル管理</Text>
+      </View>
       <SafeAreaView style={styles.contentSafeArea}>
         <FlatList
           data={adminCircles}
@@ -285,19 +308,32 @@ export default function CircleManagementScreen({ navigation }) {
             </View>
           </View>
         </View>
-      </Modal>
-    </View>
-  );
-}
+              </Modal>
+      </LinearGradient>
+    );
+  }
 
 const styles = StyleSheet.create({
-  fullScreenContainer: { flex: 1, backgroundColor: '#eef2f5' },
-  header: { width: '100%', height: 115, paddingTop: StatusBar.currentHeight, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee', alignItems: 'center', justifyContent: 'center', position: 'relative' },
-  headerTitle: { fontSize: 16, fontWeight: 'bold', color: '#333', position: 'absolute', bottom: 10, left: 0, right: 0, textAlign: 'center' },
+  fullScreenContainer: { 
+    flex: 1, 
+    backgroundColor: '#1e3a8a',
+  },
+  header: { 
+    width: '100%', 
+    height: 115, 
+    paddingTop: StatusBar.currentHeight, 
+    backgroundColor: 'rgba(255, 255, 255, 0.1)', 
+    borderBottomWidth: 1, 
+    borderBottomColor: 'rgba(255, 255, 255, 0.2)', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    position: 'relative' 
+  },
+  headerTitle: { fontSize: 16, fontWeight: 'bold', color: '#fff', position: 'absolute', bottom: 10, left: 0, right: 0, textAlign: 'center' },
   contentSafeArea: { flex: 1 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   registerButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#007bff', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 20, alignSelf: 'center', marginTop: 32 },
-  circleCard: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  circleCard: { backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: 12, padding: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 12, elevation: 5 },
   circleImage: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#e0e0e0' },
   circleName: { fontSize: 18, fontWeight: 'bold', color: '#222' },
   circleRole: { fontSize: 14, color: '#888', marginTop: 4 },
@@ -317,11 +353,11 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 8,
     paddingHorizontal: 20,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 5,
   },
   cardTitle: {
     fontSize: 28,
@@ -352,11 +388,11 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: '#fff',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     paddingVertical: 20,
     paddingHorizontal: 15,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
+    borderTopColor: 'rgba(255, 255, 255, 0.2)',
   },
   createButton: {
     flexDirection: 'row',

@@ -29,7 +29,11 @@ const LoginScreen = ({ navigation }) => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>ログイン</Text>
+        <Image 
+          source={require('../assets/icon.png')} 
+          style={styles.appIcon}
+        />
+        <Text style={styles.title}>クルカツへようこそ！</Text>
         <TextInput
           style={styles.input}
           placeholder="メールアドレス"
@@ -60,6 +64,9 @@ const LoginScreen = ({ navigation }) => {
             <Text style={styles.loginButtonText}>ログイン</Text>
           )}
         </TouchableOpacity>
+        <Text style={styles.termsText}>
+          続行することでクルカツの利用規約に同意し、クルカツのプライバシーポリシーを読んだものとみなされます。
+        </Text>
         <TouchableOpacity
           style={styles.signupButton}
           onPress={() => navigation.navigate('Signup')}
@@ -91,6 +98,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+  },
+  appIcon: {
+    width: 100,
+    height: 100,
+    marginBottom: 20,
+    borderRadius: 20,
   },
   title: {
     fontSize: 28,
@@ -130,7 +143,16 @@ const styles = StyleSheet.create({
   },
   signupButtonText: {
     color: '#007bff',
-    fontSize: 16,
+    fontSize: 18,
+  },
+  termsText: {
+    color: '#666',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: 0,
+    marginBottom: 20,
+    paddingHorizontal: 20,
+    lineHeight: 16,
   },
 });
 
