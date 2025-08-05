@@ -127,7 +127,7 @@ export default function CircleRegistrationScreen() {
         // 圧縮された画像をアップロード
         const response = await fetch(compressedUri);
         const blob = await response.blob();
-        const storageRef = ref(storage, `circle_images/icons/${Date.now()}_${circleName}`);
+        const storageRef = ref(storage, `circle_images/${circleName}/icons/${Date.now()}_${circleName}`);
         const uploadTask = uploadBytes(storageRef, blob);
         await uploadTask;
         imageUrl = await getDownloadURL(storageRef);
@@ -152,7 +152,6 @@ export default function CircleRegistrationScreen() {
       const circleDocRef = await addDoc(collection(db, 'circles'), {
         name: circleName,
         universityName,
-
         features,
         frequency,
         genderratio,
@@ -161,8 +160,8 @@ export default function CircleRegistrationScreen() {
         contactInfo,
         imageUrl,
         createdAt: new Date(),
-        createdBy: user.uid, // 作成者IDを追加
-        // memberIds: [user.uid], // ← 削除
+        leaderId: user.uid, // 代表者ID
+        leaderName: representativeName, // 代表者名
       });
 
       // 作成者をmembersサブコレクションに追加（代表者として）
@@ -355,9 +354,19 @@ export default function CircleRegistrationScreen() {
           onPress={handleRegister}
           disabled={uploading}
         >
-          <Text style={styles.registerButtonText}>
-            {uploading ? '登録中...' : 'サークルを登録'}
-          </Text>
+          <LinearGradient
+            colors={['#007bff', '#0056b3']}
+            style={styles.registerButtonGradient}
+          >
+            <Ionicons 
+              name="add-circle" 
+              size={24} 
+              color="#fff" 
+            />
+            <Text style={styles.registerButtonText}>
+              {uploading ? '登録中...' : 'サークルを登録'}
+            </Text>
+          </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -432,15 +441,27 @@ const styles = StyleSheet.create({
     elevation: 5, 
   },
   registerButton: {
-    backgroundColor: '#007bff',
-    padding: 18,
-    borderRadius: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+    marginTop: 20,
+  },
+  registerButtonGradient: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
   },
   registerButtonText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+    marginLeft: 8,
   },
   uneditableInputText: {
     color: '#888', // 薄い灰色

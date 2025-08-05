@@ -65,7 +65,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   const [descSaving, setDescSaving] = useState(false); // 保存中状態
   const [recommendationsInput, setRecommendationsInput] = useState(''); // こんな人におすすめ編集用
   const [recSaving, setRecSaving] = useState(false); // 保存中状態
-  const [leaderImage, setLeaderImage] = useState(null); // 代表者画像
+  const [leaderProfileImage, setLeaderProfileImage] = useState(null); // 代表者のプロフィール画像
   const [leaderMessage, setLeaderMessage] = useState(''); // 代表者メッセージ
   const [leaderSaving, setLeaderSaving] = useState(false); // 保存中
   const [welcomeConditions, setWelcomeConditions] = useState(''); // 入会条件編集用
@@ -329,6 +329,25 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     }
   }, [circleData]);
 
+  // 代表者のプロフィール画像を取得
+  useEffect(() => {
+    if (!circleData || !circleData.leaderId) return;
+
+    const fetchLeaderProfileImage = async () => {
+      try {
+        const leaderDoc = await getDoc(doc(db, 'users', circleData.leaderId));
+        if (leaderDoc.exists()) {
+          const leaderData = leaderDoc.data();
+          setLeaderProfileImage(leaderData.profileImageUrl || null);
+        }
+      } catch (error) {
+        console.error('Error fetching leader profile image:', error);
+      }
+    };
+
+    fetchLeaderProfileImage();
+  }, [circleData]);
+
   const toggleFavorite = async () => {
     if (!user) {
       Alert.alert("ログインが必要です", "お気に入り機能を利用するにはログインしてください。");
@@ -383,7 +402,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         const response = await fetch(compressedUri);
         const blob = await response.blob();
         const storage = getStorage();
-        const fileName = `circle_images/headers/${circleId}_${Date.now()}`;
+                  const fileName = `circle_images/${circleData.name}/headers/${circleId}_${Date.now()}`;
         const imgRef = storageRef(storage, fileName);
         await uploadBytes(imgRef, blob);
         const downloadUrl = await getDownloadURL(imgRef);
@@ -454,7 +473,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           const response = await fetch(compressedUri);
           const blob = await response.blob();
           const storage = getStorage();
-          const fileName = `circle_images/events/${circleId}_${Date.now()}`;
+          const fileName = `circle_images/${circleData.name}/events/${circleId}_${Date.now()}`;
           const imgRef = storageRef(storage, fileName);
           await uploadBytes(imgRef, blob);
           imageUrl = await getDownloadURL(imgRef);
@@ -539,7 +558,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           const response = await fetch(compressedUri);
           const blob = await response.blob();
           const storage = getStorage();
-          const fileName = `circle_images/events/${circleId}_${Date.now()}`;
+          const fileName = `circle_images/${circleData.name}/events/${circleId}_${Date.now()}`;
           const imgRef = storageRef(storage, fileName);
           await uploadBytes(imgRef, blob);
           imageUrl = await getDownloadURL(imgRef);
@@ -622,74 +641,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     }
   };
 
-  // 代表者画像選択
-  const handlePickLeaderImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      const asset = result.assets[0];
-      try {
-        // 既存画像があればStorageから削除
-        if (circleData.leaderImageUrl) {
-          await deleteImageFromStorage(circleData.leaderImageUrl);
-        }
-        
-        // 画像を圧縮
-        console.log('代表者画像圧縮開始...');
-        const compressedUri = await compressCircleImage(asset.uri);
-        console.log('代表者画像圧縮完了');
-        
-        // 圧縮された画像をアップロード
-        const response = await fetch(compressedUri);
-        const blob = await response.blob();
-        const storage = getStorage();
-        const fileName = `circle_images/leaders/${circleId}_${Date.now()}`;
-        const imgRef = storageRef(storage, fileName);
-        await uploadBytes(imgRef, blob);
-        const downloadUrl = await getDownloadURL(imgRef);
-        await updateDoc(doc(db, 'circles', circleId), { leaderImageUrl: downloadUrl });
-        setLeaderImage({ uri: downloadUrl });
-        reload && reload();
-        
-        console.log('代表者画像アップロード完了');
-      } catch (e) {
-        console.error('代表者画像アップロードエラー:', e);
-        Alert.alert('エラー', '代表者画像のアップロードに失敗しました');
-      }
-    }
-  };
 
-  // 代表者画像削除処理
-  const handleDeleteLeaderImage = async () => {
-    Alert.alert(
-      "画像を削除",
-      "本当に代表者の画像を削除しますか？",
-      [
-        { text: "キャンセル", style: "cancel" },
-        { 
-          text: "削除", 
-          onPress: async () => {
-            try {
-              // 既存画像があればStorageから削除
-              if (circleData.leaderImageUrl) {
-                await deleteImageFromStorage(circleData.leaderImageUrl);
-              }
-              await updateDoc(doc(db, 'circles', circleId), { leaderImageUrl: '' });
-              setLeaderImage(null);
-              Alert.alert('削除完了', '代表者の画像を削除しました');
-            } catch (e) {
-              Alert.alert('エラー', '画像の削除に失敗しました');
-            }
-          },
-          style: "destructive"
-        }
-      ]
-    );
-  };
   // 代表者情報保存
   const handleSaveLeader = async () => {
     setLeaderSaving(true);
@@ -747,7 +699,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         const response = await fetch(compressedUri);
         const blob = await response.blob();
         const storage = getStorage();
-        const fileName = `circle_images/activities/${circleId}_${Date.now()}`;
+        const fileName = `circle_images/${circleData.name}/activities/${circleId}_${Date.now()}`;
         const imgRef = storageRef(storage, fileName);
         await uploadBytes(imgRef, blob);
         const downloadUrl = await getDownloadURL(imgRef);
@@ -808,7 +760,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         const response = await fetch(compressedUri);
         const blob = await response.blob();
         const storage = getStorage();
-        const fileName = `circle_images/activities/${circleId}_${Date.now()}`;
+        const fileName = `circle_images/${circleData.name}/activities/${circleId}_${Date.now()}`;
         const imgRef = storageRef(storage, fileName);
         await uploadBytes(imgRef, blob);
         const downloadUrl = await getDownloadURL(imgRef);
@@ -986,19 +938,12 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>代表者からのメッセージ</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginBottom: 12 }}>
-          <TouchableOpacity onPress={handlePickLeaderImage}>
-            {leaderImage && leaderImage.uri ? (
-              <Image source={{ uri: leaderImage.uri }} style={{width: 72, height: 72, borderRadius: 36, backgroundColor: '#eee'}} />
-            ) : (
-              <View style={{width: 72, height: 72, borderRadius: 36, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center'}}>
-                <Ionicons name="camera-outline" size={36} color="#aaa" />
-              </View>
-            )}
-          </TouchableOpacity>
-          {leaderImage && leaderImage.uri && (
-            <TouchableOpacity onPress={handleDeleteLeaderImage} style={{ marginLeft: 12, padding: 8, backgroundColor: '#fee', borderRadius: 24 }}>
-              <Ionicons name="trash-outline" size={24} color="#e74c3c" />
-            </TouchableOpacity>
+          {leaderProfileImage ? (
+            <Image source={{ uri: leaderProfileImage }} style={{width: 72, height: 72, borderRadius: 36, backgroundColor: '#eee'}} />
+          ) : (
+            <View style={{width: 72, height: 72, borderRadius: 36, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center'}}>
+              <Ionicons name="person-outline" size={36} color="#aaa" />
+            </View>
           )}
         </View>
         <TextInput

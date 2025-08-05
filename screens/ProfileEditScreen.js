@@ -537,7 +537,7 @@ export default function ProfileEditScreen(props) {
               </View>
             </View>
             <View style={styles.formGroup}>
-              <Text style={styles.label}>生年月日</Text>
+              <Text style={styles.label}>生年月日<Text style={styles.required}>*</Text></Text>
               <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.datePickerButton}>
                 <Text style={styles.datePickerText}>{birthday ? birthday.toLocaleDateString('ja-JP') : '生年月日を選択'}</Text>
               </TouchableOpacity>
@@ -576,7 +576,7 @@ export default function ProfileEditScreen(props) {
             
             {/* 学生証認証 */}
             <View style={styles.formGroup}>
-              <Text style={styles.label}>学生証認証<Text style={styles.optional}>(任意)</Text></Text>
+                             <Text style={styles.label}>学生証認証<Text style={styles.required}>*</Text><Text style={styles.optional}>(スキップ可)</Text></Text>
               <View style={styles.studentIdContainer}>
                 {studentIdUrl ? (
                   <View style={styles.studentIdImageContainer}>

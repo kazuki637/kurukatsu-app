@@ -179,7 +179,7 @@ export default function CircleSettingsScreen({ route, navigation }) {
           // 圧縮された画像をアップロード
           const response = await fetch(compressedUri);
           const blob = await response.blob();
-          const storageRef = ref(storage, `circle_images/icons/${circleId}`);
+          const storageRef = ref(storage, `circle_images/${name}/icons/${circleId}`);
           await uploadBytes(storageRef, blob);
           imageUrl = await getDownloadURL(storageRef);
           

@@ -169,12 +169,8 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
       await updateDoc(doc(db, 'circles', circleId), {
         leaderId: selectedMember.id,
         leaderName: selectedMember.name || selectedMember.nickname || 'Unknown',
-        // 新しい代表者の大学名と連絡先を更新
-        universityName: newLeaderUserData.university || '',
-        leaderContact: newLeaderUserData.email || '',
-        contactInfo: newLeaderUserData.email || '', // contactInfoも更新
-        // 代表者のプロフィール画像も更新（存在する場合）
-        leaderImageUrl: newLeaderUserData.profileImageUrl || null
+        contactInfo: newLeaderUserData.email || '', // 新しい代表者の連絡先
+        universityName: newLeaderUserData.university || '' // 新しい代表者の大学名
       });
 
       // 新しい代表者を設定
