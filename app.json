@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "KurukatsuApp",
-    "slug": "kurukatsu-app",
+    "slug": "kurukatsuapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -27,7 +27,10 @@
       },
       "edgeToEdgeEnabled": true,
       "package": "com.kurukatsu.app",
-      "versionCode": 1
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -39,12 +42,11 @@
           "photosPermission": "写真を選択するためにカメラロールへのアクセスが必要です。",
           "cameraPermission": "写真を撮影するためにカメラへのアクセスが必要です。"
         }
-      ],
-      "react-native-google-mobile-ads"
+      ]
     ],
     "extra": {
       "eas": {
-        "projectId": "70457aa6-c594-49fc-a494-a6ce6c8636b4"
+        "projectId": "f94b703e-f3c4-4f9f-8bb5-8b53bf7ac727"
       }
     },
     "owner": "kazuki637"
