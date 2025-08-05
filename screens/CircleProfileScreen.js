@@ -1,6 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Linking, ActivityIndicator, Alert, SafeAreaView, StatusBar, Dimensions } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, withDelay } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as RNImage } from 'react-native';
 import { db, auth } from '../firebaseConfig';
@@ -221,119 +220,27 @@ export default function CircleProfileScreen({ route, navigation }) {
 
     const maxCount = Math.max(...data.map(item => item.count));
     
-    // 各バーのアニメーション値を管理
-    const barWidths = data.map(() => useSharedValue(0));
-    const barScales = data.map(() => useSharedValue(1));
-    const [isVisible, setIsVisible] = useState(false);
-    const chartRef = useRef(null);
 
-    // 棒グラフが画面に表示された時のアニメーション
-    const handleLayout = () => {
-      // onLayoutは削除し、スクロールイベントでのみアニメーション開始
-    };
-
-    // グローバルにcheckVisibility関数を公開
-    useEffect(() => {
-      global.checkBarChartVisibility = checkVisibility;
-      return () => {
-        global.checkBarChartVisibility = null;
-      };
-    }, [isVisible]);
-
-    // 初期状態でのアニメーション開始チェック
-    useEffect(() => {
-      // サークル活動写真がない場合、棒グラフが画面に表示されているので即座にアニメーション開始
-      if (!circleData?.activityImages || circleData.activityImages.length === 0) {
-        // 少し遅延させてからアニメーション開始（画面遷移のアニメーション完了を待つ）
-        setTimeout(() => {
-          if (!isVisible) {
-            setIsVisible(true);
-            data.forEach((item, index) => {
-              const targetWidth = (item.count / maxCount) * maxWidth;
-              barWidths[index].value = withDelay(
-                index * 100, // 各バーを100msずつ遅延
-                withTiming(targetWidth, {
-                  duration: 800, // 800msでアニメーション
-                })
-              );
-            });
-          }
-        }, 200); // 画面遷移アニメーション完了を待つ
-      }
-    }, [circleData, data]);
-
-    // 棒グラフが画面に表示されているかをチェックする関数（スクロール時用）
-    const checkVisibility = () => {
-      if (chartRef.current && !isVisible) {
-        chartRef.current.measure((x, y, width, height, pageX, pageY) => {
-          const screenHeight = Dimensions.get('window').height;
-          const chartBottom = pageY + height;
-          
-          // デバッグ情報（開発時のみ）
-          console.log('BarChart Position:', {
-            pageY,
-            chartBottom,
-            screenHeight,
-            threshold: screenHeight * 0.8,
-            isVisible: isVisible
-          });
-          
-          // 棒グラフが画面の上部80%以内に表示されたときにアニメーション開始
-          // より厳密な条件: 棒グラフの上部が画面の上部から80%以内、かつ下部が画面内にある
-          if (pageY < screenHeight * 0.8 && chartBottom > 0 && pageY > -height) {
-            console.log('Starting bar chart animation!');
-            setIsVisible(true);
-            // すぐにアニメーション開始
-            data.forEach((item, index) => {
-              const targetWidth = (item.count / maxCount) * maxWidth;
-              barWidths[index].value = withDelay(
-                index * 100, // 各バーを100msずつ遅延
-                withTiming(targetWidth, {
-                  duration: 800, // 800msでアニメーション
-                })
-              );
-            });
-          }
-        });
-      }
-    };
-
-    const handleBarPress = (index) => {
-      // フォーカス時のアニメーション
-      barScales[index].value = withTiming(1.05, { duration: 200 }, () => {
-        barScales[index].value = withTiming(1, { duration: 200 });
-      });
-    };
 
     return (
-      <View 
-        ref={chartRef}
-        style={styles.barChartContainer}
-      >
+      <View style={styles.barChartContainer}>
         {data.map((item, index) => {
-          const animatedBarStyle = useAnimatedStyle(() => {
-            return {
-              width: barWidths[index].value,
-              transform: [{ scale: barScales[index].value }],
-            };
-          });
+          const barWidth = (item.count / maxCount) * maxWidth;
 
           return (
             <View key={index} style={styles.barChartRow}>
               <Text style={styles.universityName}>{item.university}</Text>
               <Text style={styles.countText}>{item.count}</Text>
               <View style={styles.barContainer}>
-                <TouchableOpacity onPress={() => handleBarPress(index)}>
-                  <Animated.View 
-                    style={[
-                      styles.bar, 
-                      { 
-                        backgroundColor: '#007AFF'
-                      },
-                      animatedBarStyle
-                    ]} 
-                  />
-                </TouchableOpacity>
+                <View 
+                  style={[
+                    styles.bar, 
+                    { 
+                      backgroundColor: '#007AFF',
+                      width: barWidth
+                    }
+                  ]} 
+                />
               </View>
             </View>
           );
