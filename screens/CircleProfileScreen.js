@@ -29,6 +29,7 @@ export default function CircleProfileScreen({ route, navigation }) {
   const [isMember, setIsMember] = useState(false);
   const [members, setMembers] = useState([]);
   const [activeTab, setActiveTab] = useState('top');
+  const [leaderProfileImage, setLeaderProfileImage] = useState(null);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -58,6 +59,25 @@ export default function CircleProfileScreen({ route, navigation }) {
       setIsMember(false);
     }
   }, [user, circleId]);
+
+  // 代表者のプロフィール画像を取得
+  useEffect(() => {
+    if (!circleData || !circleData.leaderId) return;
+
+    const fetchLeaderProfileImage = async () => {
+      try {
+        const leaderDoc = await getDoc(doc(db, 'users', circleData.leaderId));
+        if (leaderDoc.exists()) {
+          const leaderData = leaderDoc.data();
+          setLeaderProfileImage(leaderData.profileImageUrl || null);
+        }
+      } catch (error) {
+        console.error('Error fetching leader profile image:', error);
+      }
+    };
+
+    fetchLeaderProfileImage();
+  }, [circleData]);
 
   // メンバーデータを取得
   useEffect(() => {
@@ -409,8 +429,8 @@ export default function CircleProfileScreen({ route, navigation }) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>代表者からのメッセージ</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginBottom: 12 }}>
-            {circleData.leaderImageUrl ? (
-              <Image source={{ uri: circleData.leaderImageUrl }} style={{width: 72, height: 72, borderRadius: 36, backgroundColor: '#eee'}} />
+            {leaderProfileImage ? (
+              <Image source={{ uri: leaderProfileImage }} style={{width: 72, height: 72, borderRadius: 36, backgroundColor: '#eee'}} />
             ) : (
               <View style={{width: 72, height: 72, borderRadius: 36, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center'}}>
                 <Ionicons name="person-outline" size={36} color="#aaa" />

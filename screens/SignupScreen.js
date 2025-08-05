@@ -7,9 +7,22 @@ import { doc, setDoc } from 'firebase/firestore';
 const SignupScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSignup = async () => {
+    // パスワード確認チェック
+    if (password !== confirmPassword) {
+      Alert.alert('エラー', 'パスワードが一致しません。');
+      return;
+    }
+
+    // パスワードの長さチェック
+    if (password.length < 6) {
+      Alert.alert('エラー', 'パスワードは6文字以上で入力してください。');
+      return;
+    }
+
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -83,13 +96,25 @@ const SignupScreen = ({ navigation }) => {
           value={password}
           onChangeText={setPassword}
           secureTextEntry
+          returnKeyType="next"
+          blurOnSubmit={false}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="パスワード（確認）"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          secureTextEntry
           returnKeyType="done"
           onSubmitEditing={Keyboard.dismiss}
         />
         <TouchableOpacity
-          style={styles.registerButton}
+          style={[
+            styles.registerButton,
+            (!email || !password || !confirmPassword) && styles.registerButtonDisabled
+          ]}
           onPress={handleSignup}
-          disabled={loading}
+          disabled={loading || !email || !password || !confirmPassword}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
@@ -148,6 +173,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10,
     marginBottom: 15,
+  },
+  registerButtonDisabled: {
+    backgroundColor: '#ccc',
   },
   registerButtonText: {
     color: '#fff',
