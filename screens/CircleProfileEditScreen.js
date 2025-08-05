@@ -436,6 +436,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       Alert.alert('エラー', 'タイトルと詳細を入力してください');
       return;
     }
+    if (!eventImage) {
+      Alert.alert('エラー', '写真を選択してください');
+      return;
+    }
     setEventUploading(true);
     let imageUrl = '';
     try {
@@ -1088,7 +1092,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
               multiline
               style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginBottom: 8, backgroundColor: '#fff', minHeight: 60}}
             />
-            <View style={{flexDirection: 'row', justifyContent: 'flex-end'}}>
+            <View style={{flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center'}}>
               <TouchableOpacity onPress={() => setEventFormVisible(false)} style={{marginRight: 16}} disabled={eventUploading}>
                 <Text style={{color: '#666'}}>キャンセル</Text>
               </TouchableOpacity>
@@ -1103,7 +1107,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         {/* イベントリスト */}
         {circleData.events && circleData.events.length > 0 && (
           circleData.events.slice(0, 4).map((event, idx) => (
-            <View key={idx} style={styles.eventCard}>
+            <View key={idx} style={editingEventIndex === idx ? [styles.eventCard, {backgroundColor: 'transparent', padding: 0, borderWidth: 0, shadowOpacity: 0, elevation: 0}] : styles.eventCard}>
               {/* 編集/削除ボタン */}
               <TouchableOpacity
                 style={{ position: 'absolute', top: 8, right: 8, zIndex: 2 }}
@@ -1129,6 +1133,15 @@ export default function CircleProfileEditScreen({ route, navigation }) {
                     onChangeText={setEditEventTitle}
                     style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginBottom: 8, backgroundColor: '#fff'}}
                   />
+                  <TouchableOpacity onPress={handlePickEditEventImage} style={{marginBottom: 8}}>
+                    {editEventImage ? (
+                      <Image source={{ uri: editEventImage.uri }} style={{width: '100%', aspectRatio: 16/9, borderRadius: 8}} />
+                    ) : (
+                      <View style={{width: '100%', aspectRatio: 16/9, backgroundColor: '#eee', borderRadius: 8, justifyContent: 'center', alignItems: 'center'}}>
+                        <Ionicons name="camera-outline" size={48} color="#aaa" />
+                      </View>
+                    )}
+                  </TouchableOpacity>
                   <TextInput
                     placeholder="詳細"
                     value={editEventDetail}
@@ -1136,16 +1149,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
                     multiline
                     style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginBottom: 8, backgroundColor: '#fff', minHeight: 60}}
                   />
-                  <TouchableOpacity onPress={handlePickEditEventImage} style={{marginBottom: 8}}>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Ionicons name="image-outline" size={24} color="#007bff" />
-                      <Text style={{marginLeft: 8, color: '#007bff'}}>画像を選択</Text>
-                    </View>
-                  </TouchableOpacity>
-                  {editEventImage && (
-                    <Image source={{ uri: editEventImage.uri }} style={{width: '100%', aspectRatio: 16/9, borderRadius: 8, marginBottom: 8}} />
-                  )}
-                  <View style={{flexDirection: 'row', justifyContent: 'flex-end'}}>
+                  <View style={{flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center'}}>
                     <TouchableOpacity onPress={handleCancelEditEvent} style={{marginRight: 16}} disabled={editEventUploading}>
                       <Text style={{color: '#666'}}>キャンセル</Text>
                     </TouchableOpacity>
