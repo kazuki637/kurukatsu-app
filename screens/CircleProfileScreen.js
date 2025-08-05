@@ -16,12 +16,7 @@ const { width } = Dimensions.get('window');
 //   { key: 'welcome', title: '新歓情報' },
 // ];
 
-// XロゴSVGコンポーネント
-const XLogo = ({ size = 32 }) => (
-  <Svg width={size} height={size} viewBox="0 0 1200 1227" fill="none">
-    <Path d="M1199.97 0H1067.6L600.01 529.09L132.4 0H0L494.18 587.29L0 1227H132.4L600.01 697.91L1067.6 1227H1200L705.82 639.71L1199.97 0ZM655.09 567.29L1067.6 70.59V0.59H1067.6L600.01 529.09L132.4 0.59H132.4V70.59L544.91 567.29L132.4 1156.41V1226.41H132.4L600.01 697.91L1067.6 1226.41H1067.6V1156.41L655.09 567.29Z" fill="#000"/>
-  </Svg>
-);
+
 
 export default function CircleProfileScreen({ route, navigation }) {
   const { circleId } = route.params;
@@ -31,9 +26,8 @@ export default function CircleProfileScreen({ route, navigation }) {
   const [isFavorite, setIsFavorite] = useState(false);
   const [hasRequested, setHasRequested] = useState(false);
   const [isMember, setIsMember] = useState(false);
-  // const [tabIndex, setTabIndex] = useState(0); // 削除
-  // const [routes] = useState(tabRoutes); // 削除
-  const [activeTab, setActiveTab] = useState('top'); // 追加
+  const [members, setMembers] = useState([]);
+  const [activeTab, setActiveTab] = useState('top');
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -64,6 +58,56 @@ export default function CircleProfileScreen({ route, navigation }) {
     }
   }, [user, circleId]);
 
+  // メンバーデータを取得
+  useEffect(() => {
+    if (!circleId) return;
+
+    const fetchMembers = async () => {
+      try {
+        const membersRef = collection(db, 'circles', circleId, 'members');
+        const membersSnapshot = await getDocs(membersRef);
+        const membersData = [];
+        
+        for (const memberDoc of membersSnapshot.docs) {
+          const memberId = memberDoc.id;
+          const memberData = memberDoc.data();
+          
+          // メンバードキュメントから直接性別と大学情報を取得
+          // ユーザー情報も取得（名前など他の情報のため）
+          const userDoc = await getDoc(doc(db, 'users', memberId));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            membersData.push({
+              id: memberId,
+              gender: memberData.gender || userData.gender || null,
+              university: memberData.university || userData.university || null,
+              ...memberData,
+              ...userData
+            });
+          }
+        }
+        
+        setMembers(membersData);
+        
+        // テスト用のダミーデータ（メンバーが0人の場合）
+        if (membersData.length === 0) {
+          const dummyMembers = [
+            { id: '1', gender: '男性', university: '東京大学' },
+            { id: '2', gender: '男性', university: '東京大学' },
+            { id: '3', gender: '男性', university: '早稲田大学' },
+            { id: '4', gender: '女性', university: '東京大学' },
+            { id: '5', gender: '女性', university: '慶應義塾大学' },
+          ];
+          setMembers(dummyMembers);
+        }
+      } catch (error) {
+        console.error('Error fetching members:', error);
+      }
+    };
+
+    fetchMembers();
+  }, [circleId]);
+
   useEffect(() => {
     if (user && circleId) {
       const checkRequest = async () => {
@@ -79,6 +123,25 @@ export default function CircleProfileScreen({ route, navigation }) {
       checkRequest();
     }
   }, [user, circleId]);
+
+  // 大学データを処理する関数
+  const generateUniversityData = (members) => {
+    const universityCount = {};
+    members.forEach(member => {
+      const university = member.university || '大学名未設定';
+      universityCount[university] = (universityCount[university] || 0) + 1;
+    });
+    
+    // データを降順にソート
+    const sortedData = Object.entries(universityCount)
+      .sort(([, a], [, b]) => b - a)
+      .map(([university, count]) => ({
+        university,
+        count
+      }));
+
+    return sortedData;
+  };
 
   const handleJoinRequest = async () => {
     if (!user) {
@@ -131,6 +194,35 @@ export default function CircleProfileScreen({ route, navigation }) {
     }
   };
 
+  // 横棒グラフコンポーネント
+  const BarChart = ({ data, maxWidth = 200 }) => {
+    if (!data || data.length === 0) return null;
+
+    const maxCount = Math.max(...data.map(item => item.count));
+
+    return (
+      <View style={styles.barChartContainer}>
+        {data.map((item, index) => (
+          <View key={index} style={styles.barChartRow}>
+            <Text style={styles.universityName}>{item.university}</Text>
+            <Text style={styles.countText}>{item.count}</Text>
+            <View style={styles.barContainer}>
+              <View 
+                style={[
+                  styles.bar, 
+                  { 
+                    width: (item.count / maxCount) * maxWidth,
+                    backgroundColor: '#007AFF'
+                  }
+                ]} 
+              />
+            </View>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
   const renderTopTab = () => (
     <View style={styles.tabContent}>
       {/* サークル活動画像（1枚のみ、スクロール不可） */}
@@ -141,6 +233,15 @@ export default function CircleProfileScreen({ route, navigation }) {
           resizeMode="cover"
         />
       )}
+
+      {/* サークル紹介 */}
+      {circleData.description && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>サークル紹介</Text>
+          <Text style={styles.description}>{circleData.description}</Text>
+        </View>
+      )}
+
       {/* 基本情報 */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>基本情報</Text>
@@ -158,13 +259,6 @@ export default function CircleProfileScreen({ route, navigation }) {
             <Text style={styles.infoValue}>{circleData.genderratio}</Text>
           </View>
         </View>
-        {/* 主な活動場所 */}
-        {circleData.activityLocation && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>主な活動場所</Text>
-            <Text style={styles.activityLocationText}>{circleData.activityLocation}</Text>
-          </View>
-        )}
         
         {circleData.features && circleData.features.length > 0 && (
           <View style={styles.featuresContainer}>
@@ -178,13 +272,22 @@ export default function CircleProfileScreen({ route, navigation }) {
             </View>
           </View>
         )}
+
+        {/* メンバー構成（横棒グラフ） */}
+        {members.length > 0 && (
+          <View style={styles.memberCompositionContainer}>
+            <Text style={styles.infoLabel}>メンバーの所属大学</Text>
+            <BarChart data={generateUniversityData(members)} />
+          </View>
+        )}
+
       </View>
 
-      {/* サークル紹介 */}
-      {circleData.description && (
+      {/* 活動場所 */}
+      {circleData.activityLocation && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>サークル紹介</Text>
-          <Text style={styles.description}>{circleData.description}</Text>
+          <Text style={styles.sectionTitle}>活動場所</Text>
+          <Text style={styles.activityLocationText}>{circleData.activityLocation}</Text>
         </View>
       )}
 
@@ -940,6 +1043,46 @@ const styles = StyleSheet.create({
     height: 32,
     resizeMode: 'contain',
   },
+  // 横棒グラフ関連のスタイル
+  barChartContainer: {
+    marginTop: 10,
+  },
+  barChartRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 10,
+  },
+  universityName: {
+    fontSize: 14,
+    color: '#333',
+    width: 120,
+    marginRight: 10,
+  },
+  countText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    width: 30,
+    textAlign: 'right',
+    marginRight: 10,
+  },
+  barContainer: {
+    flex: 1,
+    height: 20,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  bar: {
+    height: '100%',
+    borderRadius: 10,
+  },
+  memberCompositionContainer: {
+    marginTop: 20,
+  },
+
+
   eventCard: {
     backgroundColor: '#fff',
     borderRadius: 12,

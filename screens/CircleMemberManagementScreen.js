@@ -108,10 +108,19 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
           style: 'destructive',
           onPress: async () => {
             try {
+              // サークルのメンバーコレクションから削除
               await deleteDoc(doc(db, 'circles', circleId, 'members', memberId));
+              
+              // ユーザーのjoinedCircleIdsからサークルIDを削除
+              const userDocRef = doc(db, 'users', memberId);
+              await updateDoc(userDocRef, {
+                joinedCircleIds: arrayRemove(circleId)
+              });
+              
               setMembers(prev => prev.filter(m => m.id !== memberId));
               Alert.alert('削除完了', 'メンバーを削除しました');
             } catch (e) {
+              console.error('Error removing member:', e);
               Alert.alert('エラー', 'メンバーの削除に失敗しました');
             }
           }
@@ -163,12 +172,18 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
 
     setLoading(true);
     try {
+      // ユーザー情報を取得
+      const userDoc = await getDoc(doc(db, 'users', request.userId));
+      const userData = userDoc.exists() ? userDoc.data() : {};
+      
       // ユーザーIDをドキュメントIDとして使用してメンバーを追加
       await setDoc(doc(db, 'circles', circleId, 'members', request.userId), {
         joinedAt: new Date(),
         role: 'member',
         assignedAt: new Date(),
-        assignedBy: user.uid
+        assignedBy: user.uid,
+        gender: userData.gender || null,
+        university: userData.university || null
       });
       
       // ユーザーのjoinedCircleIdsにサークルIDを追加
