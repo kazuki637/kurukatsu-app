@@ -39,7 +39,8 @@
           "photosPermission": "写真を選択するためにカメラロールへのアクセスが必要です。",
           "cameraPermission": "写真を撮影するためにカメラへのアクセスが必要です。"
         }
-      ]
+      ],
+      "react-native-google-mobile-ads"
     ],
     "extra": {
       "eas": {

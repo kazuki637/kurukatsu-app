@@ -3,14 +3,13 @@ import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, Alert
 import { Image } from 'expo-image'; // expo-image を使用
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '../firebaseConfig';
-import { doc, onSnapshot, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import CommonHeader from '../components/CommonHeader';
 
 const SearchResultsScreen = ({ route, navigation }) => {
   const { circles } = route.params;
   const [user, setUser] = useState(null);
-  const [userSavedCircles, setUserSavedCircles] = useState({});
   const [showOnlyRecruiting, setShowOnlyRecruiting] = useState(false);
 
   useEffect(() => {
@@ -20,66 +19,16 @@ const SearchResultsScreen = ({ route, navigation }) => {
     return unsubscribeAuth;
   }, []);
 
-  useEffect(() => {
-    if (user) {
-      const userDocRef = doc(db, 'users', user.uid);
-      const unsubscribeSnapshot = onSnapshot(userDocRef, (docSnap) => {
-        if (docSnap.exists()) {
-          const userData = docSnap.data();
-          const saved = userData.favoriteCircleIds || [];
-          const newSaved = {};
-          saved.forEach(id => newSaved[id] = true);
-          setUserSavedCircles(newSaved);
-        } else {
-          setUserSavedCircles({});
-        }
-      });
-      return unsubscribeSnapshot;
-    } else {
-      setUserSavedCircles({});
-    }
-  }, [user]);
+
 
   // フィルタリングされたサークルリストを計算
   const filteredCircles = showOnlyRecruiting 
     ? circles.filter(circle => circle.welcome?.isRecruiting === true)
     : circles;
 
-  const toggleSave = async (circleId) => {
-    if (!user) {
-      Alert.alert("ログインが必要です", "サークルを保存するにはログインしてください。");
-      return;
-    }
 
-    const userDocRef = doc(db, 'users', user.uid);
-    const isCurrentlySaved = userSavedCircles[circleId];
 
-    try {
-      if (isCurrentlySaved) {
-        await updateDoc(userDocRef, { favoriteCircleIds: arrayRemove(circleId) });
-        Alert.alert("保存解除", "サークルを保存済みから削除しました。");
-      } else {
-        await updateDoc(userDocRef, { favoriteCircleIds: arrayUnion(circleId) });
-        Alert.alert("保存完了", "サークルを保存しました！");
-      }
-      // Optimistic UI update
-      setUserSavedCircles(prev => ({
-        ...prev,
-        [circleId]: !isCurrentlySaved,
-      }));
-    } catch (error) {
-      console.error("Error toggling save: ", error);
-      Alert.alert("エラー", "保存操作に失敗しました。");
-      // Revert UI on error
-      setUserSavedCircles(prev => ({
-        ...prev,
-        [circleId]: isCurrentlySaved,
-      }));
-    }
-  };
-
-  const renderItem = ({ item, userSavedCircles, toggleSave }) => {
-    const isSaved = userSavedCircles[item.id];
+  const renderItem = ({ item }) => {
     return (
     <TouchableOpacity 
       style={styles.resultItem}
@@ -93,9 +42,6 @@ const SearchResultsScreen = ({ route, navigation }) => {
           <Text style={styles.resultTitle}>{item.name}</Text>
           <Text style={styles.resultDetail}>{item.universityName} - {item.genre}</Text>
         </View>
-        <TouchableOpacity style={styles.saveButton} onPress={() => toggleSave(item.id)}>
-          <Ionicons name={isSaved ? "bookmark" : "bookmark-outline"} size={24} color={isSaved ? "gold" : "#666"} />
-        </TouchableOpacity>
       </View>
 
       {/* ヘッダー画像（サークル詳細画面のheaderImageUrl） */}
@@ -145,9 +91,9 @@ const SearchResultsScreen = ({ route, navigation }) => {
         <FlatList
           data={filteredCircles}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => renderItem({ item, userSavedCircles, toggleSave })}
+          renderItem={({ item }) => renderItem({ item })}
           contentContainerStyle={[styles.listContent, { paddingBottom: 40 }]}
-          extraData={[userSavedCircles, showOnlyRecruiting]}
+          extraData={[showOnlyRecruiting]}
                       ListHeaderComponent={() => (
               <View style={styles.filterContainer}>
                 <TouchableOpacity 

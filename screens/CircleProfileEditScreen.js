@@ -19,12 +19,7 @@ const { width } = Dimensions.get('window');
 //   { key: 'welcome', title: '新歓情報' },
 // ];
 
-// XロゴSVGコンポーネント
-const XLogo = ({ size = 32 }) => (
-  <Svg width={size} height={size} viewBox="0 0 1200 1227" fill="none">
-    <Path d="M1199.97 0H1067.6L600.01 529.09L132.4 0H0L494.18 587.29L0 1227H132.4L600.01 697.91L1067.6 1227H1200L705.82 639.71L1199.97 0ZM655.09 567.29L1067.6 70.59V0.59H1067.6L600.01 529.09L132.4 0.59H132.4V70.59L544.91 567.29L132.4 1156.41V1226.41H132.4L600.01 697.91L1067.6 1226.41H1067.6V1156.41L655.09 567.29Z" fill="#000"/>
-  </Svg>
-);
+
 
 // Firebase StorageのdownloadURLからストレージパスを抽出し削除する共通関数
 const deleteImageFromStorage = async (url) => {
@@ -86,6 +81,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   const [welcomeSchedule, setWelcomeSchedule] = useState('');
   const [activityLocation, setActivityLocation] = useState(''); // 活動場所
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // 未保存の変更があるかどうか
+  const [members, setMembers] = useState([]); // メンバーデータ
 
   // 初期値セット
   useEffect(() => {
@@ -183,6 +179,104 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       checkRequest();
     }
   }, [user, circleId]);
+
+  // メンバーデータを取得
+  useEffect(() => {
+    if (!circleId) return;
+
+    const fetchMembers = async () => {
+      try {
+        const membersRef = collection(db, 'circles', circleId, 'members');
+        const membersSnapshot = await getDocs(membersRef);
+        const membersData = [];
+        
+        for (const memberDoc of membersSnapshot.docs) {
+          const memberId = memberDoc.id;
+          const memberData = memberDoc.data();
+          
+          // メンバードキュメントから直接性別と大学情報を取得
+          // ユーザー情報も取得（名前など他の情報のため）
+          const userDoc = await getDoc(doc(db, 'users', memberId));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            membersData.push({
+              id: memberId,
+              gender: memberData.gender || userData.gender || null,
+              university: memberData.university || userData.university || null,
+              ...memberData,
+              ...userData
+            });
+          }
+        }
+        
+        setMembers(membersData);
+        
+        // テスト用のダミーデータ（メンバーが0人の場合）
+        if (membersData.length === 0) {
+          const dummyMembers = [
+            { id: '1', gender: '男性', university: '東京大学' },
+            { id: '2', gender: '男性', university: '東京大学' },
+            { id: '3', gender: '男性', university: '早稲田大学' },
+            { id: '4', gender: '女性', university: '東京大学' },
+            { id: '5', gender: '女性', university: '慶應義塾大学' },
+          ];
+          setMembers(dummyMembers);
+        }
+      } catch (error) {
+        console.error('Error fetching members:', error);
+      }
+    };
+
+    fetchMembers();
+  }, [circleId]);
+
+  // 大学データを処理する関数
+  const generateUniversityData = (members) => {
+    const universityCount = {};
+    members.forEach(member => {
+      const university = member.university || '大学名未設定';
+      universityCount[university] = (universityCount[university] || 0) + 1;
+    });
+    
+    // データを降順にソート
+    const sortedData = Object.entries(universityCount)
+      .sort(([, a], [, b]) => b - a)
+      .map(([university, count]) => ({
+        university,
+        count
+      }));
+
+    return sortedData;
+  };
+
+  // 横棒グラフコンポーネント
+  const BarChart = ({ data, maxWidth = 200 }) => {
+    if (!data || data.length === 0) return null;
+
+    const maxCount = Math.max(...data.map(item => item.count));
+
+    return (
+      <View style={styles.barChartContainer}>
+        {data.map((item, index) => (
+          <View key={index} style={styles.barChartRow}>
+            <Text style={styles.universityName}>{item.university}</Text>
+            <Text style={styles.countText}>{item.count}</Text>
+            <View style={styles.barContainer}>
+              <View 
+                style={[
+                  styles.bar, 
+                  { 
+                    width: (item.count / maxCount) * maxWidth,
+                    backgroundColor: '#007AFF'
+                  }
+                ]} 
+              />
+            </View>
+          </View>
+        ))}
+      </View>
+    );
+  };
 
   const handleJoinRequest = async () => {
     if (!user) {
@@ -800,6 +894,21 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* サークル紹介 */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>サークル紹介</Text>
+        <TextInput
+          value={description}
+          onChangeText={(text) => {
+            setDescription(text);
+            checkForChanges();
+          }}
+          multiline
+          style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 80, fontSize: 16, marginBottom: 8}}
+        />
+      </View>
+
       {/* 基本情報 */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>基本情報</Text>
@@ -817,19 +926,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             <Text style={styles.infoValue}>{circleData.genderratio}</Text>
           </View>
         </View>
-        {/* 主な活動場所 */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>主な活動場所</Text>
-          <TextInput
-            value={activityLocation}
-            onChangeText={(text) => {
-              setActivityLocation(text);
-              checkForChanges();
-            }}
-            placeholder="例：大学構内、○○教室、○○会館など"
-            style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', fontSize: 16, marginBottom: 8}}
-          />
-        </View>
         
         {circleData.features && circleData.features.length > 0 && (
           <View style={styles.featuresContainer}>
@@ -843,21 +939,31 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             </View>
           </View>
         )}
+
+        {/* メンバー構成（横棒グラフ） */}
+        {members.length > 0 && (
+          <View style={styles.memberCompositionContainer}>
+            <Text style={styles.infoLabel}>メンバーの所属大学</Text>
+            <BarChart data={generateUniversityData(members)} />
+          </View>
+        )}
       </View>
-      {/* サークル紹介（基本情報の下に移動・編集可） */}
+
+      {/* 活動場所 */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>サークル紹介</Text>
+        <Text style={styles.sectionTitle}>活動場所</Text>
         <TextInput
-          value={description}
+          value={activityLocation}
           onChangeText={(text) => {
-            setDescription(text);
+            setActivityLocation(text);
             checkForChanges();
           }}
-          multiline
-          style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 80, fontSize: 16, marginBottom: 8}}
+          placeholder="例：大学構内、○○教室、○○会館など"
+          style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', fontSize: 16, marginBottom: 8}}
         />
       </View>
-      {/* こんな人におすすめ（サークル紹介の下に追加・編集可） */}
+
+      {/* こんな人におすすめ */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>こんな人におすすめ</Text>
         <TextInput
@@ -872,7 +978,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         />
       </View>
 
-      {/* 代表者編集（こんな人におすすめの下に追加） */}
+      {/* 代表者からのメッセージ */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>代表者からのメッセージ</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginBottom: 12 }}>
@@ -903,7 +1009,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         />
       </View>
 
-      {/* SNSリンク（編集可） */}
+      {/* SNS */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>SNS</Text>
         <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 8}}>
@@ -935,40 +1041,13 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           />
         </View>
       </View>
-
-      {/* LINEグループ */}
-      {circleData.lineGroupLink && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>LINEグループ</Text>
-          <TouchableOpacity style={styles.lineButton} onPress={() => Linking.openURL(circleData.lineGroupLink)}>
-            <Ionicons name="logo-whatsapp" size={24} color="#06C755" />
-            <Text style={styles.lineButtonText}>LINEグループを開く</Text>
-            <Ionicons name="chevron-forward" size={20} color="#666" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.copyButton} onPress={() => {
-            // Clipboard.setString(circleData.lineGroupLink);
-            Alert.alert('コピーしました', 'LINEグループリンクをコピーしました');
-          }}>
-            <Ionicons name="copy-outline" size={18} color="#333" />
-            <Text style={styles.copyButtonText}>リンクをコピー</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* 新歓スケジュール */}
-      {circleData.schedule && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>新歓スケジュール</Text>
-          <Text style={styles.scheduleText}>{circleData.schedule}</Text>
-        </View>
-      )}
     </View>
   );
 
   const renderEventsTab = () => (
     <View style={styles.tabContent}>
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>恒例イベント</Text>
+        <Text style={styles.sectionTitle}>イベント</Text>
         {/* イベント追加ボタン */}
         <TouchableOpacity style={{marginBottom: 16, alignSelf: 'center'}} onPress={() => setEventFormVisible(true)}>
           <View style={{backgroundColor: '#007bff', borderRadius: 24, width: 48, height: 48, alignItems: 'center', justifyContent: 'center'}}>
@@ -1789,6 +1868,44 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     resizeMode: 'contain',
+  },
+  // 横棒グラフ関連のスタイル
+  barChartContainer: {
+    marginTop: 10,
+  },
+  barChartRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    paddingHorizontal: 10,
+  },
+  universityName: {
+    fontSize: 14,
+    color: '#333',
+    width: 120,
+    marginRight: 10,
+  },
+  countText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    width: 30,
+    textAlign: 'right',
+    marginRight: 10,
+  },
+  barContainer: {
+    flex: 1,
+    height: 20,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  bar: {
+    height: '100%',
+    borderRadius: 10,
+  },
+  memberCompositionContainer: {
+    marginTop: 20,
   },
   eventCard: {
     backgroundColor: '#fff',
