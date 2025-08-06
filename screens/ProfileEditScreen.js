@@ -197,23 +197,38 @@ export default function ProfileEditScreen(props) {
     }, [navigation, hasUnsavedChanges, isSaving])
   );
 
+  // 画像選択処理
   const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('許可が必要です', 'プロフィール画像をアップロードするには、カメラロールへのアクセス許可が必要です。');
-      return;
-    }
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 1,
-    });
-    if (!result.canceled) {
-      const uri = result.assets[0].uri;
-      setProfileImage(uri);
-      setHasUnsavedChanges(true);
-      console.log('プロフィール編集画面: 画像選択完了');
+    try {
+      // 権限チェック
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('権限が必要', '写真ライブラリへのアクセス権限が必要です');
+        return;
+      }
+
+      // 画像選択ピッカーを即座に表示
+      let result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false, // 編集は無効にして、ガイド枠で行う
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        // 選択された画像でガイド枠画面に遷移
+        navigation.navigate('ImageCrop', {
+          imageType: 'profile',
+          selectedImageUri: result.assets[0].uri,
+          onCropComplete: (croppedUri) => {
+            setProfileImage(croppedUri);
+            setHasUnsavedChanges(true);
+            console.log('プロフィール編集画面: 画像切り抜き完了');
+          }
+        });
+      }
+    } catch (error) {
+      console.error('画像選択エラー:', error);
+      Alert.alert('エラー', '画像の選択に失敗しました');
     }
   };
 
