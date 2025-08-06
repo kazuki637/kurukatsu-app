@@ -144,6 +144,7 @@ export default function ProfileEditScreen(props) {
       gender !== originalData.gender ||
       birthday.getTime() !== originalData.birthday.getTime() ||
       profileImage !== null ||
+      (profileImage === '' && originalData.profileImageUrl) ||
       studentIdImage !== null;
     
     console.log('プロフィール編集画面: 変更検知', {
@@ -153,6 +154,7 @@ export default function ProfileEditScreen(props) {
       genderChanged: gender !== originalData.gender,
       birthdayChanged: birthday.getTime() !== originalData.birthday.getTime(),
       imageChanged: profileImage !== null,
+      imageDeleted: profileImage === '' && originalData.profileImageUrl,
       studentIdChanged: studentIdImage !== null,
       hasChanges
     });
@@ -365,8 +367,8 @@ export default function ProfileEditScreen(props) {
           setIsSaving(false);
           return;
         }
-      } else if (profileImage === null && originalData && originalData.profileImageUrl) {
-        // 画像が削除された場合、既存の画像も削除して空文字列を設定
+      } else if (profileImage === '' && originalData && originalData.profileImageUrl) {
+        // 画像が明示的に削除された場合のみ、既存の画像も削除して空文字列を設定
         try {
           console.log('プロフィール編集画面: 画像削除開始...');
           await deleteExistingProfileImages(user.uid);
@@ -378,6 +380,7 @@ export default function ProfileEditScreen(props) {
         imageUrl = '';
         setProfileImageUrl(''); // 状態も更新
       }
+      // profileImageがnullの場合は既存の画像をそのまま保持
       
       const userDocRef = doc(db, 'users', user.uid);
       await setDoc(userDocRef, {
@@ -433,7 +436,12 @@ export default function ProfileEditScreen(props) {
 
   return (
     <View style={styles.container}>
-      <CommonHeader title="プロフィール編集" rightButtonLabel="保存" onRightButtonPress={handleSave} />
+      <CommonHeader 
+        title="プロフィール編集" 
+        rightButtonLabel="保存" 
+        onRightButtonPress={handleSave}
+        rightButtonDisabled={isSaving || loading}
+      />
       <SafeAreaView style={{ flex: 1 }} edges={['left', 'right']}>
         <ScrollView 
           contentContainerStyle={styles.bodyContent} 
@@ -456,10 +464,10 @@ export default function ProfileEditScreen(props) {
                     </View>
                   )}
                 </TouchableOpacity>
-                {((profileImage && profileImage.trim() !== '') || (profileImageUrl && profileImageUrl.trim() !== '')) && !imageError && (
+                {((profileImage && profileImage.trim() !== '') || (profileImageUrl && profileImageUrl.trim() !== '')) && !imageError && profileImage !== '' && (
                   <TouchableOpacity
                     onPress={() => {
-                      setProfileImage(null);
+                      setProfileImage('');
                       setProfileImageUrl('');
                       setImageError(false);
                       // 状態変更を即座に検知
@@ -544,7 +552,8 @@ export default function ProfileEditScreen(props) {
                       newGrade !== originalData.grade ||
                       gender !== originalData.gender ||
                       birthday.getTime() !== originalData.birthday.getTime() ||
-                      profileImage !== null;
+                      profileImage !== null ||
+                      (profileImage === '' && originalData.profileImageUrl);
                     
                     setHasUnsavedChanges(hasChanges);
                   }}>
@@ -569,7 +578,8 @@ export default function ProfileEditScreen(props) {
                       grade !== originalData.grade ||
                       newGender !== originalData.gender ||
                       birthday.getTime() !== originalData.birthday.getTime() ||
-                      profileImage !== null;
+                      profileImage !== null ||
+                      (profileImage === '' && originalData.profileImageUrl);
                     
                     setHasUnsavedChanges(hasChanges);
                   }}>
@@ -605,6 +615,7 @@ export default function ProfileEditScreen(props) {
                           gender !== originalData.gender ||
                           newBirthday.getTime() !== originalData.birthday.getTime() ||
                           profileImage !== null ||
+                          (profileImage === '' && originalData.profileImageUrl) ||
                           studentIdImage !== null;
                         
                         setHasUnsavedChanges(hasChanges);
@@ -662,9 +673,15 @@ export default function ProfileEditScreen(props) {
                 )}
               </View>
             </View>
-                      <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={loading}>
-            <Text style={styles.saveButtonText}>{loading ? '保存中...' : '保存する'}</Text>
-          </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={styles.saveButton} 
+                        onPress={handleSave} 
+                        disabled={isSaving || loading}
+                      >
+                        <Text style={styles.saveButtonText}>
+                          保存する
+                        </Text>
+                      </TouchableOpacity>
           <View style={{ height: 32 }} />
         </ScrollView>
         

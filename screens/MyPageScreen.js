@@ -31,24 +31,26 @@ const gridItemSize = (width - 20 * 3) / 2;
 // let lastFetchTime = 0;
 // const CACHE_DURATION = 30000; // 30秒間キャッシュ
 
-export default function MyPageScreen({ navigation }) {
+export default function MyPageScreen({ navigation, route }) {
   const user = auth.currentUser;
   const userId = user ? user.uid : null;
   // ユーザープロフィール取得（キャッシュ5秒に短縮）
   const { data: userProfile, loading, error, reload } = useFirestoreDoc(db, userId ? `users/${userId}` : '', { cacheDuration: 5000 });
+  
+  // プロフィール編集画面から渡された更新データを処理（削除）
   const [savedCircles, setSavedCircles] = useState([]);
   const [joinedCircles, setJoinedCircles] = useState([]);
   const [circlesLoading, setCirclesLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [imageError, setImageError] = useState(false);
 
-  // 画面がフォーカスされたときにユーザーデータをリロード
+  // 画面がフォーカスされたときにデータをリロード
   useFocusEffect(
     React.useCallback(() => {
-      // 画面がフォーカスされたときにデータをリロード
+      setImageError(false); // 画像エラー状態をリセット
+      // プロフィール編集画面から戻ってきた場合はデータをリロード
       reload();
-      setImageError(false); // 画像エラー状態もリセット
-    }, [])
+    }, [reload])
   );
 
   // userProfile取得後にサークル情報を取得
@@ -97,10 +99,17 @@ export default function MyPageScreen({ navigation }) {
       }
     };
     fetchCircles();
-  }, [userProfile?.joinedCircleIds, userProfile?.favoriteCircleIds, isInitialLoad]);
+  }, [userProfile?.joinedCircleIds, userProfile?.favoriteCircleIds]);
 
   // useFocusEffectや冗長なキャッシュ・ローディング処理を削除
 
+  // 初回ロード完了後はisInitialLoadをfalseに設定
+  React.useEffect(() => {
+    if (!loading && isInitialLoad) {
+      setIsInitialLoad(false);
+    }
+  }, [loading, isInitialLoad]);
+  
   // 初回ロード時のみローディング画面を表示
   if (loading && isInitialLoad) {
     return (
@@ -158,7 +167,7 @@ export default function MyPageScreen({ navigation }) {
                 <Image
                   source={{ 
                     uri: userProfile.profileImageUrl,
-                    cache: 'reload' // キャッシュを無効化して常に最新の画像を表示
+                    cache: 'default' // デフォルトのキャッシュ設定を使用
                   }}
                   style={styles.profileImage}
                   onError={() => setImageError(true)}
