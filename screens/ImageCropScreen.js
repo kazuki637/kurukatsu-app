@@ -22,14 +22,34 @@ import Animated,{
   useAnimatedStyle,
   withSpring,
   runOnJS,
-  useDerivedValue,
 } from 'react-native-reanimated';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const CROP_AREA_SIZE = screenWidth * 0.8; // クロップガイド枠のサイズ
 
+// 画像タイプに応じたクロップエリアの設定
+const getCropAreaConfig = (imageType) => {
+  if (imageType === 'profile' || imageType === 'circle') {
+    // プロフィール画像とサークルアイコンは正方形（1:1）
+    return {
+      width: CROP_AREA_SIZE,
+      height: CROP_AREA_SIZE,
+      borderRadius: CROP_AREA_SIZE / 2, // 円形
+    };
+  } else {
+    // その他の画像は横長（16:9）
+    const width = CROP_AREA_SIZE;
+    const height = (CROP_AREA_SIZE * 9) / 16;
+    return {
+      width,
+      height,
+      borderRadius: 0, // 角丸なし
+    };
+  }
+};
+
 const ImageCropScreen = ({ route, navigation }) => {
-  const { imageType = 'profile', onCropComplete, selectedImageUri } = route.params;
+  const { imageType = 'profile', onCropComplete, selectedImageUri, circleName } = route.params;
 
   const [selectedImage, setSelectedImage] = useState(selectedImageUri || null);
   const [processing, setProcessing] = useState(false);
@@ -42,11 +62,6 @@ const ImageCropScreen = ({ route, navigation }) => {
   const translateY = useSharedValue(0);
   const savedTranslateX = useSharedValue(0);
   const savedTranslateY = useSharedValue(0);
-
-  // Derived values for current image dimensions based on scale
-  // We will explicitly calculate these in onUpdate for pinch gesture for better control
-  // const currentImageWidth = useDerivedValue(() => imageDimensions.width * scale.value);
-  // const currentImageHeight = useDerivedValue(() => imageDimensions.height * scale.value);
 
   // Ref for the image component to get its layout
   const imageRef = useRef(null);
@@ -222,27 +237,57 @@ const ImageCropScreen = ({ route, navigation }) => {
 
     setProcessing(true);
 
-    // Calculate crop data based on current image transformation and crop area
-    // These calculations assume the image and crop area are centered initially
-    const cropXInImage = (-CROP_AREA_SIZE / 2 - (translateX.value - (imageDimensions.width * scale.value) / 2)) / scale.value;
-    const cropYInImage = (-CROP_AREA_SIZE / 2 - (translateY.value - (imageDimensions.height * scale.value) / 2)) / scale.value;
-    const cropWidthInImage = CROP_AREA_SIZE / scale.value;
-    const cropHeightInImage = CROP_AREA_SIZE / scale.value;
-
-    // Ensure crop coordinates are within image bounds
-    const finalCropX = Math.max(0, cropXInImage);
-    const finalCropY = Math.max(0, cropYInImage);
-    const finalCropWidth = Math.min(imageDimensions.width - finalCropX, cropWidthInImage);
-    const finalCropHeight = Math.min(imageDimensions.height - finalCropY, cropHeightInImage);
-
-    const cropData = {
-      originX: finalCropX,
-      originY: finalCropY,
-      width: finalCropWidth,
-      height: finalCropHeight,
-    };
-
     try {
+      // 画像タイプに応じたクロップエリア設定を取得
+      const cropAreaConfig = getCropAreaConfig(imageType);
+      
+      // 画像の中心からクロップエリアの中心までの距離を計算
+      const imageCenterX = (imageDimensions.width * scale.value) / 2;
+      const imageCenterY = (imageDimensions.height * scale.value) / 2;
+      
+      // クロップエリアの中心位置（画面の中心）
+      const cropCenterX = 0;
+      const cropCenterY = 0;
+      
+      // 画像の中心とクロップエリアの中心の差分を計算
+      const offsetX = cropCenterX - imageCenterX;
+      const offsetY = cropCenterY - imageCenterY;
+      
+      // 現在の画像の位置を考慮して、クロップエリアの中心位置を画像座標系に変換
+      const cropCenterInImageX = (cropCenterX - translateX.value - offsetX) / scale.value;
+      const cropCenterInImageY = (cropCenterY - translateY.value - offsetY) / scale.value;
+      
+      // クロップエリアの左上座標を計算（中心から半分のサイズを引く）
+      const cropX = cropCenterInImageX - (cropAreaConfig.width / scale.value) / 2;
+      const cropY = cropCenterInImageY - (cropAreaConfig.height / scale.value) / 2;
+      
+      // クロップエリアのサイズ（画像座標系）
+      const cropWidthInImage = cropAreaConfig.width / scale.value;
+      const cropHeightInImage = cropAreaConfig.height / scale.value;
+      
+      // 画像の境界内に収める
+      const finalCropX = Math.max(0, Math.min(cropX, imageDimensions.width - cropWidthInImage));
+      const finalCropY = Math.max(0, Math.min(cropY, imageDimensions.height - cropHeightInImage));
+      const finalCropWidth = Math.min(cropWidthInImage, imageDimensions.width - finalCropX);
+      const finalCropHeight = Math.min(cropHeightInImage, imageDimensions.height - finalCropY);
+
+      const cropData = {
+        originX: finalCropX,
+        originY: finalCropY,
+        width: finalCropWidth,
+        height: finalCropHeight,
+      };
+
+      console.log('クロップデータ:', {
+        cropData,
+        imageDimensions,
+        scale: scale.value,
+        translateX: translateX.value,
+        translateY: translateY.value,
+        cropAreaConfig,
+        cropCenterInImage: { x: cropCenterInImageX, y: cropCenterInImageY }
+      });
+
       const croppedUri = await cropAndCompressImage(
         selectedImage,
         cropData,
@@ -290,7 +335,9 @@ const ImageCropScreen = ({ route, navigation }) => {
             <Text style={styles.loadingText}>画像を処理中...</Text>
           </View>
         ) : selectedImage ? (
-          <View style={styles.imageWrapper}>
+          <View
+            style={styles.imageWrapper}
+          >
             <GestureDetector gesture={composedGestures}>
               <Animated.Image
                 ref={imageRef}
@@ -304,14 +351,15 @@ const ImageCropScreen = ({ route, navigation }) => {
                 }}
               />
             </GestureDetector>
-            {/* クロップガイド枠 */}
+
+            {/* クロップガイド枠 (白い線) */}
             <View
               style={[
                 styles.cropOverlay,
                 {
-                  width: CROP_AREA_SIZE,
-                  height: CROP_AREA_SIZE,
-                  borderRadius: imageType === 'profile' ? CROP_AREA_SIZE / 2 : 0,
+                  width: getCropAreaConfig(imageType).width,
+                  height: getCropAreaConfig(imageType).height,
+                  borderRadius: getCropAreaConfig(imageType).borderRadius,
                 },
               ]}
               pointerEvents="none" // ガイド枠がジェスチャーをブロックしないように
@@ -381,7 +429,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
   },
-  // imageスタイルはAnimated.Imageのstyle propで直接設定するため削除
   cropOverlay: {
     position: 'absolute',
     borderWidth: 2,

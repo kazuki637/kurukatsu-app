@@ -1,74 +1,63 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
-  StyleSheet,
   PanResponder,
   Dimensions,
+  StyleSheet,
 } from 'react-native';
 import { GestureHandlerRootView, PinchGestureHandler, State } from 'react-native-gesture-handler';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
-const ImageCropGuide = ({
-  imageWidth,
-  imageHeight,
+const ImageCropGuide = ({ 
+  imageWidth, 
+  imageHeight, 
   onCropChange,
-  isCircular = true,
+  initialCrop = null,
+  isCircular = false
 }) => {
+  console.log('ImageCropGuide props:', { imageWidth, imageHeight, initialCrop, isCircular });
+  
+  // 画面中心に固定されたガイド枠のサイズ
+  const [guideSize, setGuideSize] = useState(200);
   const [imageOffset, setImageOffset] = useState({ x: 0, y: 0 });
   const [imageScale, setImageScale] = useState(1);
-  const [guideSize, setGuideSize] = useState(0);
+  
+  const cropRef = useRef(null);
 
-  // ガイド枠のサイズを計算（画面の80%の円）
+  // ガイド枠の最小・最大サイズ
+  const MIN_GUIDE_SIZE = 100;
+  const MAX_GUIDE_SIZE = Math.min(imageWidth, imageHeight) * 0.8;
+
+  // 初期化時にガイドサイズを設定
   useEffect(() => {
-    const size = Math.min(screenWidth, screenHeight) * 0.8;
-    setGuideSize(size);
-  }, []);
+    if (isCircular) {
+      const size = Math.min(imageWidth, imageHeight) * 0.6;
+      setGuideSize(size);
+    } else {
+      const size = Math.min(imageWidth, imageHeight) * 0.8;
+      setGuideSize(size);
+    }
+  }, [imageWidth, imageHeight, isCircular]);
 
-  // 画像の変形を制限する関数
-  const constrainImageTransform = (offset, scale) => {
-    const maxOffsetX = (imageWidth * scale - guideSize) / 2;
-    const maxOffsetY = (imageHeight * scale - guideSize) / 2;
-    
-    return {
-      x: Math.max(-maxOffsetX, Math.min(maxOffsetX, offset.x)),
-      y: Math.max(-maxOffsetY, Math.min(maxOffsetY, offset.y)),
-    };
-  };
-
-  // 実際のクロップ座標を計算
-  const calculateActualCrop = (offsetX, offsetY, scale) => {
-    const imageCenterX = imageWidth / 2;
-    const imageCenterY = imageHeight / 2;
-    const guideCenterX = screenWidth / 2;
-    const guideCenterY = screenHeight / 2;
-    
-    // ガイド枠の中心から画像の中心への相対位置
-    const relativeX = (guideCenterX - offsetX - imageCenterX * scale) / scale;
-    const relativeY = (guideCenterY - offsetY - imageCenterY * scale) / scale;
-    
-    // ガイド枠の半径
+  // ガイド枠が画像の外に出ないように制限する関数
+  const constrainImageTransform = (newOffset, newScale) => {
+    // ガイド枠のサイズを考慮した制限
     const guideRadius = guideSize / 2;
-    
-    // クロップ座標を計算
-    const cropX = Math.max(0, relativeX + guideRadius);
-    const cropY = Math.max(0, relativeY + guideRadius);
-    const cropSize = Math.min(guideSize / scale, imageWidth - cropX, imageHeight - cropY);
+    const maxOffsetX = (imageWidth * newScale - guideSize) / 2;
+    const maxOffsetY = (imageHeight * newScale - guideSize) / 2;
     
     return {
-      x: cropX,
-      y: cropY,
-      width: cropSize,
-      height: cropSize,
+      x: Math.max(-maxOffsetX, Math.min(maxOffsetX, newOffset.x)),
+      y: Math.max(-maxOffsetY, Math.min(maxOffsetY, newOffset.y)),
+      scale: Math.max(0.5, Math.min(3.0, newScale)),
     };
   };
 
-  // 画像移動用のPanResponder
-  const panResponder = PanResponder.create({
+  // 画像移動用PanResponder
+  const movePanResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: (evt, gestureState) => {
-      return Math.abs(gestureState.dx) > 2 || Math.abs(gestureState.dy) > 2;
-    },
+    onMoveShouldSetPanResponder: () => true,
     onPanResponderGrant: () => {
       // タッチ開始時の処理
     },
@@ -77,72 +66,140 @@ const ImageCropGuide = ({
         x: imageOffset.x + gestureState.dx,
         y: imageOffset.y + gestureState.dy,
       };
+      const constrained = constrainImageTransform(newOffset, imageScale);
+      setImageOffset({ x: constrained.x, y: constrained.y });
       
-      const constrainedOffset = constrainImageTransform(newOffset, imageScale);
-      setImageOffset(constrainedOffset);
-      
-      // 親コンポーネントに通知
-      const actualCrop = calculateActualCrop(constrainedOffset.x, constrainedOffset.y, imageScale);
-      onCropChange && onCropChange({
-        ...actualCrop,
-        imageOffset: constrainedOffset,
-        imageScale,
-      });
+      // 実際のクリップ座標を計算して親コンポーネントに通知
+      const actualCrop = calculateActualCrop(constrained.x, constrained.y, imageScale);
+      onCropChange && onCropChange(actualCrop);
     },
     onPanResponderRelease: () => {
       // タッチ終了時の処理
     },
   });
 
-  // ズーム用のPinchGestureHandler
+  // ピンチジェスチャー用のハンドラー
   const onPinchGestureEvent = (event) => {
     const newScale = imageScale * event.nativeEvent.scale;
-    const minScale = Math.max(guideSize / imageWidth, guideSize / imageHeight);
-    const maxScale = 3;
+    const constrained = constrainImageTransform(imageOffset, newScale);
+    setImageScale(constrained.scale);
     
-    const constrainedScale = Math.max(minScale, Math.min(maxScale, newScale));
-    setImageScale(constrainedScale);
-    
-    // スケール変更時にオフセットも調整
-    const constrainedOffset = constrainImageTransform(imageOffset, constrainedScale);
-    setImageOffset(constrainedOffset);
-    
-    // 親コンポーネントに通知
-    const actualCrop = calculateActualCrop(constrainedOffset.x, constrainedOffset.y, constrainedScale);
-    onCropChange && onCropChange({
-      ...actualCrop,
-      imageOffset: constrainedOffset,
-      imageScale: constrainedScale,
-    });
+    // 実際のクリップ座標を計算して親コンポーネントに通知
+    const actualCrop = calculateActualCrop(constrained.x, constrained.y, constrained.scale);
+    onCropChange && onCropChange(actualCrop);
   };
 
+  const onPinchHandlerStateChange = (event) => {
+    if (event.nativeEvent.oldState === State.ACTIVE) {
+      // ピンチジェスチャーが終了した時の処理
+    }
+  };
+
+  // 実際のクリップ座標を計算
+  const calculateActualCrop = (offsetX, offsetY, scale) => {
+    const centerX = imageWidth / 2;
+    const centerY = imageHeight / 2;
+    
+    // ガイド枠の中心位置
+    const guideCenterX = centerX;
+    const guideCenterY = centerY;
+    
+    // 画像の中心位置（オフセットとスケールを考慮）
+    const imageCenterX = centerX + offsetX;
+    const imageCenterY = centerY + offsetY;
+    
+    // ガイド枠の中心から画像の中心への相対位置
+    const relativeX = (guideCenterX - imageCenterX) / scale;
+    const relativeY = (guideCenterY - imageCenterY) / scale;
+    
+    // 実際の画像座標系でのクリップ位置
+    const actualX = (imageWidth / 2) - (guideSize / 2) - relativeX;
+    const actualY = (imageHeight / 2) - (guideSize / 2) - relativeY;
+    
+    return {
+      x: Math.max(0, Math.min(actualX, imageWidth - guideSize)),
+      y: Math.max(0, Math.min(actualY, imageHeight - guideSize)),
+      width: guideSize,
+      height: guideSize,
+    };
+  };
+
+
+
+  console.log('ImageCropGuide render:', { imageOffset, imageScale, guideSize, isCircular });
+  
+  // ガイド枠の中心位置を計算
+  const guideCenterX = imageWidth / 2;
+  const guideCenterY = imageHeight / 2;
+  const guideLeft = guideCenterX - guideSize / 2;
+  const guideTop = guideCenterY - guideSize / 2;
+  
   return (
-    <GestureHandlerRootView style={StyleSheet.absoluteFillObject}>
-      <PinchGestureHandler onGestureEvent={onPinchGestureEvent}>
-        <View style={StyleSheet.absoluteFillObject} {...panResponder.panHandlers}>
-          {/* 円形ガイド枠 */}
-          <View style={[
-            styles.guideFrame, 
-            { 
-              width: guideSize, 
-              height: guideSize,
-              top: (screenHeight - guideSize) / 2,
-              left: (screenWidth - guideSize) / 2,
-              borderRadius: guideSize / 2,
-            }
-          ]} />
-        </View>
+    <GestureHandlerRootView style={styles.container}>
+      {/* 画像移動・ズーム用の透明なオーバーレイ */}
+      <View
+        style={styles.imageOverlay}
+        {...movePanResponder.panHandlers}
+      />
+      
+      {/* 固定されたガイド枠 */}
+      <View
+        ref={cropRef}
+        style={[
+          styles.cropGuide,
+          isCircular && styles.circularGuide,
+          {
+            left: guideLeft,
+            top: guideTop,
+            width: guideSize,
+            height: guideSize,
+          },
+        ]}
+      />
+      
+      {/* ピンチジェスチャー用のオーバーレイ */}
+      <PinchGestureHandler
+        onGestureEvent={onPinchGestureEvent}
+        onHandlerStateChange={onPinchHandlerStateChange}
+      >
+        <View style={styles.pinchOverlay} />
       </PinchGestureHandler>
     </GestureHandlerRootView>
   );
 };
 
 const styles = StyleSheet.create({
-  guideFrame: {
+  container: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  imageOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+  },
+  pinchOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+  },
+  cropGuide: {
     position: 'absolute',
     borderWidth: 2,
     borderColor: '#fff',
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  circularGuide: {
+    borderRadius: 9999, // 円形にする
   },
 });
 

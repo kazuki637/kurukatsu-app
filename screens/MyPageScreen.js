@@ -34,8 +34,8 @@ const gridItemSize = (width - 20 * 3) / 2;
 export default function MyPageScreen({ navigation }) {
   const user = auth.currentUser;
   const userId = user ? user.uid : null;
-  // ユーザープロフィール取得（キャッシュ30秒）
-  const { data: userProfile, loading, error, reload } = useFirestoreDoc(db, userId ? `users/${userId}` : '', { cacheDuration: 30000 });
+  // ユーザープロフィール取得（キャッシュ5秒に短縮）
+  const { data: userProfile, loading, error, reload } = useFirestoreDoc(db, userId ? `users/${userId}` : '', { cacheDuration: 5000 });
   const [savedCircles, setSavedCircles] = useState([]);
   const [joinedCircles, setJoinedCircles] = useState([]);
   const [circlesLoading, setCirclesLoading] = useState(true);
@@ -45,13 +45,10 @@ export default function MyPageScreen({ navigation }) {
   // 画面がフォーカスされたときにユーザーデータをリロード
   useFocusEffect(
     React.useCallback(() => {
-      if (isInitialLoad) {
-        setIsInitialLoad(false);
-        return;
-      }
       // 画面がフォーカスされたときにデータをリロード
       reload();
-    }, [isInitialLoad])
+      setImageError(false); // 画像エラー状態もリセット
+    }, [])
   );
 
   // userProfile取得後にサークル情報を取得
@@ -159,7 +156,10 @@ export default function MyPageScreen({ navigation }) {
             <View style={styles.profileImageContainerSimple}>
               {userProfile?.profileImageUrl && userProfile.profileImageUrl.trim() !== '' && !imageError ? (
                 <Image
-                  source={{ uri: userProfile.profileImageUrl }}
+                  source={{ 
+                    uri: userProfile.profileImageUrl,
+                    cache: 'reload' // キャッシュを無効化して常に最新の画像を表示
+                  }}
                   style={styles.profileImage}
                   onError={() => setImageError(true)}
                 />

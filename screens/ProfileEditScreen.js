@@ -11,6 +11,7 @@ import CommonHeader from '../components/CommonHeader';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import universitiesData from '../universities.json';
 import { compressProfileImage } from '../utils/imageCompression';
+import { deleteExistingProfileImages } from '../utils/imageCrop';
 
 
 const GRADES = ['大学1年', '大学2年', '大学3年', '大学4年', '大学院1年', '大学院2年', 'その他'];
@@ -222,7 +223,7 @@ export default function ProfileEditScreen(props) {
           onCropComplete: (croppedUri) => {
             setProfileImage(croppedUri);
             setHasUnsavedChanges(true);
-            console.log('プロフィール編集画面: 画像切り抜き完了');
+            console.log('プロフィール編集画面: 画像切り抜き完了（ローカルURI）');
           }
         });
       }
@@ -332,6 +333,11 @@ export default function ProfileEditScreen(props) {
       // プロフィール画像のアップロード処理
       if (profileImage) {
         try {
+          // 既存のプロフィール画像を削除
+          console.log('プロフィール編集画面: 既存画像削除開始...');
+          await deleteExistingProfileImages(user.uid);
+          console.log('プロフィール編集画面: 既存画像削除完了');
+          
           // 画像を圧縮
           console.log('プロフィール編集画面: 画像圧縮開始...');
           const compressedUri = await compressProfileImage(profileImage);
@@ -340,9 +346,16 @@ export default function ProfileEditScreen(props) {
           // 圧縮された画像をアップロード
           const response = await fetch(compressedUri);
           const blob = await response.blob();
-          const storageRef = ref(storage, `profile_images/${user.uid}`);
+          const timestamp = Date.now();
+          const randomString = Math.random().toString(36).substring(2, 15);
+          const fileName = `${timestamp}_${randomString}.jpg`;
+          const storageRef = ref(storage, `profile_images/${user.uid}/${fileName}`);
           await uploadBytes(storageRef, blob);
           imageUrl = await getDownloadURL(storageRef);
+          
+          // アップロード完了後に状態を更新してプレビューを即時反映
+          setProfileImageUrl(imageUrl);
+          setProfileImage(null); // ローカル画像をクリア
           
           console.log('プロフィール編集画面: 画像アップロード完了');
         } catch (error) {
@@ -353,8 +366,17 @@ export default function ProfileEditScreen(props) {
           return;
         }
       } else if (profileImage === null && originalData && originalData.profileImageUrl) {
-        // 画像が削除された場合、空文字列を設定
+        // 画像が削除された場合、既存の画像も削除して空文字列を設定
+        try {
+          console.log('プロフィール編集画面: 画像削除開始...');
+          await deleteExistingProfileImages(user.uid);
+          console.log('プロフィール編集画面: 画像削除完了');
+        } catch (error) {
+          console.error('プロフィール編集画面: 画像削除エラー:', error);
+          // 削除に失敗しても処理を続行
+        }
         imageUrl = '';
+        setProfileImageUrl(''); // 状態も更新
       }
       
       const userDocRef = doc(db, 'users', user.uid);
@@ -372,29 +394,34 @@ export default function ProfileEditScreen(props) {
       }, { merge: true });
       setHasUnsavedChanges(false);
       setIsSaving(false);
-      Alert.alert('保存完了', 'プロフィールを保存しました。');
-      // 少し遅延を入れてから画面遷移（アラートの表示を待つ）
-      setTimeout(() => {
-        if (route.params?.fromSignup) {
-          // 新規登録からの場合はメイン画面に遷移
-          navigation.dispatch(
-            CommonActions.reset({
-              index: 0,
-              routes: [{ name: 'Main' }],
-            })
-          );
-        } else if (forceToHome) {
-          // 強制ホーム遷移の場合
-          navigation.dispatch(
-            CommonActions.reset({
-              index: 0,
-              routes: [{ name: 'Main' }],
-            })
-          );
-        } else {
-          navigation.goBack();
-        }
-      }, 100);
+      
+      // 新規登録からの場合や強制ホーム遷移の場合のみアラートを表示
+      if (route.params?.fromSignup || forceToHome) {
+        Alert.alert('保存完了', 'プロフィールを保存しました。');
+        // 少し遅延を入れてから画面遷移（アラートの表示を待つ）
+        setTimeout(() => {
+          if (route.params?.fromSignup) {
+            // 新規登録からの場合はメイン画面に遷移
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: 'Main' }],
+              })
+            );
+          } else if (forceToHome) {
+            // 強制ホーム遷移の場合
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 0,
+                routes: [{ name: 'Main' }],
+              })
+            );
+          }
+        }, 100);
+      } else {
+        // 通常の編集の場合は即座に戻る
+        navigation.goBack();
+      }
     } catch (error) {
       console.error('Error saving profile:', error);
       Alert.alert('エラー', 'プロフィールの保存に失敗しました。');
