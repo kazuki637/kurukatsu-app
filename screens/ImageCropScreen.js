@@ -23,9 +23,10 @@ import Animated,{
   withSpring,
   runOnJS,
 } from 'react-native-reanimated';
+import Svg, { Defs, Mask, Rect, Circle } from 'react-native-svg';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
-const CROP_AREA_SIZE = screenWidth * 0.8; // クロップガイド枠のサイズ
+const CROP_AREA_SIZE = screenWidth * 0.95; // クロップガイド枠のサイズ（0.8から0.95に拡大）
 
 // 画像タイプに応じたクロップエリアの設定
 const getCropAreaConfig = (imageType) => {
@@ -55,6 +56,7 @@ const ImageCropScreen = ({ route, navigation }) => {
   const [selectedImage, setSelectedImage] = useState(selectedImageUri || null);
   const [processing, setProcessing] = useState(false);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
+  const [contentLayout, setContentLayout] = useState({ width: 0, height: 0 });
 
   // Reanimated Shared Values for image transformation
   const scale = useSharedValue(1);
@@ -350,7 +352,13 @@ const ImageCropScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.content}>
+      <View
+        style={styles.content}
+        onLayout={(event) => {
+          const { width, height } = event.nativeEvent.layout;
+          setContentLayout({ width, height });
+        }}
+      >
         {processing ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#007AFF" />
@@ -374,18 +382,51 @@ const ImageCropScreen = ({ route, navigation }) => {
               />
             </GestureDetector>
 
-            {/* クロップガイド枠 (白い線) */}
-            <View
-              style={[
-                styles.cropOverlay,
-                {
-                  width: getCropAreaConfig(imageType).width,
-                  height: getCropAreaConfig(imageType).height,
-                  borderRadius: getCropAreaConfig(imageType).borderRadius,
-                },
-              ]}
-              pointerEvents="none" // ガイド枠がジェスチャーをブロックしないように
-            />
+            {/* SVGマスクを使用したオーバーレイ */}
+            <View style={styles.overlayContainer} pointerEvents="none">
+              <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
+                <Defs>
+                  <Mask id="cropMask">
+                    <Rect width="100%" height="100%" fill="white" />
+                    {imageType === 'profile' || imageType === 'circle' ? (
+                      <Circle
+                        cx={contentLayout.width > 0 ? contentLayout.width / 2 : '50%'}
+                        cy={contentLayout.height > 0 ? contentLayout.height / 2 : '50%'}
+                        r={getCropAreaConfig(imageType).width / 2}
+                        fill="black"
+                      />
+                    ) : (
+                      <Rect
+                        x={(screenWidth - getCropAreaConfig(imageType).width) / 2}
+                        y={(contentLayout.height - getCropAreaConfig(imageType).height) / 2}
+                        width={getCropAreaConfig(imageType).width}
+                        height={getCropAreaConfig(imageType).height}
+                        fill="black"
+                      />
+                    )}
+                  </Mask>
+                </Defs>
+                <Rect
+                  width="100%"
+                  height="100%"
+                  fill="rgba(0, 0, 0, 0.7)"
+                  mask="url(#cropMask)"
+                />
+              </Svg>
+              
+              {/* クロップガイド枠 (白い線) */}
+              <View
+                style={[
+                  styles.cropOverlay,
+                  {
+                    width: getCropAreaConfig(imageType).width,
+                    height: getCropAreaConfig(imageType).height,
+                    borderRadius: getCropAreaConfig(imageType).borderRadius,
+                  },
+                ]}
+                pointerEvents="none"
+              />
+            </View>
           </View>
         ) : (
           <View style={styles.noImageContainer}>
@@ -450,6 +491,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+  },
+  overlayContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cropOverlay: {
     position: 'absolute',
