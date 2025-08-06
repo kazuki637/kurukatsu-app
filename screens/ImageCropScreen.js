@@ -51,12 +51,18 @@ const getCropAreaConfig = (imageType) => {
 };
 
 const ImageCropScreen = ({ route, navigation }) => {
+  // 横スワイプによる戻る機能を無効化
+  React.useEffect(() => {
+    navigation.setOptions({
+      gestureEnabled: false,
+    });
+  }, [navigation]);
   const { imageType = 'profile', onCropComplete, selectedImageUri, circleName } = route.params;
 
   const [selectedImage, setSelectedImage] = useState(selectedImageUri || null);
   const [processing, setProcessing] = useState(false);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
-  const [contentLayout, setContentLayout] = useState({ width: 0, height: 0 });
+  const [contentLayout, setContentLayout] = useState({ width: 0, height: 0, x: 0, y: 0 });
 
   // Reanimated Shared Values for image transformation
   const scale = useSharedValue(1);
@@ -347,6 +353,7 @@ const ImageCropScreen = ({ route, navigation }) => {
         <TouchableOpacity
           style={styles.applyButton}
           onPress={handleCropComplete}
+          disabled={processing}
         >
           <Text style={styles.applyButtonText}>適用</Text>
         </TouchableOpacity>
@@ -355,8 +362,8 @@ const ImageCropScreen = ({ route, navigation }) => {
       <View
         style={styles.content}
         onLayout={(event) => {
-          const { width, height } = event.nativeEvent.layout;
-          setContentLayout({ width, height });
+          const { width, height, x, y } = event.nativeEvent.layout;
+          setContentLayout({ width, height, x, y });
         }}
       >
         {processing ? (
@@ -365,9 +372,7 @@ const ImageCropScreen = ({ route, navigation }) => {
             <Text style={styles.loadingText}>画像を処理中...</Text>
           </View>
         ) : selectedImage ? (
-          <View
-            style={styles.imageWrapper}
-          >
+          <View style={styles.imageWrapper}>
             <GestureDetector gesture={composedGestures}>
               <Animated.Image
                 ref={imageRef}
@@ -381,52 +386,6 @@ const ImageCropScreen = ({ route, navigation }) => {
                 }}
               />
             </GestureDetector>
-
-            {/* SVGマスクを使用したオーバーレイ */}
-            <View style={styles.overlayContainer} pointerEvents="none">
-              <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
-                <Defs>
-                  <Mask id="cropMask">
-                    <Rect width="100%" height="100%" fill="white" />
-                    {imageType === 'profile' || imageType === 'circle' ? (
-                      <Circle
-                        cx={contentLayout.width > 0 ? contentLayout.width / 2 : '50%'}
-                        cy={contentLayout.height > 0 ? contentLayout.height / 2 : '50%'}
-                        r={getCropAreaConfig(imageType).width / 2}
-                        fill="black"
-                      />
-                    ) : (
-                      <Rect
-                        x={(screenWidth - getCropAreaConfig(imageType).width) / 2}
-                        y={(contentLayout.height - getCropAreaConfig(imageType).height) / 2}
-                        width={getCropAreaConfig(imageType).width}
-                        height={getCropAreaConfig(imageType).height}
-                        fill="black"
-                      />
-                    )}
-                  </Mask>
-                </Defs>
-                <Rect
-                  width="100%"
-                  height="100%"
-                  fill="rgba(0, 0, 0, 0.7)"
-                  mask="url(#cropMask)"
-                />
-              </Svg>
-              
-              {/* クロップガイド枠 (白い線) */}
-              <View
-                style={[
-                  styles.cropOverlay,
-                  {
-                    width: getCropAreaConfig(imageType).width,
-                    height: getCropAreaConfig(imageType).height,
-                    borderRadius: getCropAreaConfig(imageType).borderRadius,
-                  },
-                ]}
-                pointerEvents="none"
-              />
-            </View>
           </View>
         ) : (
           <View style={styles.noImageContainer}>
@@ -437,6 +396,56 @@ const ImageCropScreen = ({ route, navigation }) => {
           </View>
         )}
       </View>
+
+      {/* SVGマスクを使用したオーバーレイ (contentとは兄弟要素として配置) */}
+      {selectedImage && contentLayout.height > 0 && !processing && (
+        <View style={styles.overlayContainer} pointerEvents="none">
+          <Svg width="100%" height="100%" style={StyleSheet.absoluteFill}>
+            <Defs>
+              <Mask id="cropMask">
+                <Rect width="100%" height="100%" fill="white" />
+                {imageType === 'profile' || imageType === 'circle' ? (
+                  <Circle
+                    cx={screenWidth / 2}
+                    cy={contentLayout.y + contentLayout.height / 2}
+                    r={getCropAreaConfig(imageType).width / 2}
+                    fill="black"
+                  />
+                ) : (
+                  <Rect
+                    x={(screenWidth - getCropAreaConfig(imageType).width) / 2}
+                    y={contentLayout.y + (contentLayout.height - getCropAreaConfig(imageType).height) / 2}
+                    width={getCropAreaConfig(imageType).width}
+                    height={getCropAreaConfig(imageType).height}
+                    fill="black"
+                  />
+                )}
+              </Mask>
+            </Defs>
+            <Rect
+              width="100%"
+              height="100%"
+              fill="rgba(0, 0, 0, 0.7)"
+              mask="url(#cropMask)"
+            />
+          </Svg>
+          
+          {/* クロップガイド枠 (白い線) */}
+          <View
+            style={[
+              styles.cropOverlay,
+              {
+                width: getCropAreaConfig(imageType).width,
+                height: getCropAreaConfig(imageType).height,
+                borderRadius: getCropAreaConfig(imageType).borderRadius,
+                top: contentLayout.y + (contentLayout.height - getCropAreaConfig(imageType).height) / 2,
+                left: (screenWidth - getCropAreaConfig(imageType).width) / 2,
+              },
+            ]}
+            pointerEvents="none"
+          />
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -453,6 +462,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#000',
+    zIndex: 2, // ヘッダーを最前面に
   },
   backButton: {
     padding: 8,
@@ -493,13 +503,8 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   overlayContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
+    ...StyleSheet.absoluteFillObject, // 画面全体を覆う
+    zIndex: 1, // オーバーレイを画像より前面に
   },
   cropOverlay: {
     position: 'absolute',
