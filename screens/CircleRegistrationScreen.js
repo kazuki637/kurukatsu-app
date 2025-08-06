@@ -27,15 +27,21 @@ export default function CircleRegistrationScreen() {
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
+      allowsEditing: false,
       quality: 1,
     });
 
-    if (!result.canceled) {
-      const uri = result.assets[0].uri;
-      setCircleImage(uri);
-      console.log('サークル画像選択完了');
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      // 選択された画像でクロップ画面に遷移
+      navigation.navigate('ImageCrop', {
+        imageType: 'circle',
+        selectedImageUri: result.assets[0].uri,
+        circleName: circleName, // サークル名を渡す
+        onCropComplete: (croppedUri) => {
+          setCircleImage(croppedUri);
+          console.log('サークル画像切り抜き完了');
+        }
+      });
     }
   };
 

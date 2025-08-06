@@ -20,6 +20,16 @@ const IMAGE_SETTINGS = {
     height: 400,
     quality: 0.85,
   },
+  event: {
+    width: 800,
+    height: 450,
+    quality: 0.85,
+  },
+  activity: {
+    width: 800,
+    height: 450,
+    quality: 0.85,
+  },
 };
 
 // 最適な解像度を計算
@@ -69,7 +79,7 @@ export const compressImageToOneMB = async (imageUri, imageType = 'profile') => {
     console.log('元画像サイズ:', originalSize / 1024, 'KB');
     
     // 画像タイプに基づく初期設定
-    const settings = IMAGE_SETTINGS[imageType];
+    const settings = IMAGE_SETTINGS[imageType] || IMAGE_SETTINGS.header; // デフォルトはheader設定
     
     // 圧縮率を計算
     const compressionRatio = TARGET_SIZE / originalSize;
@@ -121,4 +131,6 @@ export const compressImageToOneMB = async (imageUri, imageType = 'profile') => {
 // 画像タイプ別の圧縮関数
 export const compressProfileImage = (imageUri) => compressImageToOneMB(imageUri, 'profile');
 export const compressCircleImage = (imageUri) => compressImageToOneMB(imageUri, 'circle');
-export const compressHeaderImage = (imageUri) => compressImageToOneMB(imageUri, 'header'); 
+export const compressHeaderImage = (imageUri) => compressImageToOneMB(imageUri, 'header');
+export const compressEventImage = (imageUri) => compressImageToOneMB(imageUri, 'event');
+export const compressActivityImage = (imageUri) => compressImageToOneMB(imageUri, 'activity'); 
