@@ -29,6 +29,7 @@ const CROP_AREA_SIZE = screenWidth * 0.8; // クロップガイド枠のサイ�
 
 // 画像タイプに応じたクロップエリアの設定
 const getCropAreaConfig = (imageType) => {
+  'worklet';
   if (imageType === 'profile' || imageType === 'circle') {
     // プロフィール画像とサークルアイコンは正方形（1:1）
     return {
@@ -77,8 +78,17 @@ const ImageCropScreen = ({ route, navigation }) => {
     if (selectedImage) {
       Image.getSize(selectedImage, (width, height) => {
         setImageDimensions({ width, height });
-        // Calculate initial scale to ensure the image covers the crop area
-        const initialScale = Math.max(CROP_AREA_SIZE / width, CROP_AREA_SIZE / height);
+        
+        // 画像タイプに応じた初期スケール計算
+        const cropConfig = getCropAreaConfig(imageType);
+        const cropWidth = cropConfig.width;
+        const cropHeight = cropConfig.height;
+        
+        // 画像がクロップエリアを完全にカバーするための初期スケール
+        const initialScaleX = cropWidth / width;
+        const initialScaleY = cropHeight / height;
+        const initialScale = Math.max(initialScaleX, initialScaleY);
+        
         scale.value = initialScale;
         savedScale.value = initialScale;
       }, (error) => {
@@ -86,22 +96,23 @@ const ImageCropScreen = ({ route, navigation }) => {
         Alert.alert('エラー', '画像の読み込みに失敗しました');
       });
     }
-  }, [selectedImage]);
+  }, [selectedImage, imageType]);
 
   // Function to clamp translation values
-  const clampTranslation = (currentTx, currentTy, imgWidth, imgHeight) => {
+  const clampTranslation = (currentTx, currentTy, imgWidth, imgHeight, currentImageType) => {
     'worklet';
     if (imgWidth === 0 || imgHeight === 0) {
       // If image dimensions are not yet loaded, don't clamp
       return { clampedTx: currentTx, clampedTy: currentTy };
     }
 
-    const cropHalfWidth = CROP_AREA_SIZE / 2;
-    const cropHalfHeight = CROP_AREA_SIZE / 2;
+    const cropConfig = getCropAreaConfig(currentImageType);
+    const cropHalfWidth = cropConfig.width / 2;
+    const cropHalfHeight = cropConfig.height / 2;
 
     let minTx, maxTx, minTy, maxTy;
 
-    if (imgWidth < CROP_AREA_SIZE) {
+    if (imgWidth < cropConfig.width) {
       // If image is smaller than crop area, center it horizontally
       minTx = 0;
       maxTx = 0;
@@ -111,7 +122,7 @@ const ImageCropScreen = ({ route, navigation }) => {
       maxTx = imgWidth / 2 - cropHalfWidth;
     }
 
-    if (imgHeight < CROP_AREA_SIZE) {
+    if (imgHeight < cropConfig.height) {
       // If image is smaller than crop area, center it vertically
       minTy = 0;
       maxTy = 0;
@@ -141,8 +152,9 @@ const ImageCropScreen = ({ route, navigation }) => {
       const { clampedTx, clampedTy } = clampTranslation(
         newTx,
         newTy,
-        imageDimensions.width * scale.value, // Use current scaled width
-        imageDimensions.height * scale.value // Use current scaled height
+        imageDimensions.width * scale.value,
+        imageDimensions.height * scale.value,
+        imageType
       );
 
       translateX.value = clampedTx;
@@ -163,29 +175,39 @@ const ImageCropScreen = ({ route, navigation }) => {
       // Update scale
       scale.value = savedScale.value * event.scale;
 
-      // Clamp scale immediately
-      const minScale = Math.max(CROP_AREA_SIZE / imageDimensions.width, CROP_AREA_SIZE / imageDimensions.height);
-      const maxScale = 5; // Example max zoom
+      // より柔軟な最小スケール計算
+      const cropConfig = getCropAreaConfig(imageType);
+      const cropWidth = cropConfig.width;
+      const cropHeight = cropConfig.height;
+      
+      // 画像がクロップエリアを完全にカバーするための最小スケール
+      const minScaleX = cropWidth / imageDimensions.width;
+      const minScaleY = cropHeight / imageDimensions.height;
+      const minScale = Math.max(minScaleX, minScaleY);
+      
+      // 最大スケール（5倍までズーム可能）
+      const maxScale = 5;
+      
+      // スケールを制限
       scale.value = Math.min(Math.max(scale.value, minScale), maxScale);
 
-      // Explicitly re-calculate current image dimensions based on the new clamped scale
+      // 現在の画像サイズを再計算
       const currentImgW = imageDimensions.width * scale.value;
       const currentImgH = imageDimensions.height * scale.value;
 
-      // After clamping scale, re-evaluate and adjust position to ensure it stays within bounds
+      // 位置を調整して境界内に収める
       const { clampedTx, clampedTy } = clampTranslation(
         translateX.value,
         translateY.value,
-        currentImgW, // Use the explicitly calculated current image width
-        currentImgH  // Use the explicitly calculated current image height
+        currentImgW,
+        currentImgH,
+        imageType
       );
       translateX.value = clampedTx;
       translateY.value = clampedTy;
     })
     .onEnd(() => {
-      // No need for additional clamping here if onUpdate handles it.
-      // If you want a spring effect for the final snap, you can add it here.
-      // For now, let's keep it simple and rely on onUpdate.
+      // 必要に応じてスプリングアニメーションを追加可能
     });
 
   // Combine gestures
