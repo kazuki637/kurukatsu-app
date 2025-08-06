@@ -47,6 +47,7 @@ import CircleMessageDetailScreen from './screens/CircleMessageDetailScreen';
 import CircleManagementDetailScreen from './screens/CircleManagementDetailScreen';
 import CircleLeadershipTransferScreen from './screens/CircleLeadershipTransferScreen';
 import SubscriptionScreen from './screens/SubscriptionScreen';
+import ImageCropScreen from './screens/ImageCropScreen';
 
 
 const AuthStack = createStackNavigator();
@@ -239,11 +240,18 @@ function AppNavigator() {
           }} />}
         </RootStack.Screen>
       ) : user ? (
-        <RootStack.Screen 
-          name="Main" 
-          component={MainTabNavigatorWithProfileCheck} 
-          options={{ headerShown: false }} 
-        />
+        <>
+          <RootStack.Screen 
+            name="Main" 
+            component={MainTabNavigatorWithProfileCheck} 
+            options={{ headerShown: false }} 
+          />
+          <RootStack.Screen 
+            name="ImageCrop" 
+            component={ImageCropScreen} 
+            options={{ headerShown: false }} 
+          />
+        </>
       ) : (
         <RootStack.Screen 
           name="Auth" 
