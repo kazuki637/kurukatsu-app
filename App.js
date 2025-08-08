@@ -259,6 +259,11 @@ function AppNavigator() {
             component={StudentIdCameraScreen} 
             options={{ headerShown: false }} 
           />
+          <RootStack.Screen 
+            name="ProfileEdit" 
+            component={ProfileEditScreen} 
+            options={{ headerShown: false }} 
+          />
         </>
       ) : (
         <RootStack.Screen 

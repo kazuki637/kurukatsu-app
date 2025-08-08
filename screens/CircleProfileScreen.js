@@ -6,6 +6,7 @@ import { db, auth } from '../firebaseConfig';
 import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot, increment, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import CommonHeader from '../components/CommonHeader';
+import { checkStudentIdVerification } from '../utils/permissionUtils';
 import useFirestoreDoc from '../hooks/useFirestoreDoc';
 
 const { width } = Dimensions.get('window');
@@ -168,6 +169,24 @@ export default function CircleProfileScreen({ route, navigation }) {
       Alert.alert('ログインが必要です', '入会申請にはログインが必要です。');
       return;
     }
+
+    // 学生証認証状態を確認
+    const isStudentIdVerified = await checkStudentIdVerification(user.uid);
+    if (!isStudentIdVerified) {
+      Alert.alert(
+        '学生証認証が必要です',
+        '入会申請には学生証の認証が必要です。\nプロフィール編集画面で学生証を認証してください。',
+        [
+          { text: 'キャンセル', style: 'cancel' },
+          { 
+            text: 'プロフィール編集へ', 
+            onPress: () => navigation.navigate('ProfileEdit')
+          }
+        ]
+      );
+      return;
+    }
+
     try {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       const userData = userDoc.exists() ? userDoc.data() : {};

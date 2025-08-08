@@ -39,3 +39,21 @@ export const getRoleDisplayName = (role) => {
   };
   return roleNames[role] || 'メンバー';
 }; 
+
+// 学生証認証状態を確認する関数
+export const checkStudentIdVerification = async (userId) => {
+  try {
+    const userDocRef = doc(db, 'users', userId);
+    const docSnap = await getDoc(userDocRef);
+    
+    if (!docSnap.exists()) {
+      return false;
+    }
+    
+    const userData = docSnap.data();
+    return !!(userData.studentIdUrl && userData.studentIdUrl.trim() !== '');
+  } catch (error) {
+    console.error('学生証認証状態の確認エラー:', error);
+    return false;
+  }
+}; 
