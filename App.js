@@ -48,6 +48,7 @@ import CircleManagementDetailScreen from './screens/CircleManagementDetailScreen
 import CircleLeadershipTransferScreen from './screens/CircleLeadershipTransferScreen';
 import SubscriptionScreen from './screens/SubscriptionScreen';
 import ImageCropScreen from './screens/ImageCropScreen';
+import StudentIdCameraScreen from './screens/StudentIdCameraScreen';
 
 
 const AuthStack = createStackNavigator();
@@ -77,6 +78,7 @@ function HomeStackScreen() {
       <HomeStack.Screen name="Home" component={HomeScreen} />
       <HomeStack.Screen name="CircleDetail" component={CircleProfileScreen} />
       <HomeStack.Screen name="CircleMember" component={CircleMemberScreen} />
+      <HomeStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} />
       <HomeStack.Screen name="SearchResults" component={SearchResultsScreen} />
     </HomeStack.Navigator>
   );
@@ -145,6 +147,7 @@ function CircleManagementStackScreen() {
       <CircleManagementStack.Screen name="CircleLeadershipTransfer" component={CircleLeadershipTransferScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="Subscription" component={SubscriptionScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleMember" component={CircleMemberScreen} options={{ headerShown: false, gestureEnabled: true }} />
+      <CircleManagementStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} options={{ headerShown: false, gestureEnabled: true }} />
     </CircleManagementStack.Navigator>
   );
 }
@@ -249,6 +252,11 @@ function AppNavigator() {
           <RootStack.Screen 
             name="ImageCrop" 
             component={ImageCropScreen} 
+            options={{ headerShown: false }} 
+          />
+          <RootStack.Screen 
+            name="StudentIdCamera" 
+            component={StudentIdCameraScreen} 
             options={{ headerShown: false }} 
           />
         </>

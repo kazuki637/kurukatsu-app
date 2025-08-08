@@ -38,6 +38,15 @@ const getCropAreaConfig = (imageType) => {
       height: CROP_AREA_SIZE,
       borderRadius: CROP_AREA_SIZE / 2, // 円形
     };
+  } else if (imageType === 'studentId') {
+    // 学生証は1.6:1の比率
+    const width = CROP_AREA_SIZE;
+    const height = CROP_AREA_SIZE / 1.6;
+    return {
+      width,
+      height,
+      borderRadius: 0, // 角丸なし
+    };
   } else {
     // その他の画像は横長（16:9）
     const width = CROP_AREA_SIZE;

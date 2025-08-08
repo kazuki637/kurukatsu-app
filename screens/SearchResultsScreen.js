@@ -46,7 +46,7 @@ const SearchResultsScreen = ({ route, navigation }) => {
 
       {/* ヘッダー画像（サークル詳細画面のheaderImageUrl） */}
       {item.headerImageUrl && (
-        <Image source={{ uri: item.headerImageUrl }} style={styles.headerImageCard} resizeMode="cover" />
+                      <Image source={{ uri: item.headerImageUrl }} style={styles.headerImageCard} contentFit="cover" />
       )}
 
       {item.thumbnailImage && (

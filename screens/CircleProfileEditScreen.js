@@ -1818,7 +1818,7 @@ const styles = StyleSheet.create({
   snsLogoImage: {
     width: 32,
     height: 32,
-    resizeMode: 'contain',
+    contentFit: 'contain',
   },
   snsLargeRow: {
     flexDirection: 'row',
@@ -1845,7 +1845,7 @@ const styles = StyleSheet.create({
   snsLargeLogo: {
     width: 32,
     height: 32,
-    resizeMode: 'contain',
+    contentFit: 'contain',
   },
   // 横棒グラフ関連のスタイル
   barChartContainer: {

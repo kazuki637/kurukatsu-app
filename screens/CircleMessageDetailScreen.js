@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Modal, FlatList, Dimensions, Alert } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Modal, FlatList, Dimensions, Alert, ActivityIndicator } from 'react-native';
 import CommonHeader from '../components/CommonHeader';
 import { Ionicons } from '@expo/vector-icons';
 import { db } from '../firebaseConfig';
@@ -12,7 +12,7 @@ import { collection, setDoc, doc, serverTimestamp, getDocs, getDoc, addDoc, dele
 import { startTransition } from 'react';
 
 export default function CircleMessageDetailScreen({ route, navigation }) {
-  const { message } = route.params;
+  const { message, userUid } = route.params;
   const modalizeRef = useRef(null);
   const attendanceModalizeRef = useRef(null);
   const [modalType, setModalType] = useState('read'); // 'read' or 'unread'
@@ -32,6 +32,10 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
   // 回答状況確認用のstate
   const [attendanceUsers, setAttendanceUsers] = useState({ attending: [], absent: [], pending: [] });
   const [attendanceModalType, setAttendanceModalType] = useState('attending'); // 'attending', 'absent', 'pending'
+
+  // 送信者情報のstate
+  const [senderInfo, setSenderInfo] = useState(null);
+  const [loadingSender, setLoadingSender] = useState(true);
 
   // 回答期限が過ぎているかどうかを判定
   const isDeadlinePassed = () => {
@@ -314,6 +318,42 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
     return { readUsers, unreadUsers };
   };
 
+  // 送信者情報を取得する関数
+  const getSenderInfo = async (senderUid) => {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', senderUid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        return {
+          name: userData.name || userData.nickname || '不明',
+          profileImageUrl: userData.profileImageUrl || null
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching sender info:', error);
+    }
+    
+    return { name: '不明', profileImageUrl: null };
+  };
+
+  // 送信者情報を取得
+  useEffect(() => {
+    const fetchSenderInfo = async () => {
+      if (message.senderUid) {
+        const info = await getSenderInfo(message.senderUid);
+        setSenderInfo(info);
+      } else {
+        // フォールバック: 保存された情報を使用（既存データとの互換性）
+        setSenderInfo({
+          name: message.senderName || '不明',
+          profileImageUrl: message.senderProfileImageUrl || null
+        });
+      }
+      setLoadingSender(false);
+    };
+    fetchSenderInfo();
+  }, [message.senderUid]);
+
   useEffect(() => {
     const registerAndFetch = async () => {
       try {
@@ -445,12 +485,16 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
         </View>
         {/* 送信者アイコン＋氏名 */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
-          {message.senderProfileImageUrl ? (
-            <Image source={{ uri: message.senderProfileImageUrl }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }} />
+          {loadingSender ? (
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#e0e0e0', marginRight: 10, justifyContent: 'center', alignItems: 'center' }}>
+              <ActivityIndicator size="small" color="#007bff" />
+            </View>
+          ) : senderInfo?.profileImageUrl ? (
+            <Image source={{ uri: senderInfo.profileImageUrl }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }} />
           ) : (
             <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#ccc', marginRight: 10 }} />
           )}
-          <Text style={{ fontWeight: 'bold', fontSize: 18 }}>{message.senderName || '不明'}</Text>
+          <Text style={{ fontWeight: 'bold', fontSize: 18 }}>{senderInfo?.name || '不明'}</Text>
         </View>
         {/* 区切り線 */}
         <View style={{ height: 1, backgroundColor: '#e0e0e0', marginBottom: 35 }} />
