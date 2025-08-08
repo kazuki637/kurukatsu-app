@@ -24,7 +24,7 @@ export default function OnboardingScreen({ navigation, route, onFinish }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Image source={onboardingImages[page]} style={styles.bgImage} resizeMode="cover" />
+              <Image source={onboardingImages[page]} style={styles.bgImage} contentFit="cover" />
       <View style={styles.bottomBar}>
         <TouchableOpacity style={styles.mainButton} onPress={handleNext}>
           <Text style={styles.buttonText}>{page < 3 ? '次へ' : '新規登録・ログイン'}</Text>

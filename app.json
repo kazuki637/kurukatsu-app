@@ -9,7 +9,7 @@
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
+      "contentFit": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
@@ -40,6 +40,12 @@
         "expo-image-picker",
         {
           "photosPermission": "写真を選択するためにカメラロールへのアクセスが必要です。",
+          "cameraPermission": "写真を撮影するためにカメラへのアクセスが必要です。"
+        }
+      ],
+      [
+        "expo-camera",
+        {
           "cameraPermission": "写真を撮影するためにカメラへのアクセスが必要です。"
         }
       ]

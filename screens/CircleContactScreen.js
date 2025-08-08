@@ -139,9 +139,8 @@ export default function CircleContactScreen({ route, navigation }) {
       const senderDoc = await getDoc(doc(db, 'users', senderUid));
       const senderData = senderDoc.exists() ? senderDoc.data() : {};
       const senderName = senderData.name || senderData.nickname || '不明';
-      const senderProfileImageUrl = senderData.profileImageUrl || '';
       
-      // メッセージデータを準備
+      // メッセージデータを準備（プロフィール画像URLは保存しない）
       const messageData = {
         type: messageType,
         title,
@@ -151,7 +150,6 @@ export default function CircleContactScreen({ route, navigation }) {
         ...(messageType === 'attendance' ? { deadline: deadline.toISOString() } : {}),
         senderUid,
         senderName,
-        senderProfileImageUrl,
         recipientUids: selectedUids, // 宛先ユーザーIDを追加
       };
       

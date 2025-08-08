@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
   infoCardImage: {
     width: '100%',
     height: 160,
-    resizeMode: 'cover',
+    contentFit: 'cover',
   },
   infoCardContent: {
     padding: 15,
@@ -523,7 +523,7 @@ const styles = StyleSheet.create({
     width: 200,
     height: 200,
     alignSelf: 'center',
-    resizeMode: 'contain',
+    contentFit: 'contain',
     marginTop: -20,
     marginBottom: -20,
   },

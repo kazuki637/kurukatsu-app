@@ -256,7 +256,7 @@ export default function CircleProfileScreen({ route, navigation }) {
         <Image
           source={{ uri: circleData.activityImages[0] }}
           style={styles.activityImage}
-          resizeMode="cover"
+          contentFit="cover"
         />
       )}
 
@@ -407,7 +407,7 @@ export default function CircleProfileScreen({ route, navigation }) {
             <View key={idx} style={styles.eventCard}>
               <Text style={styles.eventTitle}>{event.title}</Text>
               {event.image && (
-                <Image source={{ uri: event.image }} style={styles.eventImage} resizeMode="cover" />
+                <Image source={{ uri: event.image }} style={styles.eventImage} contentFit="cover" />
               )}
               <Text style={styles.eventDetail}>{event.detail}</Text>
             </View>
@@ -648,11 +648,11 @@ const styles = StyleSheet.create({
   scrollViewContent: {
     paddingBottom: 20,
   },
-  headerImage: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-    resizeMode: 'cover',
-  },
+      headerImage: {
+      width: '100%',
+      aspectRatio: 16 / 9,
+      contentFit: 'cover',
+    },
   headerImageContainer: {
     width: '100%',
     aspectRatio: 16 / 9,
@@ -1047,7 +1047,7 @@ const styles = StyleSheet.create({
   snsLogoImage: {
     width: 32,
     height: 32,
-    resizeMode: 'contain',
+    contentFit: 'contain',
   },
   snsLargeRow: {
     flexDirection: 'row',
@@ -1074,7 +1074,7 @@ const styles = StyleSheet.create({
   snsLargeLogo: {
     width: 32,
     height: 32,
-    resizeMode: 'contain',
+    contentFit: 'contain',
   },
   // 横棒グラフ関連のスタイル
   barChartContainer: {

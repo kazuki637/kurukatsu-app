@@ -142,7 +142,7 @@ export default function CircleManagementScreen({ navigation }) {
                 <Image 
                   source={require('../assets/CircleManagement.png')} 
                   style={styles.circleManagementImage}
-                  resizeMode="contain"
+                  contentFit="contain"
                 />
               </View>
             </View>

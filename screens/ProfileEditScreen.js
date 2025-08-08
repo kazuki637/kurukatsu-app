@@ -5,7 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db, storage } from '../firebaseConfig';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, deleteObject, getMetadata } from 'firebase/storage';
 import { useNavigation, useRoute, CommonActions, useFocusEffect } from '@react-navigation/native';
 import CommonHeader from '../components/CommonHeader';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -36,6 +36,7 @@ export default function ProfileEditScreen(props) {
   // 学生証関連の状態
   const [studentIdImage, setStudentIdImage] = useState(null);
   const [studentIdUrl, setStudentIdUrl] = useState('');
+  const [isIdConfirmed, setIsIdConfirmed] = useState(false);
   
   // オートコンプリート用の状態
   const [universitySuggestions, setUniversitySuggestions] = useState([]);
@@ -87,51 +88,88 @@ export default function ProfileEditScreen(props) {
 
   useEffect(() => {
     if (!user) return;
-    const userDocRef = doc(db, 'users', user.uid);
-    getDoc(userDocRef).then((docSnap) => {
-      if (docSnap.exists()) {
-        const d = docSnap.data();
-        setName(d.name || '');
-        setUniversity(d.university || '');
-        setGrade(d.grade || '');
-        setGender(d.gender || '');
-        setBirthday(d.birthday ? new Date(d.birthday) : new Date(2000, 0, 1));
-        setProfileImageUrl(d.profileImageUrl || '');
-        setStudentIdUrl(d.studentIdUrl || '');
-        
-        // 元のデータを保存
-        setOriginalData({
-          name: d.name || '',
-          university: d.university || '',
-          grade: d.grade || '',
-          gender: d.gender || '',
-          birthday: d.birthday ? new Date(d.birthday) : new Date(2000, 0, 1),
-          profileImageUrl: d.profileImageUrl || '',
-          studentIdUrl: d.studentIdUrl || '',
-        });
-      } else {
-        // Firestoreにデータがなければ空欄のまま（setDocしない）
-        setName('');
-        setUniversity('');
-        setGrade('');
-        setGender('');
-        setBirthday(new Date(2000, 0, 1));
-        setProfileImageUrl('');
-        setStudentIdUrl('');
-        
-        // 元のデータを保存
-        setOriginalData({
-          name: '',
-          university: '',
-          grade: '',
-          gender: '',
-          birthday: new Date(2000, 0, 1),
-          profileImageUrl: '',
-          studentIdUrl: '',
-        });
+
+    const fetchUserData = async () => {
+      const userDocRef = doc(db, 'users', user.uid);
+      try {
+        const docSnap = await getDoc(userDocRef);
+        if (docSnap.exists()) {
+          const d = docSnap.data();
+          setName(d.name || '');
+          setUniversity(d.university || '');
+          setGrade(d.grade || '');
+          setGender(d.gender || '');
+          setBirthday(d.birthday ? new Date(d.birthday) : new Date(2000, 0, 1));
+          setProfileImageUrl(d.profileImageUrl || '');
+
+          // 学生証URLの有効性チェック
+          if (d.studentIdUrl) {
+            try {
+              const storageRef = ref(storage, d.studentIdUrl);
+              await getMetadata(storageRef); // ファイルが存在するかチェック
+              setStudentIdUrl(d.studentIdUrl);
+            } catch (error) {
+              if (error.code === 'storage/object-not-found') {
+                console.log('無効な学生証URLを検出。Firestoreから削除します。');
+                setStudentIdUrl(''); // 画面表示をリセット
+                await updateDoc(userDocRef, { studentIdUrl: '' }); // FirestoreからURLを削除
+              } else {
+                console.error('学生証画像のメタデータ取得エラー:', error);
+                setStudentIdUrl(''); // エラー時は非表示にする
+              }
+            }
+          } else {
+            setStudentIdUrl('');
+          }
+
+          // 元のデータを保存
+          setOriginalData({
+            name: d.name || '',
+            university: d.university || '',
+            grade: d.grade || '',
+            gender: d.gender || '',
+            birthday: d.birthday ? new Date(d.birthday) : new Date(2000, 0, 1),
+            profileImageUrl: d.profileImageUrl || '',
+            studentIdUrl: d.studentIdUrl || '',
+          });
+        } else {
+          // Firestoreにデータがなければ空欄のまま
+          setName('');
+          setUniversity('');
+          setGrade('');
+          setGender('');
+          setBirthday(new Date(2000, 0, 1));
+          setProfileImageUrl('');
+          setStudentIdUrl('');
+
+          // 元のデータを保存
+          setOriginalData({
+            name: '',
+            university: '',
+            grade: '',
+            gender: '',
+            birthday: new Date(2000, 0, 1),
+            profileImageUrl: '',
+            studentIdUrl: '',
+          });
+        }
+      } catch (error) {
+        console.error('ユーザーデータの取得エラー:', error);
       }
-    });
+    };
+
+    fetchUserData();
   }, [user]);
+
+  // カメラ画面から戻ってきた際の処理
+  useEffect(() => {
+    if (route.params?.studentIdImage && route.params?.fromCamera) {
+      setStudentIdImage(route.params.studentIdImage);
+      checkForChanges();
+      // パラメータをクリア
+      navigation.setParams({ studentIdImage: undefined, fromCamera: undefined });
+    }
+  }, [route.params?.studentIdImage, route.params?.fromCamera]);
 
   // 変更を検知する関数
   const checkForChanges = () => {
@@ -237,24 +275,13 @@ export default function ProfileEditScreen(props) {
 
   // 学生証撮影
   const handleStudentIdCapture = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('許可が必要です', '学生証を撮影するには、カメラへのアクセス許可が必要です。');
-      return;
-    }
-    
-    let result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [3, 2], // 学生証に適した長方形の比率
-      quality: 0.8,
+    // カスタムカメラ画面に遷移
+    navigation.navigate('StudentIdCamera', {
+      onPictureTaken: (uri) => {
+        setStudentIdImage(uri);
+        checkForChanges();
+      }
     });
-    
-    if (!result.canceled) {
-      const uri = result.assets[0].uri;
-      setStudentIdImage(uri);
-      checkForChanges();
-    }
   };
 
   // 学生証アップロード
@@ -272,6 +299,7 @@ export default function ProfileEditScreen(props) {
       
       setStudentIdUrl(downloadURL);
       setStudentIdImage(null);
+      setIsIdConfirmed(false); // アップロード完了時にリセット
       
       // Firestoreに保存
       await updateDoc(doc(db, 'users', user.uid), {
@@ -632,33 +660,52 @@ export default function ProfileEditScreen(props) {
                              <Text style={styles.label}>学生証認証<Text style={styles.required}>*</Text><Text style={styles.optional}>(スキップ可)</Text></Text>
               <View style={styles.studentIdContainer}>
                 {studentIdUrl ? (
-                  <View style={styles.studentIdImageContainer}>
-                    <Image source={{ uri: studentIdUrl }} style={styles.studentIdImage} />
-                    <TouchableOpacity
-                      onPress={handleDeleteStudentId}
-                      style={styles.deleteStudentIdButton}
-                    >
-                      <Ionicons name="trash-outline" size={20} color="#e74c3c" />
-                    </TouchableOpacity>
+                  <View style={styles.verifiedContainer}>
+                    <Ionicons name="checkmark-circle" size={24} color="#28a745" />
+                    <Text style={styles.verifiedText}>認証済み</Text>
                   </View>
                 ) : studentIdImage ? (
                   <View style={styles.studentIdPreviewContainer}>
                     <Image source={{ uri: studentIdImage }} style={styles.studentIdImage} />
+                    
+                    <View style={styles.confirmationBox}>
+                      <Text style={styles.confirmationTitle}>アップロード前の最終確認</Text>
+                      <View style={styles.confirmationList}>
+                        <Text style={styles.confirmationListItem}>・氏名、大学名、生年月日が鮮明に写っている</Text>
+                        <Text style={styles.confirmationListItem}>・画像に加工や修正、隠蔽がされていない</Text>
+                        <Text style={styles.confirmationListItem}>・入力したプロフィール情報と記載内容が一致している</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.finalConfirmationRow}
+                        onPress={() => setIsIdConfirmed(!isIdConfirmed)}
+                      >
+                        <Ionicons
+                          name={isIdConfirmed ? 'checkbox' : 'square-outline'}
+                          size={24}
+                          color={isIdConfirmed ? '#007bff' : '#ccc'}
+                        />
+                        <Text style={styles.finalConfirmationText}>上記全ての項目を確認し、同意します</Text>
+                      </TouchableOpacity>
+                    </View>
+
                     <View style={styles.studentIdPreviewButtons}>
                       <TouchableOpacity
+                        onPress={() => {
+                          setStudentIdImage(null);
+                          setIsIdConfirmed(false); // キャンセル時にリセット
+                        }}
+                        style={styles.cancelStudentIdButton}
+                      >
+                        <Text style={styles.cancelStudentIdButtonText}>キャンセル</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
                         onPress={handleStudentIdUpload}
-                        style={styles.uploadStudentIdButton}
-                        disabled={loading}
+                        style={[styles.uploadStudentIdButton, (!isIdConfirmed || loading) && styles.disabledButton]}
+                        disabled={!isIdConfirmed || loading}
                       >
                         <Text style={styles.uploadStudentIdButtonText}>
                           {loading ? 'アップロード中...' : 'アップロード'}
                         </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => setStudentIdImage(null)}
-                        style={styles.cancelStudentIdButton}
-                      >
-                        <Text style={styles.cancelStudentIdButtonText}>キャンセル</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -746,7 +793,7 @@ const styles = StyleSheet.create({
   // 学生証関連のスタイル
   studentIdContainer: { marginTop: 4 },
   studentIdImageContainer: { position: 'relative' },
-  studentIdImage: { width: '100%', height: 200, borderRadius: 8, resizeMode: 'contain' },
+      studentIdImage: { width: '100%', aspectRatio: 1.6, borderRadius: 8, contentFit: 'cover' },
   deleteStudentIdButton: { 
     position: 'absolute', 
     top: 8, 
@@ -767,7 +814,7 @@ const styles = StyleSheet.create({
     padding: 12, 
     borderRadius: 8, 
     alignItems: 'center', 
-    marginRight: 8 
+    marginLeft: 8 
   },
   uploadStudentIdButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   cancelStudentIdButton: { 
@@ -776,9 +823,46 @@ const styles = StyleSheet.create({
     padding: 12, 
     borderRadius: 8, 
     alignItems: 'center', 
-    marginLeft: 8 
+    marginRight: 8 
   },
   cancelStudentIdButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  confirmationBox: {
+    marginTop: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    backgroundColor: '#f9f9f9',
+  },
+  confirmationTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#333',
+  },
+  confirmationList: {
+    marginBottom: 16,
+  },
+  confirmationListItem: {
+    fontSize: 14,
+    color: '#555',
+    marginBottom: 8,
+  },
+  finalConfirmationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  finalConfirmationText: {
+    marginLeft: 8,
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 1,
+  },
+  disabledButton: {
+    backgroundColor: '#a0c8f0', // 無効時の色
+  },
   captureStudentIdButton: { 
     flexDirection: 'row', 
     alignItems: 'center', 
@@ -795,6 +879,22 @@ const styles = StyleSheet.create({
     fontSize: 16, 
     fontWeight: 'bold', 
     marginLeft: 8 
+  },
+  verifiedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#28a745',
+    borderRadius: 8,
+    padding: 20,
+    backgroundColor: '#f0fff4'
+  },
+  verifiedText: {
+    color: '#28a745',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8
   },
   required: {
     color: '#e74c3c',

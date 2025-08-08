@@ -289,6 +289,33 @@ export default function CircleMemberScreen({ route, navigation }) {
   const [memberSearchText, setMemberSearchText] = useState('');
   const [leaveModalVisible, setLeaveModalVisible] = useState(false);
 
+  // 送信者情報のキャッシュ
+  const [senderCache, setSenderCache] = useState({});
+
+  // 送信者情報を取得する関数
+  const getSenderInfo = async (senderUid) => {
+    if (senderCache[senderUid]) {
+      return senderCache[senderUid];
+    }
+
+    try {
+      const userDoc = await getDoc(doc(db, 'users', senderUid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const senderInfo = {
+          name: userData.name || userData.nickname || '不明',
+          profileImageUrl: userData.profileImageUrl || null
+        };
+        setSenderCache(prev => ({ ...prev, [senderUid]: senderInfo }));
+        return senderInfo;
+      }
+    } catch (error) {
+      console.error('Error fetching sender info:', error);
+    }
+    
+    return { name: '不明', profileImageUrl: null };
+  };
+
   useEffect(() => {
     const fetchCircle = async () => {
       if (circleId) {
@@ -315,7 +342,31 @@ export default function CircleMemberScreen({ route, navigation }) {
           orderBy('sentAt', 'desc')
         );
         const snap = await getDocs(q);
-        setMessages(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        const messagesData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // 送信者情報を事前に取得
+        const messagesWithSenderInfo = await Promise.all(
+          messagesData.map(async (message) => {
+            if (message.senderUid) {
+              const senderInfo = await getSenderInfo(message.senderUid);
+              return {
+                ...message,
+                senderInfo
+              };
+            } else {
+              // フォールバック: 保存された情報を使用
+              return {
+                ...message,
+                senderInfo: {
+                  name: message.senderName || '不明',
+                  profileImageUrl: message.senderProfileImageUrl || null
+                }
+              };
+            }
+          })
+        );
+        
+        setMessages(messagesWithSenderInfo);
       } catch (e) {
         setMessages([]);
       } finally {
@@ -603,7 +654,9 @@ export default function CircleMemberScreen({ route, navigation }) {
                 data={messages}
                 keyExtractor={item => item.id}
                 renderItem={({ item }) => {
-                  const hasImage = item.senderProfileImageUrl && item.senderProfileImageUrl.trim() !== '' && !imageErrorMap[item.id];
+                  const senderInfo = item.senderInfo;
+                  const hasImage = senderInfo?.profileImageUrl && senderInfo.profileImageUrl.trim() !== '' && !imageErrorMap[item.id];
+                  
                   return (
                     <TouchableOpacity
                       activeOpacity={0.7}
@@ -635,7 +688,7 @@ export default function CircleMemberScreen({ route, navigation }) {
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         {hasImage ? (
                           <Image
-                            source={{ uri: item.senderProfileImageUrl }}
+                            source={{ uri: senderInfo.profileImageUrl }}
                             style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }}
                             onError={() => setImageErrorMap(prev => ({ ...prev, [item.id]: true }))}
                           />
@@ -644,7 +697,7 @@ export default function CircleMemberScreen({ route, navigation }) {
                             <Ionicons name="person-outline" size={22} color="#aaa" />
                           </View>
                         )}
-                        <Text style={{ fontWeight: 'bold', fontSize: 18 }}>{item.senderName || '不明'}</Text>
+                        <Text style={{ fontWeight: 'bold', fontSize: 18 }}>{senderInfo?.name || '不明'}</Text>
                       </View>
                     </TouchableOpacity>
                   );
