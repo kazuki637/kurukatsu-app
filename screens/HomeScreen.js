@@ -507,25 +507,28 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     alignItems: 'center',
-    paddingVertical: 0,
-    paddingTop: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
   },
   emptyText: {
     fontSize: 16,
     color: '#666',
     marginBottom: 8,
+    textAlign: 'center',
   },
   emptySubText: {
     fontSize: 14,
     color: '#999',
+    textAlign: 'center',
+    marginBottom: 0,
   },
   emptyImage: {
-    width: 200,
-    height: 200,
+    width: 180,
+    height: 180,
     alignSelf: 'center',
-    contentFit: 'contain',
-    marginTop: -20,
-    marginBottom: -20,
+    resizeMode: 'contain',
+    marginTop: -5,
+    marginBottom: 10,
   },
 });
 

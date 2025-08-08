@@ -7,7 +7,7 @@ import { collection, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore
 import { onAuthStateChanged } from 'firebase/auth';
 import { useNavigation } from '@react-navigation/native';
 import CommonHeader from '../components/CommonHeader';
-import { getUserRole } from '../utils/permissionUtils';
+import { getUserRole, checkStudentIdVerification } from '../utils/permissionUtils';
 
 export default function CircleManagementScreen({ navigation }) {
   const [user, setUser] = useState(null);
@@ -69,7 +69,29 @@ export default function CircleManagementScreen({ navigation }) {
     return () => unsubscribe();
   }, [user?.uid]);
 
-  const handleRegisterCirclePress = () => {
+  const handleRegisterCirclePress = async () => {
+    if (!user) {
+      Alert.alert('ログインが必要です', 'サークル登録にはログインが必要です。');
+      return;
+    }
+
+    // 学生証認証状態を確認
+    const isStudentIdVerified = await checkStudentIdVerification(user.uid);
+    if (!isStudentIdVerified) {
+      Alert.alert(
+        '学生証認証が必要です',
+        'サークル登録には学生証の認証が必要です。\nプロフィール編集画面で学生証を認証してください。',
+        [
+          { text: 'キャンセル', style: 'cancel' },
+          { 
+            text: 'プロフィール編集へ', 
+            onPress: () => navigation.navigate('ProfileEdit')
+          }
+        ]
+      );
+      return;
+    }
+
     setModalVisible(true);
   };
 
