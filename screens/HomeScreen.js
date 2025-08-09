@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, TextInput } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, TextInput, ActivityIndicator } from 'react-native';
 import CommonHeader from '../components/CommonHeader';
 import { Ionicons } from '@expo/vector-icons';
-import { auth, db } from '../firebaseConfig';
-import { collection, query, where, getDocs, getDoc, doc } from 'firebase/firestore';
+import { auth, db, storage } from '../firebaseConfig';
+import { collection, query, where, getDocs, getDoc, doc, orderBy, limit } from 'firebase/firestore';
+import { ref, getDownloadURL } from 'firebase/storage';
 import { useFocusEffect } from '@react-navigation/native';
 
 const HomeScreen = ({ navigation }) => {
@@ -12,6 +13,10 @@ const HomeScreen = ({ navigation }) => {
   const [userUniversity, setUserUniversity] = useState('');
   const [popularCircles, setPopularCircles] = useState([]);
   const [searchText, setSearchText] = useState('');
+  const [articles, setArticles] = useState([]);
+  const [articlesLoading, setArticlesLoading] = useState(true);
+  const [articlesInitialized, setArticlesInitialized] = useState(false);
+  const articlesCache = useRef(new Map());
 
   useFocusEffect(
     React.useCallback(() => {
@@ -67,6 +72,73 @@ const HomeScreen = ({ navigation }) => {
       fetchUserData();
     }, [])
   );
+
+  // 記事データを取得する共通関数
+  const fetchArticlesData = async () => {
+    try {
+      setArticlesLoading(true);
+      
+      // Firestoreから記事データを取得（最新順）
+      const articlesRef = collection(db, 'articles');
+      const articlesQuery = query(articlesRef, orderBy('createdAt', 'desc'), limit(10));
+      const articlesSnapshot = await getDocs(articlesQuery);
+      
+      const articlesData = [];
+      
+      for (const articleDoc of articlesSnapshot.docs) {
+        const articleData = { id: articleDoc.id, ...articleDoc.data() };
+        
+        // キャッシュからサムネイルURLを取得、なければ新規取得
+        let thumbnailUrl = articlesCache.current.get(articleData.id);
+        if (!thumbnailUrl && articleData.title) {
+          try {
+            const thumbnailRef = ref(storage, `articles/${articleData.title}/header`);
+            thumbnailUrl = await getDownloadURL(thumbnailRef);
+            // キャッシュに保存
+            articlesCache.current.set(articleData.id, thumbnailUrl);
+          } catch (error) {
+            console.log(`記事 ${articleData.title} のサムネイル画像が見つかりません:`, error);
+            thumbnailUrl = 'https://picsum.photos/300/200?random=1';
+            // エラー時もキャッシュに保存（デフォルト画像）
+            articlesCache.current.set(articleData.id, thumbnailUrl);
+          }
+        }
+        
+        articlesData.push({
+          ...articleData,
+          thumbnailUrl: thumbnailUrl || 'https://picsum.photos/300/200?random=1'
+        });
+      }
+      
+      setArticles(articlesData);
+      setArticlesInitialized(true);
+    } catch (error) {
+      console.error("Error fetching articles: ", error);
+      setArticles([]);
+    } finally {
+      setArticlesLoading(false);
+    }
+  };
+
+  // 記事データを取得（最適化版）
+  useFocusEffect(
+    React.useCallback(() => {
+      // 既に記事が読み込まれている場合は再読み込みしない
+      if (articlesInitialized && articles.length > 0) {
+        setArticlesLoading(false);
+        return;
+      }
+
+      fetchArticlesData();
+    }, [articlesInitialized, articles.length])
+  );
+
+  // 記事データの初期化（初回のみ）
+  useEffect(() => {
+    if (!articlesInitialized) {
+      fetchArticlesData();
+    }
+  }, [articlesInitialized]);
 
   // 大学別の人気サークルを取得する関数
   const fetchPopularCirclesByUniversity = async (university) => {
@@ -134,81 +206,54 @@ const HomeScreen = ({ navigation }) => {
             />
           </View>
 
-          {/* 情報カード（横スクロール） */}
+          {/* 記事カード（横スクロール） */}
           <View style={styles.infoCardsContainer}>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.infoCardsScrollContainer}
-              pagingEnabled={true}
-              snapToInterval={295}
-              decelerationRate={0}
-              snapToAlignment="center"
-              scrollEventThrottle={16}
-            >
-              <TouchableOpacity style={styles.infoCard}>
-                <Image 
-                  source={{ uri: 'https://picsum.photos/300/200?random=1' }} 
-                  style={styles.infoCardImage}
-                />
-                <View style={styles.infoCardContent}>
-                  <Text style={styles.infoCardTitle}>クルカツ新機能</Text>
-                  <Text style={styles.infoCardSubtitle}>サークル管理機能</Text>
-                  <Text style={styles.infoCardDate}>2024年12月</Text>
-                </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.infoCard}>
-                <Image 
-                  source={{ uri: 'https://picsum.photos/300/200?random=2' }} 
-                  style={styles.infoCardImage}
-                />
-                <View style={styles.infoCardContent}>
-                  <Text style={styles.infoCardTitle}>学生向けイベント</Text>
-                  <Text style={styles.infoCardSubtitle}>キャリア支援セミナー</Text>
-                  <Text style={styles.infoCardDate}>2024年12月</Text>
-                </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.infoCard}>
-                <Image 
-                  source={{ uri: 'https://picsum.photos/300/200?random=3' }} 
-                  style={styles.infoCardImage}
-                />
-                <View style={styles.infoCardContent}>
-                  <Text style={styles.infoCardTitle}>サークル紹介</Text>
-                  <Text style={styles.infoCardSubtitle}>人気サークル特集</Text>
-                  <Text style={styles.infoCardDate}>2024年12月</Text>
-                </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.infoCard}>
-                <Image 
-                  source={{ uri: 'https://picsum.photos/300/200?random=4' }} 
-                  style={styles.infoCardImage}
-                />
-                <View style={styles.infoCardContent}>
-                  <Text style={styles.infoCardTitle}>キャリア支援</Text>
-                  <Text style={styles.infoCardSubtitle}>就職活動サポート</Text>
-                  <Text style={styles.infoCardDate}>2024年12月</Text>
-                </View>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.infoCard}>
-                <Image 
-                  source={{ uri: 'https://picsum.photos/300/200?random=5' }} 
-                  style={styles.infoCardImage}
-                />
-                <View style={styles.infoCardContent}>
-                  <Text style={styles.infoCardTitle}>大学イベント</Text>
-                  <Text style={styles.infoCardSubtitle}>学園祭情報</Text>
-                  <Text style={styles.infoCardDate}>2024年12月</Text>
-                </View>
-              </TouchableOpacity>
-            </ScrollView>
+            {articlesLoading && articles.length === 0 ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#999" />
+              </View>
+            ) : articles.length > 0 ? (
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.infoCardsScrollContainer}
+                pagingEnabled={true}
+                snapToInterval={295}
+                decelerationRate={0}
+                snapToAlignment="center"
+                scrollEventThrottle={16}
+              >
+                {articles.map((article) => (
+                  <TouchableOpacity 
+                    key={article.id}
+                    style={styles.infoCard}
+                    onPress={() => navigation.navigate('ArticleDetail', { articleId: article.id })}
+                  >
+                    <Image 
+                      source={{ uri: article.thumbnailUrl || 'https://picsum.photos/300/200?random=1' }} 
+                      style={styles.infoCardImage}
+                      defaultSource={require('../assets/pictures/1.png')}
+                      resizeMode="cover"
+                      fadeDuration={300}
+                    />
+                    <View style={styles.infoCardContent}>
+                      <Text style={styles.infoCardTitle} numberOfLines={2}>{article.title}</Text>
+                      {article.subtitle && (
+                        <Text style={styles.infoCardSubtitle} numberOfLines={1}>{article.subtitle}</Text>
+                      )}
+                      {article.date && (
+                        <Text style={styles.infoCardDate}>{article.date}</Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>記事がありません</Text>
+              </View>
+            )}
           </View>
-
-
 
           {/* 所属しているサークル */}
           <View style={styles.sectionContainer}>
@@ -216,7 +261,7 @@ const HomeScreen = ({ navigation }) => {
             <View style={styles.favoriteCirclesContainer}>
               {loading ? (
                 <View style={styles.loadingContainer}>
-                  <Text style={styles.loadingText}>読み込み中...</Text>
+                  <ActivityIndicator size="small" color="#999" />
                 </View>
               ) : userCircles.length > 0 ? (
                 userCircles.map((circle, index) => (
@@ -226,10 +271,13 @@ const HomeScreen = ({ navigation }) => {
                     onPress={() => navigation.navigate('CircleMember', { circleId: circle.id })}
                   >
                     <View style={styles.circleCard}>
-                      <Image 
-                        source={{ uri: circle.imageUrl || 'https://via.placeholder.com/60' }} 
-                        style={styles.circleImage}
-                      />
+                      {circle.imageUrl ? (
+                        <Image source={{ uri: circle.imageUrl }} style={styles.circleImage} />
+                      ) : (
+                        <View style={[styles.circleImage, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
+                          <Ionicons name="people-outline" size={40} color="#aaa" />
+                        </View>
+                      )}
                       <View style={styles.circleInfo}>
                         <Text style={styles.circleCategory}>サークル | {circle.genre || 'その他'}</Text>
                         <Text style={styles.circleName}>{circle.name}</Text>
@@ -272,10 +320,13 @@ const HomeScreen = ({ navigation }) => {
                     style={styles.popularCircleCard}
                     onPress={() => navigation.navigate('CircleDetail', { circleId: circle.id })}
                   >
-                    <Image 
-                      source={{ uri: circle.imageUrl || 'https://via.placeholder.com/80' }} 
-                      style={styles.popularCircleImage}
-                    />
+                    {circle.imageUrl ? (
+                      <Image source={{ uri: circle.imageUrl }} style={styles.popularCircleImage} />
+                    ) : (
+                      <View style={[styles.popularCircleImage, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
+                        <Ionicons name="people-outline" size={40} color="#aaa" />
+                      </View>
+                    )}
                     <Text style={styles.popularCircleName}>{circle.name}</Text>
                   </TouchableOpacity>
                 ))}
@@ -338,11 +389,12 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     overflow: 'hidden',
+    minHeight: 200,
   },
   infoCardImage: {
     width: '100%',
     height: 160,
-    contentFit: 'cover',
+    backgroundColor: '#f0f0f0',
   },
   infoCardContent: {
     padding: 15,
@@ -500,10 +552,13 @@ const styles = StyleSheet.create({
   loadingContainer: {
     alignItems: 'center',
     paddingVertical: 20,
+    minHeight: 200,
+    justifyContent: 'center',
   },
   loadingText: {
     fontSize: 14,
     color: '#666',
+    marginTop: 8,
   },
   emptyContainer: {
     alignItems: 'center',

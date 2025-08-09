@@ -518,7 +518,7 @@ export default function CircleProfileScreen({ route, navigation }) {
   if (loading && !circleData) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#007bff" />
+        <ActivityIndicator size="small" color="#999" />
       </View>
     );
   }

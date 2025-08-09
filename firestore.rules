@@ -20,11 +20,23 @@ service cloud.firestore {
       }
     }
 
+    // 記事情報
+    match /articles/{articleId} {
+      allow read, write: if true; // 誰でも記事を読み書きできる
+    }
+
     // サークル情報
     match /circles/{circleId} {
       allow read: if true;
       allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && 
+      allow update: if request.auth != null && 
+        (resource.data.createdBy == request.auth.uid || 
+         exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)).data.role in ['leader', 'admin'] ||
+         // いいね機能のため、認証済みユーザーによるlikesフィールドの更新を許可
+         (request.auth != null && 
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes'])));
+      allow delete: if request.auth != null && 
         (resource.data.createdBy == request.auth.uid || 
          exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)) &&
          get(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)).data.role in ['leader', 'admin']);
@@ -90,4 +102,4 @@ service cloud.firestore {
       }
     }
   }
-} ｓ
+} 

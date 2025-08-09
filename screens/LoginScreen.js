@@ -59,7 +59,7 @@ const LoginScreen = ({ navigation }) => {
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator size="small" color="#fff" />
           ) : (
             <Text style={styles.loginButtonText}>ログイン</Text>
           )}

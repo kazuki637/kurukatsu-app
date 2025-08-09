@@ -49,6 +49,7 @@ import CircleLeadershipTransferScreen from './screens/CircleLeadershipTransferSc
 import SubscriptionScreen from './screens/SubscriptionScreen';
 import ImageCropScreen from './screens/ImageCropScreen';
 import StudentIdCameraScreen from './screens/StudentIdCameraScreen';
+import ArticleDetailScreen from './screens/ArticleDetailScreen';
 
 
 const AuthStack = createStackNavigator();
@@ -80,6 +81,7 @@ function HomeStackScreen() {
       <HomeStack.Screen name="CircleMember" component={CircleMemberScreen} />
       <HomeStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} />
       <HomeStack.Screen name="SearchResults" component={SearchResultsScreen} />
+      <HomeStack.Screen name="ArticleDetail" component={ArticleDetailScreen} />
     </HomeStack.Navigator>
   );
 }

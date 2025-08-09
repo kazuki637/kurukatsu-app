@@ -377,8 +377,7 @@ const ImageCropScreen = ({ route, navigation }) => {
       >
         {processing ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#007AFF" />
-            <Text style={styles.loadingText}>画像を処理中...</Text>
+            <ActivityIndicator size="small" color="#999" />
           </View>
         ) : selectedImage ? (
           <View style={styles.imageWrapper}>

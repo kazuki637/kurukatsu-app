@@ -100,6 +100,73 @@ const generateDummyData = async (count) => {
   }
 };
 
+// 記事データのサンプル
+const sampleArticles = [
+  {
+    id: 'article1',
+    title: 'クルカツ新機能',
+    subtitle: 'サークル管理機能',
+    date: '2024年12月',
+    createdAt: new Date('2024-12-01'),
+    paragraph1: 'クルカツに新しいサークル管理機能が追加されました。',
+    paragraph2: 'この機能により、サークルの運営がより簡単になりました。',
+    paragraph3: '主な機能：\n• メンバー管理\n• スケジュール管理\n• 連絡機能\n• 設定管理',
+    paragraph4: 'これらの機能を活用して、より良いサークル運営を目指しましょう。',
+    imageFiles: ['image1.jpg', 'image2.jpg']
+  },
+  {
+    id: 'article2',
+    title: '学生向けイベント',
+    subtitle: 'キャリア支援セミナー',
+    date: '2024年12月',
+    createdAt: new Date('2024-12-02'),
+    paragraph1: '学生向けキャリア支援セミナーを開催いたします。',
+    paragraph2: 'このセミナーでは、就職活動に役立つ情報を提供します。',
+    paragraph3: 'セミナー内容：\n• 就職活動の流れ\n• エントリーシートの書き方\n• 面接対策\n• 企業研究の方法',
+    paragraph4: '参加費は無料です。多くの学生の参加をお待ちしています。',
+    imageFiles: ['seminar1.jpg', 'seminar2.jpg']
+  },
+  {
+    id: 'article3',
+    title: 'サークル紹介',
+    subtitle: '人気サークル特集',
+    date: '2024年12月',
+    createdAt: new Date('2024-12-03'),
+    paragraph1: '今月の人気サークル特集をお届けします。',
+    paragraph2: '様々なジャンルのサークルを紹介しています。',
+    paragraph3: '特集サークル：\n• 運動系サークル\n• 文化系サークル\n• 音楽系サークル\n• ボランティア系サークル',
+    paragraph4: 'これらのサークルに興味がある方は、ぜひ参加してみてください。',
+    imageFiles: ['circle1.jpg', 'circle2.jpg']
+  }
+];
+
+// 記事データをFirestoreに追加する関数（管理者用）
+const addSampleArticles = async () => {
+  const { db } = require('./firebaseConfig');
+  const { collection, addDoc, serverTimestamp } = require('firebase/firestore');
+  
+  for (const article of sampleArticles) {
+    try {
+      await addDoc(collection(db, 'articles'), {
+        title: article.title,
+        subtitle: article.subtitle,
+        date: article.date,
+        createdAt: serverTimestamp(),
+        paragraph1: article.paragraph1,
+        paragraph2: article.paragraph2,
+        paragraph3: article.paragraph3,
+        paragraph4: article.paragraph4,
+        imageFiles: article.imageFiles
+      });
+      console.log(`記事 "${article.title}" を追加しました`);
+    } catch (error) {
+      console.error(`記事 "${article.title}" の追加に失敗:`, error);
+    }
+  }
+};
+
+module.exports = { addSampleArticles };
+
 // --- Execution ---
 const DUMMY_DATA_COUNT = 500; // 作成したいダミーデータの件数
 generateDummyData(DUMMY_DATA_COUNT);

@@ -117,7 +117,7 @@ export default function MyPageScreen({ navigation, route }) {
         <CommonHeader title="マイページ" />
         <SafeAreaView style={{ flex: 1 }}>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#007bff" />
+            <ActivityIndicator size="small" color="#999" style={{ marginTop: 10 }} />
           </View>
         </SafeAreaView>
       </View>
@@ -200,10 +200,13 @@ export default function MyPageScreen({ navigation, route }) {
                   onPress={() => navigation.navigate('CircleMember', { circleId: circle.id })}
                 >
                   <View style={styles.circleCard}>
-                    <Image 
-                      source={{ uri: circle.imageUrl || 'https://via.placeholder.com/60' }} 
-                      style={styles.circleImage}
-                    />
+                    {circle.imageUrl ? (
+                      <Image source={{ uri: circle.imageUrl }} style={styles.circleImage} />
+                    ) : (
+                      <View style={[styles.circleImage, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
+                        <Ionicons name="people-outline" size={40} color="#aaa" />
+                      </View>
+                    )}
                     <View style={styles.circleInfo}>
                       <Text style={styles.circleCategory}>サークル | {circle.genre || 'その他'}</Text>
                       <Text style={styles.circleName}>{circle.name}</Text>
@@ -237,10 +240,13 @@ export default function MyPageScreen({ navigation, route }) {
                     style={styles.popularCircleCard}
                     onPress={() => navigation.navigate('CircleDetail', { circleId: circle.id })}
                   >
-                    <Image 
-                      source={{ uri: circle.imageUrl || 'https://via.placeholder.com/80' }} 
-                      style={styles.popularCircleImage}
-                    />
+                    {circle.imageUrl ? (
+                      <Image source={{ uri: circle.imageUrl }} style={styles.popularCircleImage} />
+                    ) : (
+                      <View style={[styles.popularCircleImage, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
+                        <Ionicons name="people-outline" size={40} color="#aaa" />
+                      </View>
+                    )}
                     <Text style={styles.popularCircleName}>{circle.name}</Text>
                   </TouchableOpacity>
                 ))}

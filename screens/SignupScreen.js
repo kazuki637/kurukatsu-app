@@ -117,7 +117,7 @@ const SignupScreen = ({ navigation }) => {
           disabled={loading || !email || !password || !confirmPassword}
         >
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator size="small" color="#fff" />
           ) : (
             <Text style={styles.registerButtonText}>登録</Text>
           )}
