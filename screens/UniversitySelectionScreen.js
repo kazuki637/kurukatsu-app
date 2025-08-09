@@ -98,7 +98,7 @@ const UniversitySelectionScreen = ({ route, navigation }) => {
         </View>
 
         {loadingUniversities ? (
-          <ActivityIndicator size="large" color="#007bff" style={styles.loadingIndicator} />
+          <ActivityIndicator size="small" color="#999" style={styles.loadingIndicator} />
         ) : (
           <FlatList
             data={filteredUniversities}

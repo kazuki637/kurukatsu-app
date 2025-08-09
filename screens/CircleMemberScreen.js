@@ -568,7 +568,7 @@ export default function CircleMemberScreen({ route, navigation }) {
         return (
           <ScrollView style={styles.tabContent} showsVerticalScrollIndicator={false}>
             {eventsLoading ? (
-              <ActivityIndicator size="large" color="#007bff" style={{ marginTop: 40 }} />
+              <ActivityIndicator size="small" color="#999" style={{ marginTop: 40 }} />
             ) : (
               <>
                 <Calendar
@@ -646,7 +646,7 @@ export default function CircleMemberScreen({ route, navigation }) {
         return (
           <View style={[styles.tabContent, { justifyContent: 'flex-start', alignItems: 'stretch', padding: 16 }]}>
             {messagesLoading ? (
-              <ActivityIndicator size="large" color="#007bff" style={{ marginTop: 40 }} />
+              <ActivityIndicator size="small" color="#999" style={{ marginTop: 40 }} />
             ) : messages.length === 0 ? (
               <Text style={{ color: '#888', textAlign: 'center', marginTop: 40 }}>お知らせはありません</Text>
             ) : (
@@ -727,7 +727,7 @@ export default function CircleMemberScreen({ route, navigation }) {
               </Text>
             )}
             {membersLoading ? (
-              <ActivityIndicator size="large" color="#007bff" style={{ marginTop: 40 }} />
+              <ActivityIndicator size="small" color="#999" style={{ marginTop: 40 }} />
             ) : (
               <FlatList
                 data={filteredMembers}

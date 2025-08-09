@@ -35,8 +35,12 @@ const SearchResultsScreen = ({ route, navigation }) => {
       onPress={() => navigation.navigate('CircleDetail', { circleId: item.id })}
     >
       <View style={styles.headerContainer}>
-        {item.imageUrl && (
+        {item.imageUrl ? (
           <Image source={{ uri: item.imageUrl }} style={styles.accountImage} />
+        ) : (
+          <View style={[styles.accountImage, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
+            <Ionicons name="people-outline" size={40} color="#aaa" />
+          </View>
         )}
         <View style={styles.headerTextContainer}>
           <Text style={styles.resultTitle}>{item.name}</Text>

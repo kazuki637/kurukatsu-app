@@ -117,7 +117,7 @@ export default function CircleManagementScreen({ navigation }) {
       </View>
       <SafeAreaView style={styles.contentSafeArea}>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#007bff" />
+            <ActivityIndicator size="small" color="#007bff" />
           </View>
         </SafeAreaView>
       </LinearGradient>
@@ -160,6 +160,9 @@ export default function CircleManagementScreen({ navigation }) {
                 <Text style={styles.cardTitle}>サークルの管理ができる！</Text>
                 <Text style={styles.cardSubtitle}>
                   {`メンバーの管理やイベントの企画など\nあなたのサークル運営をサポートします`}
+                </Text>
+                <Text style={styles.cardNote}>
+                  ※これはサークル代表者向けの機能です
                 </Text>
                 <Image 
                   source={require('../assets/CircleManagement.png')} 
@@ -365,7 +368,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 100,
+    marginTop: 0,
   },
   card: {
     width: '95%',
@@ -393,6 +396,14 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginBottom: 0,
+  },
+  cardNote: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 16,
+    fontStyle: 'italic',
   },
   circleManagementImage: {
     width: '100%',

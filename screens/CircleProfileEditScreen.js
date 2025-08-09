@@ -872,7 +872,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           // 画像がない場合は追加ボタンのみ
           <TouchableOpacity onPress={handleAddActivityImage} disabled={activityUploading} style={{width: '100%', aspectRatio: 16/9, borderRadius: 0, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center', marginBottom: 20, alignSelf: 'center'}}>
             {activityUploading ? (
-              <ActivityIndicator size="large" color="#007bff" />
+              <ActivityIndicator size="small" color="#999" />
             ) : (
               <Ionicons name="camera-outline" size={48} color="#aaa" />
             )}
@@ -1281,7 +1281,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   if (loading && !circleData) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#007bff" />
+        <ActivityIndicator size="small" color="#999" />
       </View>
     );
   }
@@ -1320,7 +1320,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           <TouchableOpacity style={styles.headerImageContainer} onPress={handleHeaderImagePress} activeOpacity={0.7}>
             {uploading ? (
               <View style={styles.headerImagePlaceholder}>
-                <ActivityIndicator size="large" color="#007bff" />
+                <ActivityIndicator size="small" color="#999" />
               </View>
             ) : circleData.headerImageUrl ? (
               <>

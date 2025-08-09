@@ -291,7 +291,7 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
   const canManageRoles = currentUserRole === 'leader';
 
   if (loading) {
-    return <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator size="large" color="#007bff" /></View>;
+    return <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator size="small" color="#999" /></View>;
   }
 
   return (

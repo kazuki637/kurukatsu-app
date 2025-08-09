@@ -85,8 +85,7 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
         </View>
         <SafeAreaView style={styles.contentSafeArea}>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#fff" />
-            <Text style={{ color: '#fff', marginTop: 10 }}>サークル情報を読み込み中...</Text>
+            <ActivityIndicator size="small" color="#fff" />
           </View>
         </SafeAreaView>
       </LinearGradient>
@@ -184,7 +183,9 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
               {circleData.imageUrl ? (
                 <Image source={{ uri: circleData.imageUrl }} style={styles.circleImageLarge} />
               ) : (
-                <Ionicons name="image-outline" size={64} color="#ccc" />
+                <View style={[styles.circleImageLarge, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
+                  <Ionicons name="people-outline" size={64} color="#aaa" />
+                </View>
               )}
             </View>
             <View style={styles.circleInfoTextCol}>

@@ -487,7 +487,7 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
           {loadingSender ? (
             <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#e0e0e0', marginRight: 10, justifyContent: 'center', alignItems: 'center' }}>
-              <ActivityIndicator size="small" color="#007bff" />
+              <ActivityIndicator size="small" color="#999" />
             </View>
           ) : senderInfo?.profileImageUrl ? (
             <Image source={{ uri: senderInfo.profileImageUrl }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }} />
