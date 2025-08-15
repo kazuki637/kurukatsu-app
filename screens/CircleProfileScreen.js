@@ -369,24 +369,7 @@ export default function CircleProfileScreen({ route, navigation }) {
         </View>
       )}
 
-      {/* SNSリンク */}
-      {(circleData.snsLink || circleData.xLink) && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>SNS</Text>
-          <View style={styles.snsLargeRow}>
-            {circleData.snsLink && (
-              <TouchableOpacity onPress={() => Linking.openURL(circleData.snsLink)} style={styles.snsLargeButton}>
-                <RNImage source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} style={styles.snsLargeLogo} />
-              </TouchableOpacity>
-            )}
-            {circleData.xLink && (
-              <TouchableOpacity onPress={() => Linking.openURL(circleData.xLink)} style={styles.snsLargeButton}>
-                <RNImage source={require('../assets/SNS-icons/X_logo-black.png')} style={styles.snsLargeLogo} />
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      )}
+
 
       {/* LINEグループ */}
       {circleData.lineGroupLink && (
@@ -454,10 +437,12 @@ export default function CircleProfileScreen({ route, navigation }) {
           </View>
         )}
       </View>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>入会条件</Text>
-        <Text style={styles.description}>{circleData.welcome?.conditions || '入会条件は未設定です'}</Text>
-      </View>
+      {circleData.welcome?.conditions && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>入会条件</Text>
+          <Text style={styles.description}>{circleData.welcome.conditions}</Text>
+        </View>
+      )}
       {/* 新歓LINEグループ 追加 */}
       {circleData.shinkanLineGroupLink && (
         <View style={styles.section}>
@@ -468,14 +453,12 @@ export default function CircleProfileScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
       )}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>新歓スケジュール</Text>
-        {circleData.welcome?.schedule && circleData.welcome.schedule.length > 0 ? (
+      {circleData.welcome?.schedule && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>新歓スケジュール</Text>
           <Text style={styles.scheduleText}>{circleData.welcome.schedule}</Text>
-        ) : (
-          <Text style={styles.placeholderText}>新歓スケジュールは未定です</Text>
-        )}
-      </View>
+        </View>
+      )}
     </View>
   );
 

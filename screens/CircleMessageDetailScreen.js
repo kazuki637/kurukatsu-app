@@ -731,7 +731,7 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
                 <Text style={{ fontSize: 16, marginRight: 8 }}>{item.name}</Text>
                 {item.status && (
                   <View style={{ 
-                    backgroundColor: item.status === 'attending' ? '#28a745' : 
+                    backgroundColor: item.status === 'attending' ? '#007bff' : 
                                   item.status === 'absent' ? '#dc3545' : '#ffc107',
                     borderRadius: 4,
                     paddingHorizontal: 6,

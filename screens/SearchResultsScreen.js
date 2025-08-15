@@ -21,10 +21,11 @@ const SearchResultsScreen = ({ route, navigation }) => {
 
 
 
-  // フィルタリングされたサークルリストを計算
-  const filteredCircles = showOnlyRecruiting 
+  // フィルタリングされたサークルリストを計算（いいね数でソート）
+  const filteredCircles = (showOnlyRecruiting 
     ? circles.filter(circle => circle.welcome?.isRecruiting === true)
-    : circles;
+    : circles
+  ).sort((a, b) => (b.likes || 0) - (a.likes || 0));
 
 
 

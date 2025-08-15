@@ -46,7 +46,7 @@ import CircleSettingsScreen from './screens/CircleSettingsScreen';
 import CircleMessageDetailScreen from './screens/CircleMessageDetailScreen';
 import CircleManagementDetailScreen from './screens/CircleManagementDetailScreen';
 import CircleLeadershipTransferScreen from './screens/CircleLeadershipTransferScreen';
-import SubscriptionScreen from './screens/SubscriptionScreen';
+
 import ImageCropScreen from './screens/ImageCropScreen';
 import StudentIdCameraScreen from './screens/StudentIdCameraScreen';
 import ArticleDetailScreen from './screens/ArticleDetailScreen';
@@ -147,7 +147,7 @@ function CircleManagementStackScreen() {
       <CircleManagementStack.Screen name="AddSchedule" component={AddScheduleScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleContact" component={CircleContactScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleLeadershipTransfer" component={CircleLeadershipTransferScreen} options={{ headerShown: false, gestureEnabled: true }} />
-      <CircleManagementStack.Screen name="Subscription" component={SubscriptionScreen} options={{ headerShown: false, gestureEnabled: true }} />
+
       <CircleManagementStack.Screen name="CircleMember" component={CircleMemberScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} options={{ headerShown: false, gestureEnabled: true }} />
     </CircleManagementStack.Navigator>
@@ -264,6 +264,11 @@ function AppNavigator() {
           <RootStack.Screen 
             name="ProfileEdit" 
             component={ProfileEditScreen} 
+            options={{ headerShown: false }} 
+          />
+          <RootStack.Screen 
+            name="ArticleDetail" 
+            component={ArticleDetailScreen} 
             options={{ headerShown: false }} 
           />
         </>

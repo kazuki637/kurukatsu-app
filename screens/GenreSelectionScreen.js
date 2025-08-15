@@ -4,13 +4,15 @@ import { Ionicons } from '@expo/vector-icons';
 import CommonHeader from '../components/CommonHeader';
 
 const GENRES = [
-  '運動系（球技）',
-  '運動系（球技以外）',
-  'アウトドア系',
-  '文化系',
+  'スポーツ（球技）',
+  'スポーツ（球技以外）',
+  'アウトドア・旅行',
+  '文化・教養',
   '芸術・芸能',
-  '音楽系',
-  '学問系',
+  '音楽',
+  '学問・研究',
+  '趣味・娯楽',
+  '国際交流',
   'ボランティア',
   'イベント',
   'オールラウンド',

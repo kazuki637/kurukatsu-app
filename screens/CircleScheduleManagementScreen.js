@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert, TextInput, Modal, ScrollView, Platform, Switch, Keyboard } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert, TextInput, Modal, ScrollView, Platform, Switch, Keyboard, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { db } from '../firebaseConfig';
-import { collection, getDocs, addDoc, doc, deleteDoc, query, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, deleteDoc, query, where, orderBy, getDocs as getDocsFirestore, getDoc } from 'firebase/firestore';
 import CommonHeader from '../components/CommonHeader';
+import { Modalize } from 'react-native-modalize';
 
 // 高度に洗練されたカレンダーコンポーネント
 const Calendar = ({ selectedDate, onDateSelect, events }) => {
@@ -272,12 +273,24 @@ const Calendar = ({ selectedDate, onDateSelect, events }) => {
 
 export default function CircleScheduleManagementScreen({ route, navigation }) {
   const { circleId } = route.params;
+  const { height } = Dimensions.get('window');
+  const SHEET_HEIGHT = height * 0.8;
+  
+  // refs
+  const attendanceModalizeRef = useRef(null);
+  
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState([]);
   const [selectedDate, setSelectedDate] = useState(() => {
     const today = new Date();
     return today;
   });
+  
+  // 出席状況確認用のstate
+  const [attendanceUsers, setAttendanceUsers] = useState({ attending: [], absent: [], pending: [] });
+  const [attendanceModalType, setAttendanceModalType] = useState('all');
+  const [userList, setUserList] = useState([]);
+  const [userCount, setUserCount] = useState(0);
 
 
   useEffect(() => {
@@ -378,6 +391,85 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
     return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日（${weekday}）`;
   };
 
+  // 出席状況データの取得
+  const fetchAttendanceData = async (eventId) => {
+    try {
+      const attendanceRef = collection(db, 'circles', circleId, 'events', eventId, 'attendance');
+      const attendanceSnap = await getDocs(attendanceRef);
+      
+      let attendingCount = 0;
+      let absentCount = 0;
+      let pendingCount = 0;
+      
+      // 回答者一覧を取得
+      const attendingUsers = [];
+      const absentUsers = [];
+      const pendingUsers = [];
+      
+      for (const docSnapshot of attendanceSnap.docs) {
+        const data = docSnapshot.data();
+        const userDocRef = doc(db, 'users', docSnapshot.id);
+        const userDocSnap = await getDoc(userDocRef);
+        const userData = userDocSnap.exists() ? userDocSnap.data() : {};
+        const userName = userData.name || userData.nickname || '未設定';
+        
+        if (data.status === 'attending') {
+          attendingCount++;
+          attendingUsers.push({
+            uid: docSnapshot.id,
+            name: userName,
+            respondedAt: data.respondedAt ? data.respondedAt.toDate() : null,
+          });
+        } else if (data.status === 'absent') {
+          absentCount++;
+          absentUsers.push({
+            uid: docSnapshot.id,
+            name: userName,
+            respondedAt: data.respondedAt ? data.respondedAt.toDate() : null,
+          });
+        } else if (data.status === 'pending') {
+          pendingCount++;
+          pendingUsers.push({
+            uid: docSnapshot.id,
+            name: userName,
+            respondedAt: data.respondedAt ? data.respondedAt.toDate() : null,
+          });
+        }
+      }
+      
+      setAttendanceUsers({
+        attending: attendingUsers,
+        absent: absentUsers,
+        pending: pendingUsers
+      });
+    } catch (error) {
+      console.error('Error fetching attendance data:', error);
+    }
+  };
+
+  // 回答状況確認の表示
+  const handleShowAttendanceStatus = async (eventId) => {
+    try {
+      // 出席状況データを取得
+      await fetchAttendanceData(eventId);
+      
+      // 全回答者を一つのリストにまとめる
+      const allAttendanceUsers = [
+        ...attendanceUsers.attending.map(user => ({ ...user, status: 'attending' })),
+        ...attendanceUsers.absent.map(user => ({ ...user, status: 'absent' })),
+        ...attendanceUsers.pending.map(user => ({ ...user, status: 'pending' }))
+      ];
+      
+      setUserList(allAttendanceUsers);
+      setUserCount(allAttendanceUsers.length);
+      setAttendanceModalType('all');
+      attendanceModalizeRef.current?.open();
+    } catch (error) {
+      console.error('出席状況データの取得に失敗:', error);
+      Alert.alert('エラー', '出席状況データの取得に失敗しました');
+    }
+  };
+
   // ローディング状態でも画面を表示し、データが取得できたら更新する
 
   return (
@@ -449,6 +541,20 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
                   {event.description && (
                     <Text style={styles.eventDescription}>{event.description}</Text>
                   )}
+                  
+                  {/* 回答状況確認ボタン */}
+                  <View style={styles.attendanceButtonsContainer}>
+                    <TouchableOpacity 
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleShowAttendanceStatus(event.id);
+                      }} 
+                      style={styles.attendanceStatusButton}
+                    >
+                      <Ionicons name="people" size={20} color="#666" style={{ marginRight: 8 }} />
+                      <Text style={styles.attendanceStatusButtonText}>回答状況を確認</Text>
+                    </TouchableOpacity>
+                  </View>
                 </TouchableOpacity>
               ))
             ) : (
@@ -463,6 +569,64 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      {/* 回答状況確認ユーザー一覧ボトムシート */}
+      <Modalize
+        ref={attendanceModalizeRef}
+        adjustToContentHeight={false}
+        modalHeight={SHEET_HEIGHT}
+        handleStyle={{ backgroundColor: '#222', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}
+        modalStyle={{ borderTopLeftRadius: 16, borderTopRightRadius: 16, backgroundColor: '#fff' }}
+        overlayStyle={{ backgroundColor: 'rgba(0,0,0,0.2)' }}
+        handlePosition="inside"
+        HeaderComponent={
+          <>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 20, paddingHorizontal: 20, paddingBottom: 12 }}>
+              <Text style={{ fontWeight: 'bold', fontSize: 18 }}>
+                {attendanceModalType === 'attending' ? '出席' : 
+                 attendanceModalType === 'absent' ? '欠席' :
+                 attendanceModalType === 'pending' ? '保留' :
+                 attendanceModalType === 'all' ? '回答者一覧' : 'ユーザー一覧'}
+              </Text>
+              <Text style={{ color: '#007bff', fontWeight: 'bold', fontSize: 18 }}>{userCount}人</Text>
+            </View>
+            <View style={{ height: 1, backgroundColor: '#e0e0e0', width: '100%' }} />
+          </>
+        }
+        flatListProps={{
+          data: userList,
+          keyExtractor: item => item.uid,
+          renderItem: ({ item }) => (
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderColor: '#f0f0f0', paddingHorizontal: 20 }}>
+              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 16, marginRight: 8 }}>{item.name}</Text>
+                {item.status && (
+                                     <View style={{ 
+                     backgroundColor: item.status === 'attending' ? '#007bff' : 
+                                   item.status === 'absent' ? '#dc3545' : '#ffc107',
+                     borderRadius: 4,
+                     paddingHorizontal: 6,
+                     paddingVertical: 2
+                   }}>
+                    <Text style={{ 
+                      color: '#fff', 
+                      fontSize: 10, 
+                      fontWeight: 'bold' 
+                    }}>
+                      {item.status === 'attending' ? '出席' : 
+                       item.status === 'absent' ? '欠席' : '保留'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={{ color: '#888', fontSize: 16, width: 110, textAlign: 'right' }}>
+                {item.respondedAt ? item.respondedAt.toLocaleString('ja-JP') : ''}
+              </Text>
+            </View>
+          ),
+          ListEmptyComponent: <Text style={{ color: '#888', textAlign: 'center', marginTop: 20 }}>ユーザーがいません</Text>,
+        }}
+      />
     </View>
   );
 }
@@ -934,4 +1098,25 @@ const styles = StyleSheet.create({
   },
   // スケジュール追加・編集画面のスタイル
 
+  // 出席・欠席ボタンのスタイル
+  attendanceButtonsContainer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  attendanceStatusButton: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attendanceStatusButtonText: {
+    color: '#666',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
 }); 

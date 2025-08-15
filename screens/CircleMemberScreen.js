@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, Alert, ScrollView, FlatList, ActivityIndicator, TextInput, Modal } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, Alert, ScrollView, FlatList, ActivityIndicator, TextInput, Modal, Dimensions } from 'react-native';
 import CommonHeader from '../components/CommonHeader';
 import { db } from '../firebaseConfig';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, setDoc } from 'firebase/firestore';
 import { auth } from '../firebaseConfig';
-import { collection, query, where, orderBy, getDocs, deleteDoc, updateDoc, arrayRemove } from 'firebase/firestore';
+import { collection as firestoreCollection, query, where, orderBy, getDocs as getDocsFirestore, deleteDoc, updateDoc, arrayRemove } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
 import { getRoleDisplayName } from '../utils/permissionUtils';
+import { Modalize } from 'react-native-modalize';
 
 // 高度に洗練されたカレンダーコンポーネント
 const Calendar = ({ selectedDate, onDateSelect, events }) => {
@@ -268,6 +269,12 @@ const Calendar = ({ selectedDate, onDateSelect, events }) => {
 
 export default function CircleMemberScreen({ route, navigation }) {
   const { circleId } = route.params;
+  const { height } = Dimensions.get('window');
+  const SHEET_HEIGHT = height * 0.8;
+  
+  // refs
+  const attendanceModalizeRef = useRef(null);
+  
   const [circleName, setCircleName] = useState('メンバー');
   const [tabIndex, setTabIndex] = useState(0);
   const tabs = [
@@ -291,6 +298,15 @@ export default function CircleMemberScreen({ route, navigation }) {
 
   // 送信者情報のキャッシュ
   const [senderCache, setSenderCache] = useState({});
+  
+  // 出席状況確認用のstate
+  const [attendanceUsers, setAttendanceUsers] = useState({ attending: [], absent: [], pending: [] });
+  const [attendanceModalType, setAttendanceModalType] = useState('all');
+  const [userList, setUserList] = useState([]);
+  const [userCount, setUserCount] = useState(0);
+  
+  // 現在のユーザーの出席状況を管理
+  const [currentUserAttendance, setCurrentUserAttendance] = useState({});
 
   // 送信者情報を取得する関数
   const getSenderInfo = async (senderUid) => {
@@ -468,16 +484,166 @@ export default function CircleMemberScreen({ route, navigation }) {
   };
 
   // 詳細表示の切り替え
-  const toggleEventDetails = (eventId) => {
+  const toggleEventDetails = async (eventId) => {
     setExpandedEvents(prev => {
       const newSet = new Set(prev);
       if (newSet.has(eventId)) {
         newSet.delete(eventId);
       } else {
         newSet.add(eventId);
+        // 詳細展開時に出席状況データを取得
+        fetchAttendanceData(eventId);
       }
       return newSet;
     });
+  };
+
+  // 出席状況データの取得
+  const fetchAttendanceData = async (eventId) => {
+    try {
+      const attendanceRef = collection(db, 'circles', circleId, 'events', eventId, 'attendance');
+      const attendanceSnap = await getDocs(attendanceRef);
+      
+      let attendingCount = 0;
+      let absentCount = 0;
+      let pendingCount = 0;
+      
+      // 回答者一覧を取得
+      const attendingUsers = [];
+      const absentUsers = [];
+      const pendingUsers = [];
+      
+      // 現在のユーザーの出席状況を取得
+      const currentUser = auth.currentUser;
+      let currentUserStatus = null;
+      
+      for (const docSnapshot of attendanceSnap.docs) {
+        const data = docSnapshot.data();
+        const userDocRef = doc(db, 'users', docSnapshot.id);
+        const userDocSnap = await getDoc(userDocRef);
+        const userData = userDocSnap.exists() ? userDocSnap.data() : {};
+        const userName = userData.name || userData.nickname || '未設定';
+        
+        if (data.status === 'attending') {
+          attendingCount++;
+          attendingUsers.push({
+            uid: docSnapshot.id,
+            name: userName,
+            respondedAt: data.respondedAt ? data.respondedAt.toDate() : null,
+          });
+        } else if (data.status === 'absent') {
+          absentCount++;
+          absentUsers.push({
+            uid: docSnapshot.id,
+            name: userName,
+            respondedAt: data.respondedAt ? data.respondedAt.toDate() : null,
+          });
+        } else if (data.status === 'pending') {
+          pendingCount++;
+          pendingUsers.push({
+            uid: docSnapshot.id,
+            name: userName,
+            respondedAt: data.respondedAt ? data.respondedAt.toDate() : null,
+          });
+        }
+        
+        // 現在のユーザーの出席状況を取得
+        if (currentUser && docSnapshot.id === currentUser.uid) {
+          currentUserStatus = data.status;
+        }
+      }
+      
+      setAttendanceUsers({
+        attending: attendingUsers,
+        absent: absentUsers,
+        pending: pendingUsers
+      });
+      
+      // 現在のユーザーの出席状況を更新
+      setCurrentUserAttendance(prev => ({
+        ...prev,
+        [eventId]: currentUserStatus
+      }));
+    } catch (error) {
+      console.error('Error fetching attendance data:', error);
+    }
+  };
+
+  // 出席・欠席の処理
+  const handleAttendance = async (eventId, status) => {
+    try {
+      const user = auth.currentUser;
+      if (!user) {
+        Alert.alert('エラー', 'ログインが必要です');
+        return;
+      }
+
+      const currentStatus = currentUserAttendance[eventId];
+      
+      // 同じステータスを押した場合は取り消し
+      if (currentStatus === status) {
+        // ドキュメントを削除
+        const attendanceRef = doc(db, 'circles', circleId, 'events', eventId, 'attendance', user.uid);
+        await deleteDoc(attendanceRef);
+        
+        // 現在のユーザーの出席状況を即座に更新
+        setCurrentUserAttendance(prev => ({
+          ...prev,
+          [eventId]: null
+        }));
+        
+        // 出席状況データを再取得
+        await fetchAttendanceData(eventId);
+        
+        Alert.alert('取り消し完了', '出席確認を取り消しました');
+        return;
+      }
+
+      // 新しいステータスを登録
+      const attendanceRef = doc(db, 'circles', circleId, 'events', eventId, 'attendance', user.uid);
+      await setDoc(attendanceRef, {
+        status: status,
+        respondedAt: new Date(),
+        userName: user.displayName || '未設定',
+      });
+
+      // 現在のユーザーの出席状況を即座に更新
+      setCurrentUserAttendance(prev => ({
+        ...prev,
+        [eventId]: status
+      }));
+
+      // 出席状況データを再取得
+      await fetchAttendanceData(eventId);
+
+      Alert.alert('完了', `出席状況を${status === 'attending' ? '出席' : '欠席'}に更新しました`);
+    } catch (error) {
+      console.error('出席状況の更新に失敗:', error);
+      Alert.alert('エラー', '出席状況の更新に失敗しました');
+    }
+  };
+
+  // 回答状況確認の表示
+  const handleShowAttendanceStatus = async (eventId) => {
+    try {
+      // 出席状況データを取得
+      await fetchAttendanceData(eventId);
+      
+      // 全回答者を一つのリストにまとめる
+      const allAttendanceUsers = [
+        ...attendanceUsers.attending.map(user => ({ ...user, status: 'attending' })),
+        ...attendanceUsers.absent.map(user => ({ ...user, status: 'absent' })),
+        ...attendanceUsers.pending.map(user => ({ ...user, status: 'pending' }))
+      ];
+      
+      setUserList(allAttendanceUsers);
+      setUserCount(allAttendanceUsers.length);
+      setAttendanceModalType('all');
+      attendanceModalizeRef.current?.open();
+    } catch (error) {
+      console.error('出席状況データの取得に失敗:', error);
+      Alert.alert('エラー', '出席状況データの取得に失敗しました');
+    }
   };
 
   // 役割に基づくソート関数（自分を一番上に）
@@ -612,26 +778,89 @@ export default function CircleMemberScreen({ route, navigation }) {
                                 )}
                               </View>
                             </View>
-                            {hasDescription && (
-                              <TouchableOpacity
-                                onPress={() => toggleEventDetails(event.id)}
-                                style={styles.detailsButton}
-                                activeOpacity={0.7}
-                              >
-                                <Text style={styles.detailsButtonText}>
-                                  {isExpanded ? '詳細を閉じる' : '詳細を見る'}
-                                </Text>
-                                <Ionicons 
-                                  name={isExpanded ? "chevron-up" : "chevron-down"} 
-                                  size={16} 
-                                  color="#007bff" 
-                                  style={{ marginLeft: 4 }}
-                                />
-                              </TouchableOpacity>
-                            )}
+                            <TouchableOpacity
+                              onPress={() => toggleEventDetails(event.id)}
+                              style={styles.detailsButton}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={styles.detailsButtonText}>
+                                {isExpanded ? '詳細を閉じる' : '詳細を見る'}
+                              </Text>
+                              <Ionicons 
+                                name={isExpanded ? "chevron-up" : "chevron-down"} 
+                                size={16} 
+                                color="#007bff" 
+                                style={{ marginLeft: 4 }}
+                              />
+                            </TouchableOpacity>
                           </View>
-                          {hasDescription && isExpanded && (
-                            <Text style={styles.eventDescription}>{event.description}</Text>
+                          {isExpanded && (
+                            <>
+                              {hasDescription && (
+                                <Text style={styles.eventDescription}>{event.description}</Text>
+                              )}
+                              
+                              {/* 出席・欠席・回答状況確認ボタン */}
+                              <View style={styles.attendanceButtonsContainer}>
+                                <View style={styles.attendanceButtonsRow}>
+                                  <TouchableOpacity 
+                                    onPress={() => handleAttendance(event.id, 'attending')} 
+                                    style={[
+                                      styles.attendanceButton, 
+                                      { 
+                                        backgroundColor: currentUserAttendance[event.id] === 'attending' ? '#007bff' : '#f0f0f0'
+                                      }
+                                    ]}
+                                  >
+                                    <View style={styles.attendanceButtonContent}>
+                                      <Ionicons 
+                                        name="checkmark-circle" 
+                                        size={24} 
+                                        color={currentUserAttendance[event.id] === 'attending' ? '#fff' : '#666'} 
+                                      />
+                                      <Text style={[
+                                        styles.attendanceButtonText,
+                                        { color: currentUserAttendance[event.id] === 'attending' ? '#fff' : '#666' }
+                                      ]}>
+                                        出席
+                                      </Text>
+                                    </View>
+                                  </TouchableOpacity>
+                                  
+                                  <TouchableOpacity 
+                                    onPress={() => handleAttendance(event.id, 'absent')} 
+                                    style={[
+                                      styles.attendanceButton, 
+                                      { 
+                                        backgroundColor: currentUserAttendance[event.id] === 'absent' ? '#dc3545' : '#f0f0f0'
+                                      }
+                                    ]}
+                                  >
+                                    <View style={styles.attendanceButtonContent}>
+                                      <Ionicons 
+                                        name="close-circle" 
+                                        size={24} 
+                                        color={currentUserAttendance[event.id] === 'absent' ? '#fff' : '#666'} 
+                                      />
+                                      <Text style={[
+                                        styles.attendanceButtonText,
+                                        { color: currentUserAttendance[event.id] === 'absent' ? '#fff' : '#666' }
+                                      ]}>
+                                        欠席
+                                      </Text>
+                                    </View>
+                                  </TouchableOpacity>
+                                </View>
+                                
+                                <TouchableOpacity 
+                                  onPress={() => handleShowAttendanceStatus(event.id)} 
+                                  style={styles.attendanceStatusButton}
+                                >
+                                  <Ionicons name="people" size={20} color="#666" style={{ marginRight: 8 }} />
+                                  <Text style={styles.attendanceStatusButtonText}>回答状況を確認</Text>
+                                </TouchableOpacity>
+                              </View>
+                            </>
                           )}
                         </View>
                       );
@@ -830,6 +1059,64 @@ export default function CircleMemberScreen({ route, navigation }) {
           </View>
         </View>
       </Modal>
+
+      {/* 回答状況確認ユーザー一覧ボトムシート */}
+      <Modalize
+        ref={attendanceModalizeRef}
+        adjustToContentHeight={false}
+        modalHeight={SHEET_HEIGHT}
+        handleStyle={{ backgroundColor: '#222', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}
+        modalStyle={{ borderTopLeftRadius: 16, borderTopRightRadius: 16, backgroundColor: '#fff' }}
+        overlayStyle={{ backgroundColor: 'rgba(0,0,0,0.2)' }}
+        handlePosition="inside"
+        HeaderComponent={
+          <>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 20, paddingHorizontal: 20, paddingBottom: 12 }}>
+              <Text style={{ fontWeight: 'bold', fontSize: 18 }}>
+                {attendanceModalType === 'attending' ? '出席' : 
+                 attendanceModalType === 'absent' ? '欠席' :
+                 attendanceModalType === 'pending' ? '保留' :
+                 attendanceModalType === 'all' ? '回答者一覧' : 'ユーザー一覧'}
+              </Text>
+              <Text style={{ color: '#007bff', fontWeight: 'bold', fontSize: 18 }}>{userCount}人</Text>
+            </View>
+            <View style={{ height: 1, backgroundColor: '#e0e0e0', width: '100%' }} />
+          </>
+        }
+        flatListProps={{
+          data: userList,
+          keyExtractor: item => item.uid,
+          renderItem: ({ item }) => (
+            <View style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 16, borderBottomWidth: 1, borderColor: '#f0f0f0', paddingHorizontal: 20 }}>
+              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 16, marginRight: 8 }}>{item.name}</Text>
+                {item.status && (
+                                     <View style={{ 
+                     backgroundColor: item.status === 'attending' ? '#007bff' : 
+                                   item.status === 'absent' ? '#dc3545' : '#ffc107',
+                     borderRadius: 4,
+                     paddingHorizontal: 6,
+                     paddingVertical: 2
+                   }}>
+                    <Text style={{ 
+                      color: '#fff', 
+                      fontSize: 16, 
+                      fontWeight: 'bold' 
+                    }}>
+                      {item.status === 'attending' ? '出席' : 
+                       item.status === 'absent' ? '欠席' : '保留'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text style={{ color: '#888', fontSize: 16, width: 110, textAlign: 'right' }}>
+                {item.respondedAt ? item.respondedAt.toLocaleString('ja-JP') : ''}
+              </Text>
+            </View>
+          ),
+          ListEmptyComponent: <Text style={{ color: '#888', textAlign: 'center', marginTop: 20 }}>ユーザーがいません</Text>,
+        }}
+      />
     </>
   );
 }
@@ -1258,6 +1545,50 @@ const styles = StyleSheet.create({
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  // 出席・欠席ボタンのスタイル
+  attendanceButtonsContainer: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+  },
+  attendanceButtonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  attendanceButton: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attendanceButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  attendanceButtonText: {
+    fontWeight: 'bold',
+    fontSize: 14,
+    marginLeft: 6,
+  },
+  attendanceStatusButton: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attendanceStatusButtonText: {
+    color: '#666',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
   cancelButton: {
     flex: 1,

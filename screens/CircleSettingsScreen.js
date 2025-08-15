@@ -10,10 +10,10 @@ import CommonHeader from '../components/CommonHeader';
 import { compressCircleImage } from '../utils/imageCompression';
 
 const GENRES = [
-  '運動系（球技）', '運動系（球技以外）', 'アウトドア系', '文化系', '芸術・芸能', '音楽系', '学問系', 'ボランティア', 'イベント', 'オールラウンド', 'その他',
+  'スポーツ（球技）', 'スポーツ（球技以外）', 'アウトドア・旅行', '文化・教養', '芸術・芸能', '音楽', '学問・研究', '趣味・娯楽', '国際交流', 'ボランティア', 'イベント', 'オールラウンド', 'その他',
 ];
 const FEATURES = [
-  'ワイワイ', '真剣', '初心者歓迎', '友達作り重視', 'イベント充実', '勉強サポート', '国際交流', 'アットホーム', 'スポーツ志向',
+  'イベント充実', '友達作り重視', '初心者歓迎', 'ゆるめ', '真剣', '体育会系', 'フラット', '和やか', '賑やか',
 ];
 const FREQUENCIES = ['週１回', '週２回', '週３回', '月１回', '不定期'];
 const GENDER_RATIO_OPTIONS = ['男性多め', '女性多め', '半々'];
@@ -34,6 +34,7 @@ export default function CircleSettingsScreen({ route, navigation }) {
   const [snsLink, setSnsLink] = useState('');
   const [xLink, setXLink] = useState('');
   const [shinkanLineGroupLink, setShinkanLineGroupLink] = useState('');
+  const [isRecruiting, setIsRecruiting] = useState(false);
   const [circleImage, setCircleImage] = useState(null);
   const [circleImageUrl, setCircleImageUrl] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -59,6 +60,7 @@ export default function CircleSettingsScreen({ route, navigation }) {
           setSnsLink(d.snsLink || '');
           setXLink(d.xLink || '');
           setShinkanLineGroupLink(d.shinkanLineGroupLink || '');
+          setIsRecruiting(d.welcome?.isRecruiting || false);
           setCircleImageUrl(d.imageUrl || '');
         }
       } catch (e) {
@@ -90,6 +92,7 @@ export default function CircleSettingsScreen({ route, navigation }) {
       frequency !== (circle.frequency || '') ||
       members !== (circle.members || '') ||
       genderratio !== (circle.genderratio || '') ||
+      isRecruiting !== (circle.welcome?.isRecruiting || false) ||
       circleImage !== null;
     
     console.log('サークル設定画面: 変更検知', {
@@ -99,6 +102,7 @@ export default function CircleSettingsScreen({ route, navigation }) {
       frequencyChanged: frequency !== (circle.frequency || ''),
       membersChanged: members !== (circle.members || ''),
       genderratioChanged: genderratio !== (circle.genderratio || ''),
+      recruitingChanged: isRecruiting !== (circle.welcome?.isRecruiting || false),
       imageChanged: circleImage !== null,
       hasChanges
     });
@@ -208,6 +212,10 @@ export default function CircleSettingsScreen({ route, navigation }) {
         members,
         genderratio,
         imageUrl,
+        welcome: {
+          ...circle?.welcome,
+          isRecruiting,
+        },
       });
       setHasUnsavedChanges(false);
       setIsSaving(false);
@@ -425,6 +433,53 @@ export default function CircleSettingsScreen({ route, navigation }) {
                 </TouchableOpacity>
               ))}
             </View>
+            {/* 入会募集状況 */}
+            <Text style={styles.label}>入会募集状況</Text>
+            <View style={styles.recruitingContainer}>
+              <View style={styles.recruitingStatusContainer}>
+                {isRecruiting ? (
+                  <>
+                    <Ionicons name="checkmark-circle" size={24} color="#28a745" />
+                    <Text style={styles.recruitingStatusText}>入会募集中</Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="close-circle" size={24} color="#e74c3c" />
+                    <Text style={styles.recruitingStatusText}>現在入会の募集はありません</Text>
+                  </>
+                )}
+              </View>
+              <TouchableOpacity
+                style={[styles.toggleButton, isRecruiting && styles.toggleButtonActive]}
+                onPress={() => {
+                  const newRecruitingStatus = !isRecruiting;
+                  setIsRecruiting(newRecruitingStatus);
+                  // 状態変更を即座に検知
+                  if (!circle) return;
+                  
+                  const originalFeatures = circle.features || [];
+                  const currentFeatures = features || [];
+                  const featuresChanged = 
+                    originalFeatures.length !== currentFeatures.length ||
+                    !originalFeatures.every(feature => currentFeatures.includes(feature)) ||
+                    !currentFeatures.every(feature => originalFeatures.includes(feature));
+                  
+                  const hasChanges = 
+                    name !== (circle.name || '') ||
+                    genre !== (circle.genre || '') ||
+                    featuresChanged ||
+                    frequency !== (circle.frequency || '') ||
+                    members !== (circle.members || '') ||
+                    genderratio !== (circle.genderratio || '') ||
+                    newRecruitingStatus !== (circle.welcome?.isRecruiting || false) ||
+                    circleImage !== null;
+                  
+                  setHasUnsavedChanges(hasChanges);
+                }}
+              >
+                <View style={[styles.toggleCircle, isRecruiting && styles.toggleCircleActive]} />
+              </TouchableOpacity>
+            </View>
             {/* SNSリンク（Instagram）、SNSリンク（X）、新歓LINEグループリンクを削除 */}
             <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={loading}>
               <Text style={styles.saveButtonText}>{loading ? '保存中...' : '保存する'}</Text>
@@ -449,4 +504,52 @@ const styles = StyleSheet.create({
   saveButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
   circleImagePicker: { alignItems: 'center', marginBottom: 16 },
   circleImage: { width: 100, height: 100, borderRadius: 50 },
+  // 入会募集状況関連のスタイル
+  recruitingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  recruitingStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    flex: 1,
+    marginRight: 16,
+  },
+  recruitingStatusText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 12,
+  },
+  toggleButton: {
+    width: 60,
+    height: 32,
+    backgroundColor: '#e9ecef',
+    borderRadius: 16,
+    padding: 2,
+    justifyContent: 'center',
+  },
+  toggleButtonActive: {
+    backgroundColor: '#28a745',
+  },
+  toggleCircle: {
+    width: 28,
+    height: 28,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
+    elevation: 2,
+  },
+  toggleCircleActive: {
+    transform: [{ translateX: 28 }],
+  },
 }); 

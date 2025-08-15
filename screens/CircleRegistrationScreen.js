@@ -21,6 +21,7 @@ export default function CircleRegistrationScreen() {
   const [members, setMembers] = useState('');
   const [contactInfo, setContactInfo] = useState('');
   const [representativeName, setRepresentativeName] = useState('');
+  const [isRecruiting, setIsRecruiting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [circleImage, setCircleImage] = useState(null);
 
@@ -68,13 +69,15 @@ export default function CircleRegistrationScreen() {
   ];
 
   const GENRES = [
-    '運動系（球技）',
-    '運動系（球技以外）',
-    'アウトドア系',
-    '文化系',
+    'スポーツ（球技）',
+    'スポーツ（球技以外）',
+    'アウトドア・旅行',
+    '文化・教養',
     '芸術・芸能',
-    '音楽系',
-    '学問系',
+    '音楽',
+    '学問・研究',
+    '趣味・娯楽',
+    '国際交流',
     'ボランティア',
     'イベント',
     'オールラウンド',
@@ -82,15 +85,15 @@ export default function CircleRegistrationScreen() {
   ];
 
   const FEATURES = [
-    'ワイワイ',
-    '真剣',
-    '初心者歓迎',
-    '友達作り重視',
     'イベント充実',
-    '勉強サポート',
-    '国際交流',
-    'アットホーム',
-    'スポーツ志向',
+    '友達作り重視',
+    '初心者歓迎',
+    'ゆるめ',
+    '真剣',
+    '体育会系',
+    'フラット',
+    '和やか',
+    '賑やか',
   ];
 
   useEffect(() => {
@@ -165,6 +168,9 @@ export default function CircleRegistrationScreen() {
         members,
         contactInfo,
         imageUrl,
+        welcome: {
+          isRecruiting,
+        },
         createdAt: new Date(),
         leaderId: user.uid, // 代表者ID
         leaderName: representativeName, // 代表者名
@@ -355,6 +361,31 @@ export default function CircleRegistrationScreen() {
           </View>
         </View>
 
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>入会募集状況</Text>
+          <View style={styles.recruitingContainer}>
+            <View style={styles.recruitingStatusContainer}>
+              {isRecruiting ? (
+                <>
+                  <Ionicons name="checkmark-circle" size={24} color="#28a745" />
+                  <Text style={styles.recruitingStatusText}>入会募集中</Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name="close-circle" size={24} color="#e74c3c" />
+                  <Text style={styles.recruitingStatusText}>現在入会の募集はありません</Text>
+                </>
+              )}
+            </View>
+            <TouchableOpacity
+              style={[styles.toggleButton, isRecruiting && styles.toggleButtonActive]}
+              onPress={() => setIsRecruiting(!isRecruiting)}
+            >
+              <View style={[styles.toggleCircle, isRecruiting && styles.toggleCircleActive]} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <TouchableOpacity
           style={styles.registerButton}
           onPress={handleRegister}
@@ -492,10 +523,61 @@ const styles = StyleSheet.create({
   },
   optionButtonText: {
     color: '#fff',
-    fontSize: 14,
   },
   optionButtonTextActive: {
     color: '#1e3a8a',
+  },
+  // 入会募集状況関連のスタイル
+  recruitingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 5,
+  },
+  recruitingStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    flex: 1,
+    marginRight: 16,
+  },
+  recruitingStatusText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 12,
+    color: '#fff',
+  },
+  toggleButton: {
+    width: 60,
+    height: 32,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 16,
+    padding: 2,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  toggleButtonActive: {
+    backgroundColor: '#28a745',
+    borderColor: '#28a745',
+  },
+  toggleCircle: {
+    width: 28,
+    height: 28,
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
+    elevation: 2,
+  },
+  toggleCircleActive: {
+    transform: [{ translateX: 28 }],
   },
   selectionItem: {
     flexDirection: 'row',

@@ -14,7 +14,7 @@ import {
   SafeAreaView, // Import SafeAreaView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, CommonActions } from '@react-navigation/native';
 import { auth, db, storage } from '../firebaseConfig';
 import { doc, onSnapshot, updateDoc, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -40,6 +40,7 @@ export default function MyPageScreen({ navigation, route }) {
   // プロフィール編集画面から渡された更新データを処理（削除）
   const [savedCircles, setSavedCircles] = useState([]);
   const [joinedCircles, setJoinedCircles] = useState([]);
+  const [likedArticles, setLikedArticles] = useState([]);
   const [circlesLoading, setCirclesLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [imageError, setImageError] = useState(false);
@@ -90,10 +91,42 @@ export default function MyPageScreen({ navigation, route }) {
           }
         }
         setSavedCircles(saved);
+
+        // いいねした記事を取得
+        let liked = [];
+        if (userProfile.likedArticleIds && userProfile.likedArticleIds.length > 0) {
+          const batchSize = 10;
+          for (let i = 0; i < userProfile.likedArticleIds.length; i += batchSize) {
+            const batch = userProfile.likedArticleIds.slice(i, i + batchSize);
+            const articlesRef = collection(db, 'articles');
+            const q = query(articlesRef, where('__name__', 'in', batch));
+            const querySnapshot = await getDocs(q);
+            const articlesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            // 各記事のヘッダー画像URLを取得
+            for (let article of articlesData) {
+              if (article.title) {
+                try {
+                  const headerImageRef = ref(storage, `articles/${article.title}/header`);
+                  const headerUrl = await getDownloadURL(headerImageRef);
+                  article.headerImageUrl = headerUrl;
+                } catch (error) {
+                  console.log(`記事 ${article.title} のヘッダー画像が見つかりません:`, error);
+                  // ヘッダー画像がなくてもエラーにはしない
+                }
+              }
+            }
+            
+            liked.push(...articlesData);
+          }
+        }
+        console.log('いいねした記事データ:', liked);
+        setLikedArticles(liked);
       } catch (e) {
         console.error('Error fetching circles:', e);
         setJoinedCircles([]);
         setSavedCircles([]);
+        setLikedArticles([]);
       } finally {
         setCirclesLoading(false);
       }
@@ -258,6 +291,43 @@ export default function MyPageScreen({ navigation, route }) {
               </View>
             )}
           </View>
+          <View style={styles.contentArea}>
+            <Text style={styles.sectionTitle}>いいね！した記事</Text>
+            {likedArticles.length > 0 ? (
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.popularCirclesScrollContainer}
+                style={styles.popularCirclesScrollView}
+              >
+                {likedArticles.map((article, index) => (
+                  <TouchableOpacity 
+                    key={article.id} 
+                    style={styles.articleCard}
+                    onPress={() => navigation.dispatch(CommonActions.navigate({
+                      name: 'ArticleDetail',
+                      params: { articleId: article.id }
+                    }))}
+                  >
+                    {article.headerImageUrl ? (
+                      <Image source={{ uri: article.headerImageUrl }} style={styles.articleImage} />
+                    ) : (
+                      <View style={[styles.articleImage, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
+                        <Ionicons name="document-text-outline" size={40} color="#aaa" />
+                      </View>
+                    )}
+                    <Text style={styles.articleTitle} numberOfLines={2}>{article.title}</Text>
+                    <Text style={styles.articleDate}>{article.date}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>いいね！した記事はありません</Text>
+                <Text style={styles.emptySubText}>気になる記事をいいねしましょう</Text>
+              </View>
+            )}
+          </View>
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -306,6 +376,31 @@ const styles = StyleSheet.create({
     color: '#333',
     textAlign: 'center',
     marginBottom: 4,
+  },
+  // 記事カードのスタイル
+  articleCard: {
+    alignItems: 'center',
+    width: 120,
+    marginRight: 15,
+  },
+  articleImage: {
+    width: 100,
+    height: 60,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  articleTitle: {
+    fontSize: 12,
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 4,
+    fontWeight: '600',
+    lineHeight: 16,
+  },
+  articleDate: {
+    fontSize: 10,
+    color: '#666',
+    textAlign: 'center',
   },
   // サークルカードスタイル（ホーム画面と同じ）
   circleCardContainer: {
