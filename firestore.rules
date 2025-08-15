@@ -76,6 +76,24 @@ service cloud.firestore {
         get(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)).data.role in ['leader', 'admin'];
     }
 
+    // サークルのイベント
+    match /circles/{circleId}/events/{eventId} {
+      allow read: if request.auth != null && 
+        exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid));
+      allow create, update, delete: if request.auth != null && 
+        exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)).data.role in ['leader', 'admin'];
+      
+      // イベントの出席状況情報
+      match /attendance/{userId} {
+        allow read: if request.auth != null && 
+          exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid));
+        allow create, update, delete: if request.auth != null && 
+          request.auth.uid == userId && 
+          exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid));
+      }
+    }
+
     // サークルのメッセージ
     match /circles/{circleId}/messages/{messageId} {
       allow read: if request.auth != null && 

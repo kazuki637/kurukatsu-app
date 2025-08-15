@@ -196,31 +196,7 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
               </Text>
             </View>
           </View>
-          {/* サブスクリプション提案カード */}
-          <LinearGradient
-            colors={["#f0fcfd", "#b2ebf2"]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.subscriptionCard}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <MaterialCommunityIcons name="crown-outline" size={24} color="#ffb300" style={{ marginRight: 8 }} />
-              <Text style={styles.subscriptionTitle}>プレミアム</Text>
-              <View style={{ flex: 1 }} />
-              <TouchableOpacity 
-                style={styles.subscriptionButton}
-                onPress={() => navigation.navigate('Subscription', { circleId, circleName })}
-              >
-                <Text style={styles.subscriptionButtonText}>無料で体験する</Text>
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.subscriptionDesc}>¥0で7日間プレミアムを楽しみましょう</Text>
-            <View style={styles.subscriptionFeatureRow}>
-              <View style={styles.subscriptionFeature}><Ionicons name="calendar-outline" size={20} color="#333" /><Text style={styles.subscriptionFeatureText}>スケジュール</Text></View>
-              <View style={styles.subscriptionFeature}><Ionicons name="mail-outline" size={20} color="#333" /><Text style={styles.subscriptionFeatureText}>連絡</Text></View>
-              <View style={styles.subscriptionFeature}><Ionicons name="star-outline" size={20} color="#333" /><Text style={styles.subscriptionFeatureText}>おすすめ掲載</Text></View>
-            </View>
-          </LinearGradient>
+
           {/* 管理ボタン（グリッド） */}
           <View style={styles.managementGridSection}>
             {Array.from({ length: GRID_ROWS }).map((_, rowIdx) => (
@@ -323,54 +299,7 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 4,
   },
-  subscriptionCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 16,
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  subscriptionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1e3a8a',
-  },
-  subscriptionButton: {
-    backgroundColor: '#1e3a8a',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-  },
-  subscriptionButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 13,
-  },
-  subscriptionDesc: {
-    fontSize: 13,
-    color: '#1e3a8a',
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  subscriptionFeatureRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
-  },
-  subscriptionFeature: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  subscriptionFeatureText: {
-    fontSize: 12,
-    color: '#1e3a8a',
-    marginTop: 2,
-  },
+
   managementGridSection: {
     flex: 1,
     paddingHorizontal: 10,

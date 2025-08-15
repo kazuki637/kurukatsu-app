@@ -4,15 +4,15 @@ import { Ionicons } from '@expo/vector-icons';
 import CommonHeader from '../components/CommonHeader';
 
 const FEATURES = [
-  'ワイワイ',
-  '真剣',
-  '初心者歓迎',
-  '友達作り重視',
   'イベント充実',
-  '勉強サポート',
-  '国際交流',
-  'アットホーム',
-  'スポーツ志向',
+  '友達作り重視',
+  '初心者歓迎',
+  'ゆるめ',
+  '真剣',
+  '体育会系',
+  'フラット',
+  '和やか',
+  '賑やか',
 ];
 
 const FeatureSelectionScreen = ({ route, navigation }) => {

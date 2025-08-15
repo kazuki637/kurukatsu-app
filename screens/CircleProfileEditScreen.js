@@ -1154,46 +1154,17 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     <View style={styles.tabContent}>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>入会募集状況</Text>
-        <View style={styles.recruitingContainer}>
+        {isRecruiting ? (
           <View style={styles.recruitingStatusContainer}>
-            {isRecruiting ? (
-              <>
-                <Ionicons name="checkmark-circle" size={24} color="#28a745" />
-                <Text style={styles.recruitingStatusText}>入会募集中</Text>
-              </>
-            ) : (
-              <>
-                <Ionicons name="close-circle" size={24} color="#e74c3c" />
-                <Text style={styles.recruitingStatusText}>現在入会の募集はありません</Text>
-              </>
-            )}
+            <Ionicons name="checkmark-circle" size={24} color="#28a745" />
+            <Text style={styles.recruitingStatusText}>入会募集中</Text>
           </View>
-          <TouchableOpacity
-            style={[styles.toggleButton, isRecruiting && styles.toggleButtonActive]}
-            onPress={() => {
-              const newRecruitingStatus = !isRecruiting;
-              setIsRecruiting(newRecruitingStatus);
-              // 状態変更を即座に検知
-              if (!circleData) return;
-              
-              const hasChanges = 
-                description !== (circleData.description || '') ||
-                recommendationsInput !== (circleData.recommendations?.join(', ') || '') ||
-                leaderMessage !== (circleData.leaderMessage || '') ||
-                welcomeConditions !== (circleData.welcome?.conditions || '') ||
-                welcomeSchedule !== (circleData.welcome?.schedule || '') ||
-                snsLink !== (circleData.snsLink || '') ||
-                xLink !== (circleData.xLink || '') ||
-                shinkanLineGroupLink !== (circleData.shinkanLineGroupLink || '') ||
-                activityLocation !== (circleData.activityLocation || '') ||
-                newRecruitingStatus !== (circleData.welcome?.isRecruiting || false);
-              
-              setHasUnsavedChanges(hasChanges);
-            }}
-          >
-            <View style={[styles.toggleCircle, isRecruiting && styles.toggleCircleActive]} />
-          </TouchableOpacity>
-        </View>
+        ) : (
+          <View style={styles.recruitingStatusContainer}>
+            <Ionicons name="close-circle" size={24} color="#e74c3c" />
+            <Text style={styles.recruitingStatusText}>現在入会の募集はありません</Text>
+          </View>
+        )}
       </View>
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>入会条件</Text>
