@@ -187,9 +187,11 @@ const Calendar = ({ selectedDate, onDateSelect, events }) => {
           <Text style={styles.monthTitle}>
             {currentMonth.getFullYear()}年 {monthNames[currentMonth.getMonth()]}
           </Text>
-          <Text style={styles.monthSubtitle}>
-            {getEventCount(currentMonth) > 0 ? `${getEventCount(currentMonth)}件のスケジュール` : 'スケジュールなし'}
-          </Text>
+          {getEventCount(currentMonth) > 0 && (
+            <Text style={styles.monthSubtitle}>
+              {getEventCount(currentMonth)}件のスケジュール
+            </Text>
+          )}
         </View>
         
         <TouchableOpacity 

@@ -16,6 +16,7 @@ const FEATURES = [
   'イベント充実', '友達作り重視', '初心者歓迎', 'ゆるめ', '真剣', '体育会系', 'フラット', '和やか', '賑やか',
 ];
 const FREQUENCIES = ['週１回', '週２回', '週３回', '月１回', '不定期'];
+const ACTIVITY_WEEKDAYS = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日', '不定期'];
 const GENDER_RATIO_OPTIONS = ['男性多め', '女性多め', '半々'];
 const MEMBERS_OPTIONS = ['1-10人', '11-30人', '31-50人', '51-100人', '100人以上'];
 
@@ -29,6 +30,7 @@ export default function CircleSettingsScreen({ route, navigation }) {
   const [genre, setGenre] = useState('');
   const [features, setFeatures] = useState([]);
   const [frequency, setFrequency] = useState('');
+  const [activityDays, setActivityDays] = useState([]);
   const [members, setMembers] = useState('');
   const [genderratio, setGenderratio] = useState('');
   const [snsLink, setSnsLink] = useState('');
@@ -55,6 +57,7 @@ export default function CircleSettingsScreen({ route, navigation }) {
           setGenre(d.genre || '');
           setFeatures(d.features || []);
           setFrequency(d.frequency || '');
+          setActivityDays(d.activityDays || []);
           setMembers(d.members || '');
           setGenderratio(d.genderratio || '');
           setSnsLink(d.snsLink || '');
@@ -90,6 +93,7 @@ export default function CircleSettingsScreen({ route, navigation }) {
       genre !== (circle.genre || '') ||
       featuresChanged ||
       frequency !== (circle.frequency || '') ||
+      JSON.stringify(activityDays.sort()) !== JSON.stringify((circle.activityDays || []).sort()) ||
       members !== (circle.members || '') ||
       genderratio !== (circle.genderratio || '') ||
       isRecruiting !== (circle.welcome?.isRecruiting || false) ||
@@ -209,6 +213,7 @@ export default function CircleSettingsScreen({ route, navigation }) {
         genre,
         features,
         frequency,
+        activityDays,
         members,
         genderratio,
         imageUrl,
@@ -368,6 +373,38 @@ export default function CircleSettingsScreen({ route, navigation }) {
                   setHasUnsavedChanges(hasChanges);
                 }}>
                   <Text style={[styles.optionButtonText, frequency === item && styles.optionButtonTextActive]}>{item}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text style={styles.label}>活動曜日（複数選択可）</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
+              {ACTIVITY_WEEKDAYS.map(item => (
+                <TouchableOpacity key={item} style={[styles.optionButton, activityDays.includes(item) && styles.optionButtonActive]} onPress={() => {
+                  const newActivityDays = activityDays.includes(item) ? activityDays.filter(d => d !== item) : [...activityDays, item];
+                  setActivityDays(newActivityDays);
+                  // 状態変更を即座に検知
+                  if (!circle) return;
+                  
+                  const originalFeatures = circle.features || [];
+                  const currentFeatures = features || [];
+                  const featuresChanged = 
+                    originalFeatures.length !== currentFeatures.length ||
+                    !originalFeatures.every(feature => currentFeatures.includes(feature)) ||
+                    !currentFeatures.every(feature => originalFeatures.includes(feature));
+                  
+                  const hasChanges = 
+                    name !== (circle.name || '') ||
+                    genre !== (circle.genre || '') ||
+                    featuresChanged ||
+                    frequency !== (circle.frequency || '') ||
+                    JSON.stringify(newActivityDays.sort()) !== JSON.stringify((circle.activityDays || []).sort()) ||
+                    members !== (circle.members || '') ||
+                    genderratio !== (circle.genderratio || '') ||
+                    circleImage !== null;
+                  
+                  setHasUnsavedChanges(hasChanges);
+                }}>
+                  <Text style={[styles.optionButtonText, activityDays.includes(item) && styles.optionButtonTextActive]}>{item}</Text>
                 </TouchableOpacity>
               ))}
             </View>

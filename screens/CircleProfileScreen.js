@@ -305,6 +305,19 @@ export default function CircleProfileScreen({ route, navigation }) {
           </View>
         </View>
         
+        {circleData.activityDays && circleData.activityDays.length > 0 && (
+          <View style={styles.featuresContainer}>
+            <Text style={styles.infoLabel}>活動曜日</Text>
+            <View style={styles.featuresList}>
+              {circleData.activityDays.map((day, index) => (
+                <View key={index} style={styles.featureTag}>
+                  <Text style={styles.featureText}>{day}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+        
         {circleData.features && circleData.features.length > 0 && (
           <View style={styles.featuresContainer}>
             <Text style={styles.infoLabel}>特色</Text>

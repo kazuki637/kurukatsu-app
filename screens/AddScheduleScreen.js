@@ -9,7 +9,7 @@ import {
   TextInput, 
   ScrollView, 
   Platform, 
-  Switch, 
+  Switch,
   Keyboard,
   KeyboardAvoidingView
 } from 'react-native';
@@ -17,7 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { db } from '../firebaseConfig';
 import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
-import * as Notifications from 'expo-notifications';
+
 
 // 追加: 4桁時刻入力用のカスタムコンポーネント
 function TimeInput({ value, onChange, placeholder }) {
@@ -118,8 +118,7 @@ export default function AddScheduleScreen({ route, navigation }) {
   const [endTimeInput, setEndTimeInput] = useState('');
   const [location, setLocation] = useState('');
   const [selectedColor, setSelectedColor] = useState('#007bff');
-  const [enableReminder, setEnableReminder] = useState(true); // 通知の有効/無効
-  const [reminderTime, setReminderTime] = useState('15'); // 通知時間（分前）
+
   const scrollViewRef = useRef(null);
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
   // Add: 詳細欄のref
@@ -140,8 +139,7 @@ export default function AddScheduleScreen({ route, navigation }) {
       }
       setLocation(eventData.location || '');
       setSelectedColor(eventData.color || '#007bff');
-      setEnableReminder(eventData.enableReminder || true); // 通知設定の初期値
-      setReminderTime(eventData.reminderTime || '15'); // 通知時間の初期値
+      
       
     }
   }, [editMode, eventData]);
@@ -176,8 +174,7 @@ export default function AddScheduleScreen({ route, navigation }) {
         description: newDescription.trim(),
         location: location.trim(),
         color: selectedColor,
-        enableReminder: enableReminder, // 通知設定を保存
-        reminderTime: reminderTime, // 通知時間を保存
+
         updatedAt: new Date()
       };
 
@@ -321,61 +318,7 @@ export default function AddScheduleScreen({ route, navigation }) {
           </View>
         </View>
 
-        {/* 通知設定 */}
-        <View style={styles.formRow}>
-          <Text style={styles.formLabel}>通知</Text>
-          <Switch 
-            value={enableReminder} 
-            onValueChange={setEnableReminder}
-            trackColor={{ false: '#e0e0e0', true: '#007bff' }}
-            thumbColor={enableReminder ? '#fff' : '#f4f3f4'}
-          />
-        </View>
 
-        {/* 通知時間設定 */}
-        {enableReminder && (
-          <View style={styles.formRow}>
-            <Text style={styles.formLabel}>通知時間</Text>
-            <View style={styles.reminderTimeContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.reminderTimeOption,
-                  reminderTime === '5' && styles.selectedReminderTime
-                ]}
-                onPress={() => setReminderTime('5')}
-              >
-                <Text style={styles.reminderTimeText}>5分前</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.reminderTimeOption,
-                  reminderTime === '15' && styles.selectedReminderTime
-                ]}
-                onPress={() => setReminderTime('15')}
-              >
-                <Text style={styles.reminderTimeText}>15分前</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.reminderTimeOption,
-                  reminderTime === '30' && styles.selectedReminderTime
-                ]}
-                onPress={() => setReminderTime('30')}
-              >
-                <Text style={styles.reminderTimeText}>30分前</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.reminderTimeOption,
-                  reminderTime === '60' && styles.selectedReminderTime
-                ]}
-                onPress={() => setReminderTime('60')}
-              >
-                <Text style={styles.reminderTimeText}>1時間前</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
 
         {/* 詳細入力 */}
         <View style={styles.formRow}>
@@ -538,26 +481,7 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
   },
-  reminderTimeContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  reminderTimeOption: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  selectedReminderTime: {
-    borderColor: '#007bff',
-    borderWidth: 1,
-  },
-  reminderTimeText: {
-    fontSize: 14,
-    color: '#333',
-  },
+
   // 追加: 4桁分割表示用スタイル
   timeInputBox: {
     width: 32,
