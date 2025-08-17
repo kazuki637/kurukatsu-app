@@ -61,6 +61,15 @@ const LoginScreen = ({ navigation }) => {
           returnKeyType="done"
           onSubmitEditing={Keyboard.dismiss}
         />
+        
+        {/* パスワードリセットリンク */}
+        <TouchableOpacity
+          style={styles.forgotPasswordButton}
+          onPress={() => navigation.navigate('PasswordReset')}
+        >
+          <Text style={styles.forgotPasswordText}>パスワードをお忘れですか？</Text>
+        </TouchableOpacity>
+        
         <TouchableOpacity
           style={styles.loginButton}
           onPress={handleLogin}
@@ -72,6 +81,7 @@ const LoginScreen = ({ navigation }) => {
             <Text style={styles.loginButtonText}>ログイン</Text>
           )}
         </TouchableOpacity>
+        
         <View style={styles.termsContainer}>
           <Text style={styles.termsText}>
             続行することでクルカツの
@@ -150,6 +160,15 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  forgotPasswordButton: {
+    marginBottom: 15,
+    alignSelf: 'flex-start',
+    marginLeft: '5%',
+  },
+  forgotPasswordText: {
+    color: '#007bff',
+    fontSize: 16,
   },
   signupButton: {
     marginTop: 10,
