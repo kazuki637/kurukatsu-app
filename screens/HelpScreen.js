@@ -1,31 +1,81 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, SafeAreaView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, SafeAreaView, ActivityIndicator } from 'react-native';
 import CommonHeader from '../components/CommonHeader';
+import { db, auth } from '../firebaseConfig';
+import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 
 export default function HelpScreen() {
   const [subject, setSubject] = useState('');
   const [inquiry, setInquiry] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userName, setUserName] = useState('');
 
-  const handleSubmit = () => {
+  // ユーザー名を取得
+  useEffect(() => {
+    const fetchUserName = async () => {
+      if (auth.currentUser) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setUserName(userData.name || '');
+          }
+        } catch (error) {
+          console.error('ユーザー名の取得に失敗:', error);
+        }
+      }
+    };
+
+    fetchUserName();
+  }, []);
+
+  const handleSubmit = async () => {
     if (!subject.trim() || !inquiry.trim()) {
       Alert.alert('エラー', '件名とお問い合わせ内容を入力してください。');
       return;
     }
 
-    // ここで実際の送信処理を実装
-    Alert.alert(
-      '送信完了',
-      'お問い合わせを送信しました。2~3営業日以内にご返信いたします。',
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            setSubject('');
-            setInquiry('');
+    // 認証状態を確認
+    if (!auth.currentUser) {
+      Alert.alert('エラー', 'ログインが必要です。');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Firestoreにお問い合わせを保存
+      const inquiryData = {
+        subject: subject.trim(),
+        inquiry: inquiry.trim(),
+        userId: auth.currentUser.uid,
+        userEmail: auth.currentUser.email,
+        userName: userName || '未設定',
+        createdAt: serverTimestamp(),
+        status: 'pending' // pending, in_progress, resolved
+      };
+
+      await addDoc(collection(db, 'inquiries'), inquiryData);
+
+      Alert.alert(
+        '送信完了',
+        'お問い合わせを送信しました。2~3営業日以内にご返信いたします。',
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              setSubject('');
+              setInquiry('');
+            }
           }
-        }
-      ]
-    );
+        ]
+      );
+    } catch (error) {
+      console.error('お問い合わせ送信エラー:', error);
+      Alert.alert('エラー', 'お問い合わせの送信に失敗しました。しばらく時間をおいて再度お試しください。');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -75,6 +125,9 @@ export default function HelpScreen() {
               ※土・日・祝日にいただいたお問い合わせは翌営業日以降、順次ご対応させていただきます。
             </Text>
             <Text style={styles.notesText}>
+              ※ご返信は、クルカツに登録いただいたメールアドレス（{auth.currentUser?.email || '未設定'}）宛に送信いたします。
+            </Text>
+            <Text style={styles.notesText}>
               【受信許可設定について】「kurukatsu.app@gmail.com」からのメールを受信できるよう、受信許可設定(迷惑メール設定・ドメイン指定受信等)のご確認をお願いいたします。
             </Text>
           </View>
@@ -85,12 +138,16 @@ export default function HelpScreen() {
           <TouchableOpacity
             style={[
               styles.submitButton,
-              (!subject.trim() || !inquiry.trim()) && styles.submitButtonDisabled
+              (!subject.trim() || !inquiry.trim() || isSubmitting) && styles.submitButtonDisabled
             ]}
             onPress={handleSubmit}
-            disabled={!subject.trim() || !inquiry.trim()}
+            disabled={!subject.trim() || !inquiry.trim() || isSubmitting}
           >
-            <Text style={styles.submitButtonText}>送信する</Text>
+            {isSubmitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.submitButtonText}>送信する</Text>
+            )}
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -193,5 +250,9 @@ const styles = StyleSheet.create({
   submitButtonDisabled: {
     backgroundColor: '#ccc',
     opacity: 0.7,
+  },
+  submitButtonLoading: {
+    backgroundColor: '#007bff',
+    opacity: 0.8,
   },
 });

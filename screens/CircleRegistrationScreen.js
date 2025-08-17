@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, SafeAreaView, Alert, Image, ActivityIndicator, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, SafeAreaView, Alert, Image, ActivityIndicator, StatusBar, Platform, KeyboardAvoidingView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as ImagePicker from 'expo-image-picker';
 import { db, storage, auth } from '../firebaseConfig';
 import { collection, addDoc, doc, getDoc, updateDoc, arrayUnion, setDoc } from 'firebase/firestore';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { compressCircleImage } from '../utils/imageCompression';
+import CommonHeader from '../components/CommonHeader';
 
 export default function CircleRegistrationScreen() {
   const navigation = useNavigation();
@@ -233,348 +233,182 @@ export default function CircleRegistrationScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={['#1e3a8a', '#3b82f6', '#60a5fa']}
-      style={styles.fullScreenContainer}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-    >
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>サークル登録</Text>
-      </View>
-      <SafeAreaView style={styles.contentSafeArea}>
-      <ScrollView contentContainerStyle={styles.scrollViewContent}>
+    <View style={{ flex: 1, backgroundColor: '#fff' }}>
+      <CommonHeader title="サークル登録" showBackButton onBack={() => navigation.goBack()} />
+      <SafeAreaView style={{ flex: 1 }}>
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 40}
+        >
+          <ScrollView contentContainerStyle={{ padding: 20 }}>
         
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>サークルアイコン</Text>
-          <TouchableOpacity style={[styles.imagePicker, styles.circleImageContainer]} onPress={pickImage}>
-            {circleImage ? (
-              <Image source={{ uri: circleImage }} style={styles.circleImage} />
-            ) : (
-              <View style={styles.circleImagePlaceholder}>
-                <Ionicons name="camera-outline" size={40} color="#ccc" />
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>サークル名</Text>
-          <TextInput
-            style={styles.input}
-            value={circleName}
-            onChangeText={setCircleName}
-            placeholder=""
-          />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>大学名</Text>
-          <TextInput
-            style={[styles.input, styles.uneditableInputText]}
-            value={universityName}
-            editable={false}
-          />
-        </View>
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>代表者氏名</Text>
-          <TextInput
-            style={[styles.input, styles.uneditableInputText]}
-            value={representativeName}
-            editable={false}
-          />
-        </View>
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>代表者連絡先</Text>
-          <TextInput
-            style={[styles.input, styles.uneditableInputText]}
-            value={contactInfo}
-            editable={false}
-          />
-        </View>
-
-
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>ジャンル</Text>
-          <View style={styles.optionsContainer}>
-            {GENRES.map((item) => (
-              <TouchableOpacity
-                key={item}
-                style={[styles.optionButton, genre === item && styles.optionButtonActive]}
-                onPress={() => setGenre(item)}
-              >
-                <Text style={[styles.optionButtonText, genre === item && styles.optionButtonTextActive]}>{item}</Text>
+            {/* サークルアイコン画像 */}
+            <Text style={styles.label}>サークルアイコン画像</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: 8, marginBottom: 16 }}>
+              <TouchableOpacity style={[styles.circleImagePicker, {marginTop: 0, marginBottom: 0}]} onPress={pickImage}>
+                {circleImage ? (
+                  <Image source={{ uri: circleImage }} style={styles.circleImage} />
+                ) : (
+                  <View style={[styles.circleImage, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
+                    <Ionicons name="people-outline" size={60} color="#aaa" />
+                  </View>
+                )}
               </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+            </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>特色（複数選択可）</Text>
-          <View style={styles.optionsContainer}>
-            {FEATURES.map((item) => (
-              <TouchableOpacity
-                key={item}
-                style={[styles.optionButton, features.includes(item) && styles.optionButtonActive]}
-                onPress={() => {
+            <Text style={styles.label}>サークル名</Text>
+            <TextInput 
+              style={styles.input} 
+              value={circleName} 
+              onChangeText={setCircleName} 
+              placeholder="サークル名を入力してください"
+            />
+
+            <Text style={styles.label}>大学名</Text>
+            <TextInput 
+              style={[styles.input, styles.disabledInput]} 
+              value={universityName} 
+              onChangeText={setUniversityName}
+              editable={false}
+              placeholder="登録時に設定された大学名"
+            />
+            <Text style={styles.label}>代表者連絡先</Text>
+            <TextInput 
+              style={[styles.input, styles.disabledInput]} 
+              value={contactInfo} 
+              onChangeText={setContactInfo}
+              editable={false}
+              placeholder="登録時に設定された連絡先"
+            />
+
+
+
+            <Text style={styles.label}>ジャンル</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
+              {GENRES.map(item => (
+                <TouchableOpacity key={item} style={[styles.optionButton, genre === item && styles.optionButtonActive]} onPress={() => setGenre(item)}>
+                  <Text style={[styles.optionButtonText, genre === item && styles.optionButtonTextActive]}>{item}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.label}>特色（複数選択可）</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
+              {FEATURES.map(item => (
+                <TouchableOpacity key={item} style={[styles.optionButton, features.includes(item) && styles.optionButtonActive]} onPress={() => {
                   setFeatures((prev) =>
                     prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
                   );
-                }}
-              >
-                <Text style={[styles.optionButtonText, features.includes(item) && styles.optionButtonTextActive]}>{item}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+                }}>
+                  <Text style={[styles.optionButtonText, features.includes(item) && styles.optionButtonTextActive]}>{item}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>活動頻度</Text>
-          <View style={styles.optionsContainer}>
-            {FREQUENCIES.map((item) => (
-              <TouchableOpacity
-                key={item}
-                style={[styles.optionButton, frequency === item && styles.optionButtonActive]}
-                onPress={() => setFrequency(item)}
-              >
-                <Text style={[styles.optionButtonText, frequency === item && styles.optionButtonTextActive]}>{item}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+            <Text style={styles.label}>活動頻度</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
+              {FREQUENCIES.map(item => (
+                <TouchableOpacity key={item} style={[styles.optionButton, frequency === item && styles.optionButtonActive]} onPress={() => setFrequency(item)}>
+                  <Text style={[styles.optionButtonText, frequency === item && styles.optionButtonTextActive]}>{item}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
 
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>活動曜日（複数選択可）</Text>
-          <View style={styles.optionsContainer}>
-            {ACTIVITY_WEEKDAYS.map((item) => (
-              <TouchableOpacity
-                key={item}
-                style={[styles.optionButton, activityDays.includes(item) && styles.optionButtonActive]}
-                onPress={() => {
+            <Text style={styles.label}>活動曜日（複数選択可）</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
+              {ACTIVITY_WEEKDAYS.map(item => (
+                <TouchableOpacity key={item} style={[styles.optionButton, activityDays.includes(item) && styles.optionButtonActive]} onPress={() => {
                   setActivityDays((prev) =>
                     prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
                   );
-                }}
-              >
-                <Text style={[styles.optionButtonText, activityDays.includes(item) && styles.optionButtonTextActive]}>{item}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>人数</Text>
-          <View style={styles.optionsContainer}>
-            {MEMBERS_OPTIONS.map((item) => (
-              <TouchableOpacity
-                key={item}
-                style={[styles.optionButton, members === item && styles.optionButtonActive]}
-                onPress={() => setMembers(item)}
-              >
-                <Text style={[styles.optionButtonText, members === item && styles.optionButtonTextActive]}>{item}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>男女比</Text>
-          <View style={styles.optionsContainer}>
-            {GENDER_RATIO_OPTIONS.map((item) => (
-              <TouchableOpacity
-                key={item}
-                style={[styles.optionButton, genderratio === item && styles.optionButtonActive]}
-                onPress={() => setGenderratio(item)}
-              >
-                <Text style={[styles.optionButtonText, genderratio === item && styles.optionButtonTextActive]}>{item}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>入会募集状況</Text>
-          <View style={styles.recruitingContainer}>
-            <View style={styles.recruitingStatusContainer}>
-              {isRecruiting ? (
-                <>
-                  <Ionicons name="checkmark-circle" size={24} color="#28a745" />
-                  <Text style={styles.recruitingStatusText}>入会募集中</Text>
-                </>
-              ) : (
-                <>
-                  <Ionicons name="close-circle" size={24} color="#e74c3c" />
-                  <Text style={styles.recruitingStatusText}>現在入会の募集はありません</Text>
-                </>
-              )}
+                }}>
+                  <Text style={[styles.optionButtonText, activityDays.includes(item) && styles.optionButtonTextActive]}>{item}</Text>
+                </TouchableOpacity>
+              ))}
             </View>
-            <TouchableOpacity
-              style={[styles.toggleButton, isRecruiting && styles.toggleButtonActive]}
-              onPress={() => setIsRecruiting(!isRecruiting)}
-            >
-              <View style={[styles.toggleCircle, isRecruiting && styles.toggleCircleActive]} />
-            </TouchableOpacity>
-          </View>
-        </View>
 
-        <TouchableOpacity
-          style={styles.registerButton}
-          onPress={handleRegister}
-          disabled={uploading}
-        >
-          <LinearGradient
-            colors={['#007bff', '#0056b3']}
-            style={styles.registerButtonGradient}
-          >
-            <Ionicons 
-              name="add-circle" 
-              size={24} 
-              color="#fff" 
-            />
-            <Text style={styles.registerButtonText}>
-              {uploading ? '登録中...' : 'サークルを登録'}
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </ScrollView>
-    </SafeAreaView>
-    </LinearGradient>
+            <Text style={styles.label}>人数</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
+              {MEMBERS_OPTIONS.map(item => (
+                <TouchableOpacity key={item} style={[styles.optionButton, members === item && styles.optionButtonActive]} onPress={() => setMembers(item)}>
+                  <Text style={[styles.optionButtonText, members === item && styles.optionButtonTextActive]}>{item}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.label}>男女比</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
+              {GENDER_RATIO_OPTIONS.map(item => (
+                <TouchableOpacity key={item} style={[styles.optionButton, genderratio === item && styles.optionButtonActive]} onPress={() => setGenderratio(item)}>
+                  <Text style={[styles.optionButtonText, genderratio === item && styles.optionButtonTextActive]}>{item}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* 入会募集状況 */}
+            <Text style={styles.label}>入会募集状況</Text>
+            <View style={styles.recruitingContainer}>
+              <View style={styles.recruitingStatusContainer}>
+                {isRecruiting ? (
+                  <>
+                    <Ionicons name="checkmark-circle" size={24} color="#28a745" />
+                    <Text style={styles.recruitingStatusText}>入会募集中</Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons name="close-circle" size={24} color="#e74c3c" />
+                    <Text style={styles.recruitingStatusText}>現在入会の募集はありません</Text>
+                  </>
+                )}
+              </View>
+              <TouchableOpacity
+                style={[styles.toggleButton, isRecruiting && styles.toggleButtonActive]}
+                onPress={() => setIsRecruiting(!isRecruiting)}
+              >
+                <View style={[styles.toggleCircle, isRecruiting && styles.toggleCircleActive]} />
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity style={styles.saveButton} onPress={handleRegister} disabled={uploading}>
+              <Text style={styles.saveButtonText}>{uploading ? '登録中...' : 'サークルを登録'}</Text>
+            </TouchableOpacity>
+                </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8f8f8',
-  },
-  scrollViewContent: {
-    padding: 20,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    marginBottom: 40, 
-    textAlign: 'center',
-    color: '#333',
-  },
-  fullScreenContainer: {
-    flex: 1,
-    backgroundColor: '#1e3a8a',
-  },
-  header: {
-    width: '100%',
-    height: 115,
-    paddingTop: StatusBar.currentHeight,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-    position: 'absolute',
-    bottom: 10,
-    left: 0,
-    right: 0,
-    textAlign: 'center',
-  },
-  contentSafeArea: {
-    flex: 1,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#fff', 
-  },
-  input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-    borderRadius: 12, 
-    paddingVertical: 14, 
-    paddingHorizontal: 16, 
-    fontSize: 16,
-    shadowColor: '#000', 
-    shadowOffset: { width: 0, height: 2 }, 
-    shadowOpacity: 0.1, 
-    shadowRadius: 8, 
-    elevation: 5, 
-  },
-  registerButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-    marginTop: 20,
-  },
-  registerButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-  },
-  registerButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  uneditableInputText: {
-    color: '#888', // 薄い灰色
-  },
-  optionsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-start',
-    marginTop: 5,
-  },
-  optionButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    margin: 5,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  optionButtonActive: {
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-  },
-  optionButtonText: {
-    color: '#fff',
-  },
-  optionButtonTextActive: {
-    color: '#1e3a8a',
-  },
+  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, color: '#333' },
+  label: { fontSize: 16, color: '#333', marginTop: 12, marginBottom: 4 },
+  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, fontSize: 16, backgroundColor: '#fafafa', marginBottom: 4 },
+  disabledInput: { backgroundColor: '#f0f0f0', color: '#666', borderColor: '#ddd' },
+  optionButton: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 16, borderWidth: 1, borderColor: '#ccc', marginRight: 8, marginBottom: 6, backgroundColor: '#fff' },
+  optionButtonActive: { backgroundColor: '#007bff', borderColor: '#007bff' },
+  optionButtonText: { color: '#333', fontSize: 15 },
+  optionButtonTextActive: { color: '#fff', fontWeight: 'bold' },
+  saveButton: { backgroundColor: '#007bff', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 24 },
+  saveButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  circleImagePicker: { alignItems: 'center', marginBottom: 16 },
+  circleImage: { width: 100, height: 100, borderRadius: 50 },
   // 入会募集状況関連のスタイル
   recruitingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 5,
+    marginBottom: 16,
   },
   recruitingStatusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: '#f8f9fa',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: '#e9ecef',
     flex: 1,
     marginRight: 16,
   },
@@ -582,21 +416,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 12,
-    color: '#fff',
   },
   toggleButton: {
     width: 60,
     height: 32,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: '#e9ecef',
     borderRadius: 16,
     padding: 2,
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   toggleButtonActive: {
     backgroundColor: '#28a745',
-    borderColor: '#28a745',
   },
   toggleCircle: {
     width: 28,
@@ -612,50 +442,4 @@ const styles = StyleSheet.create({
   toggleCircleActive: {
     transform: [{ translateX: 28 }],
   },
-  selectionItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    height: 50, // 固定の高さ
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  selectionItemText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  selectedCheckmark: {
-    marginLeft: 10,
-  },
-  imagePicker: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  circleImageContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    overflow: 'hidden', // これを追加することで、子要素がこの境界からはみ出さないようにします
-  },
-  circleImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    resizeMode: 'cover',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  circleImagePlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  
 });
