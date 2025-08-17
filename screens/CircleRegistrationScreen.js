@@ -25,6 +25,7 @@ export default function CircleRegistrationScreen() {
   const [isRecruiting, setIsRecruiting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [circleImage, setCircleImage] = useState(null);
+  const [circleType, setCircleType] = useState('学内サークル'); // デフォルトは学内サークル
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -181,6 +182,7 @@ export default function CircleRegistrationScreen() {
         members,
         contactInfo,
         imageUrl,
+        circleType, // サークル種別を追加
         welcome: {
           isRecruiting,
         },
@@ -224,6 +226,7 @@ export default function CircleRegistrationScreen() {
       setGenre('');
       setMembers('');
       setContactInfo('');
+      setCircleType('学内サークル'); // サークル種別をリセット
     } catch (error) {
       console.error('Error registering circle:', error);
       Alert.alert('登録エラー', 'サークル情報の登録中にエラーが発生しました。');
@@ -255,6 +258,30 @@ export default function CircleRegistrationScreen() {
                     <Ionicons name="people-outline" size={60} color="#aaa" />
                   </View>
                 )}
+              </TouchableOpacity>
+            </View>
+
+            {/* サークル種別選択 */}
+            <Text style={styles.label}>サークル種別</Text>
+            <View style={styles.circleTypeContainer}>
+              <TouchableOpacity 
+                style={styles.circleTypeButton} 
+                onPress={() => setCircleType('学内サークル')}
+              >
+                <View style={styles.radioButton}>
+                  {circleType === '学内サークル' && <View style={styles.radioButtonInner} />}
+                </View>
+                <Text style={styles.circleTypeText}>学内サークル</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.circleTypeButton} 
+                onPress={() => setCircleType('インカレサークル')}
+              >
+                <View style={styles.radioButton}>
+                  {circleType === 'インカレサークル' && <View style={styles.radioButtonInner} />}
+                </View>
+                <Text style={styles.circleTypeText}>インカレサークル</Text>
               </TouchableOpacity>
             </View>
 
@@ -441,5 +468,39 @@ const styles = StyleSheet.create({
   },
   toggleCircleActive: {
     transform: [{ translateX: 28 }],
+  },
+  // サークル種別選択関連のスタイル
+  circleTypeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 8,
+  },
+  circleTypeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#fff',
+  },
+  circleTypeText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#333',
+  },
+  radioButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#007bff',
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioButtonInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#007bff',
   },
 });

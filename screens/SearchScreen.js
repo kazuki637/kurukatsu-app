@@ -14,6 +14,7 @@ const SearchScreen = ({ navigation }) => {
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [selectedGenderRatio, setSelectedGenderRatio] = useState([]);
   const [selectedActivityDays, setSelectedActivityDays] = useState([]);
+  const [selectedCircleType, setSelectedCircleType] = useState(''); // サークル種別を追加
   
   const [allCircles, setAllCircles] = useState([]);
   const [filteredCircles, setFilteredCircles] = useState([]);
@@ -81,12 +82,16 @@ const SearchScreen = ({ navigation }) => {
         ? selectedActivityDays.some(day => circle.activityDays?.includes(day)) 
         : true;
 
-      return matchesSearchText && matchesUniversity && matchesGenre && matchesFeatures && matchesFrequency && matchesMembers && matchesGenderRatio && matchesActivityDays;
+      const matchesCircleType = selectedCircleType 
+        ? circle.circleType === selectedCircleType 
+        : true;
+
+      return matchesSearchText && matchesUniversity && matchesGenre && matchesFeatures && matchesFrequency && matchesMembers && matchesGenderRatio && matchesActivityDays && matchesCircleType;
     });
 
     setFilteredCircles(filtered);
 
-  }, [searchText, selectedUniversities, selectedGenres, selectedFeatures, selectedFrequency, selectedMembers, selectedGenderRatio, selectedActivityDays, allCircles, initialLoading]);
+  }, [searchText, selectedUniversities, selectedGenres, selectedFeatures, selectedFrequency, selectedMembers, selectedGenderRatio, selectedActivityDays, selectedCircleType, allCircles, initialLoading]);
 
 
   const updateFilter = (filterType, value) => {
@@ -98,6 +103,7 @@ const SearchScreen = ({ navigation }) => {
       case 'members': setSelectedMembers(value); break;
       case 'genderRatio': setSelectedGenderRatio(value); break;
       case 'activityDays': setSelectedActivityDays(value); break;
+      case 'circleType': setSelectedCircleType(value); break;
       default: break;
     }
   };
@@ -111,6 +117,7 @@ const SearchScreen = ({ navigation }) => {
     setSelectedMembers([]);
     setSelectedGenderRatio([]);
     setSelectedActivityDays([]);
+    setSelectedCircleType(''); // サークル種別もリセット
   };
 
   const handleSearch = async () => {
@@ -158,7 +165,11 @@ const SearchScreen = ({ navigation }) => {
           ? selectedActivityDays.some(day => circle.activityDays?.includes(day)) 
           : true;
 
-        return matchesSearchText && matchesUniversity && matchesGenre && matchesFeatures && matchesFrequency && matchesMembers && matchesGenderRatio && matchesActivityDays;
+        const matchesCircleType = selectedCircleType 
+          ? circle.circleType === selectedCircleType 
+          : true;
+
+        return matchesSearchText && matchesUniversity && matchesGenre && matchesFeatures && matchesFrequency && matchesMembers && matchesGenderRatio && matchesActivityDays && matchesCircleType;
       });
       
       navigation.navigate('SearchResults', { circles: latestFiltered });
@@ -219,6 +230,30 @@ const SearchScreen = ({ navigation }) => {
 
         <ScrollView style={styles.filterSection}>
           <Text style={styles.sectionTitle}>サークル情報</Text>
+          
+          {/* サークル種別選択 */}
+          <View style={styles.circleTypeContainer}>
+            <TouchableOpacity 
+              style={styles.circleTypeButton} 
+              onPress={() => updateFilter('circleType', selectedCircleType === '学内サークル' ? '' : '学内サークル')}
+            >
+              <View style={styles.radioButton}>
+                {selectedCircleType === '学内サークル' && <View style={styles.radioButtonInner} />}
+              </View>
+              <Text style={styles.circleTypeText}>学内サークル</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.circleTypeButton} 
+              onPress={() => updateFilter('circleType', selectedCircleType === 'インカレサークル' ? '' : 'インカレサークル')}
+            >
+              <View style={styles.radioButton}>
+                {selectedCircleType === 'インカレサークル' && <View style={styles.radioButtonInner} />}
+              </View>
+              <Text style={styles.circleTypeText}>インカレサークル</Text>
+            </TouchableOpacity>
+          </View>
+
           <FilterItem label="大学" value={selectedUniversities} onPress={() => navigation.navigate('UniversitySelection', { currentSelection: selectedUniversities, onComplete: (value) => updateFilter('universities', value) })} />
           <FilterItem label="ジャンル" value={selectedGenres} onPress={() => navigation.navigate('GenreSelection', { currentSelection: selectedGenres, onComplete: (value) => updateFilter('genres', value) })} />
           <FilterItem label="特色" value={selectedFeatures} onPress={() => navigation.navigate('FeatureSelection', { currentSelection: selectedFeatures, onComplete: (value) => updateFilter('features', value) })} />
@@ -229,11 +264,9 @@ const SearchScreen = ({ navigation }) => {
         </ScrollView>
 
         <View style={styles.footer}>
-          {filteredCircles.length > 0 && (
-            <Text style={styles.filterCountText}>
-              <Text style={styles.filterCountNumber}>{filteredCircles.length}</Text>件に絞り込み中
-            </Text>
-          )}
+          <Text style={styles.filterCountText}>
+            <Text style={styles.filterCountNumber}>{filteredCircles.length}</Text>件に絞り込み中
+          </Text>
           <View style={styles.footerButtons}>
             <TouchableOpacity style={styles.clearButton} onPress={handleClearFilters}>
               <Text style={styles.clearButtonText}>リセット</Text>
@@ -395,6 +428,46 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  // サークル種別選択関連のスタイル
+  circleTypeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 10,
+    backgroundColor: '#fff',
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#eee',
+  },
+  circleTypeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#fff',
+  },
+  circleTypeText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: '#333',
+  },
+  radioButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#007bff',
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioButtonInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#007bff',
   },
 });
 
