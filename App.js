@@ -31,6 +31,7 @@ import GenderRatioSelectionScreen from './screens/GenderRatioSelectionScreen';
 import ActivityDaySelectionScreen from './screens/ActivityDaySelectionScreen';
 import HelpScreen from './screens/HelpScreen';
 import LoginScreen from './screens/LoginScreen';
+import PasswordResetScreen from './screens/PasswordResetScreen';
 import MembersSelectionScreen from './screens/MembersSelectionScreen';
 import PrivacyPolicyScreen from './screens/PrivacyPolicyScreen';
 import SearchResultsScreen from './screens/SearchResultsScreen';
@@ -69,6 +70,7 @@ function AuthStackScreen() {
     <AuthStack.Navigator screenOptions={{ headerShown: false }}>
       <AuthStack.Screen name="Login" component={LoginScreen} />
       <AuthStack.Screen name="Signup" component={SignupScreen} />
+      <AuthStack.Screen name="PasswordReset" component={PasswordResetScreen} />
       <AuthStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
     </AuthStack.Navigator>
   );
