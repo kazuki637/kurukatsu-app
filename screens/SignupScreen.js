@@ -9,6 +9,32 @@ const SignupScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [passwordErrors, setPasswordErrors] = useState([]);
+
+  // パスワード検証関数
+  const validatePassword = (password) => {
+    const errors = [];
+    // 8文字以上
+    if (password.length < 8) {
+      errors.push("・8文字以上で入力してください。");
+    }
+    // アルファベットを含む
+    if (!/[a-zA-Z]/.test(password)) {
+      errors.push("・アルファベットを1文字以上含めてください。");
+    }
+    // 数字を含む
+    if (!/[0-9]/.test(password)) {
+      errors.push("・数字を1文字以上含めてください。");
+    }
+    return errors;
+  };
+
+  // パスワード入力時のリアルタイムバリデーション
+  const handlePasswordChange = (text) => {
+    setPassword(text);
+    const errors = validatePassword(text);
+    setPasswordErrors(errors);
+  };
 
   const handleSignup = async () => {
     // パスワード確認チェック
@@ -17,9 +43,9 @@ const SignupScreen = ({ navigation }) => {
       return;
     }
 
-    // パスワードの長さチェック
-    if (password.length < 6) {
-      Alert.alert('エラー', 'パスワードは6文字以上で入力してください。');
+    // パスワード条件チェック
+    if (passwordErrors.length > 0) {
+      Alert.alert('エラー', 'パスワードの条件を満たしていません。');
       return;
     }
 
@@ -102,11 +128,18 @@ const SignupScreen = ({ navigation }) => {
           style={styles.input}
           placeholder="パスワード"
           value={password}
-          onChangeText={setPassword}
+          onChangeText={handlePasswordChange}
           secureTextEntry
           returnKeyType="next"
           blurOnSubmit={false}
         />
+        {passwordErrors.length > 0 && (
+          <View style={styles.errorContainer}>
+            {passwordErrors.map((error, index) => (
+              <Text key={index} style={styles.errorText}>{error}</Text>
+            ))}
+          </View>
+        )}
         <TextInput
           style={styles.input}
           placeholder="パスワード（確認）"
@@ -119,10 +152,10 @@ const SignupScreen = ({ navigation }) => {
         <TouchableOpacity
           style={[
             styles.registerButton,
-            (!email || !password || !confirmPassword) && styles.registerButtonDisabled
+            (!email || !password || !confirmPassword || passwordErrors.length > 0) && styles.registerButtonDisabled
           ]}
           onPress={handleSignup}
-          disabled={loading || !email || !password || !confirmPassword}
+          disabled={loading || !email || !password || !confirmPassword || passwordErrors.length > 0}
         >
           {loading ? (
             <ActivityIndicator size="small" color="#fff" />
@@ -223,6 +256,20 @@ const styles = StyleSheet.create({
     color: '#007bff',
     fontSize: 12,
     textDecorationLine: 'underline',
+  },
+  errorContainer: {
+    width: '90%',
+    backgroundColor: '#ffebee',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#ef5350',
+  },
+  errorText: {
+    color: '#ef5350',
+    fontSize: 12,
+    marginBottom: 2,
   },
 });
 

@@ -324,7 +324,7 @@ export default function MyPageScreen({ navigation, route }) {
             ) : (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>いいね！した記事はありません</Text>
-                <Text style={styles.emptySubText}>気になる記事をいいねしましょう</Text>
+                <Text style={styles.emptySubText}>気になる記事を保存しましょう</Text>
               </View>
             )}
           </View>
@@ -384,15 +384,14 @@ const styles = StyleSheet.create({
     marginRight: 15,
   },
   articleImage: {
-    width: 100,
-    height: 60,
-    borderRadius: 8,
+    width: 120,
+    height: 72,
     marginBottom: 8,
   },
   articleTitle: {
     fontSize: 12,
     color: '#333',
-    textAlign: 'center',
+    textAlign: 'left',
     marginBottom: 4,
     fontWeight: '600',
     lineHeight: 16,

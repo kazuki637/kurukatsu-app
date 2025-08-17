@@ -136,7 +136,7 @@ export default function TermsOfServiceScreen({ navigation }) {
               1. 本規約の解釈には、日本法を準拠法とします。
             </Text>
             <Text style={styles.paragraph}>
-              2. 本サービスに関して紛争が生じた場合、運営者の住所地を管轄する裁判所を専属的合意管轄とします。
+              2. 本サービスに関して紛争が生じた場合、東京地方裁判所を第一審の専属的合意管轄とします。
             </Text>
 
             <View style={styles.divider} />
