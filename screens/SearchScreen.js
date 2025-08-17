@@ -13,6 +13,7 @@ const SearchScreen = ({ navigation }) => {
   const [selectedFrequency, setSelectedFrequency] = useState([]);
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [selectedGenderRatio, setSelectedGenderRatio] = useState([]);
+  const [selectedActivityDays, setSelectedActivityDays] = useState([]);
   
   const [allCircles, setAllCircles] = useState([]);
   const [filteredCircles, setFilteredCircles] = useState([]);
@@ -76,12 +77,16 @@ const SearchScreen = ({ navigation }) => {
         ? selectedGenderRatio.includes(circle.genderratio) 
         : true;
 
-      return matchesSearchText && matchesUniversity && matchesGenre && matchesFeatures && matchesFrequency && matchesMembers && matchesGenderRatio;
+      const matchesActivityDays = selectedActivityDays.length > 0 
+        ? selectedActivityDays.some(day => circle.activityDays?.includes(day)) 
+        : true;
+
+      return matchesSearchText && matchesUniversity && matchesGenre && matchesFeatures && matchesFrequency && matchesMembers && matchesGenderRatio && matchesActivityDays;
     });
 
     setFilteredCircles(filtered);
 
-  }, [searchText, selectedUniversities, selectedGenres, selectedFeatures, selectedFrequency, selectedMembers, selectedGenderRatio, allCircles, initialLoading]);
+  }, [searchText, selectedUniversities, selectedGenres, selectedFeatures, selectedFrequency, selectedMembers, selectedGenderRatio, selectedActivityDays, allCircles, initialLoading]);
 
 
   const updateFilter = (filterType, value) => {
@@ -92,6 +97,7 @@ const SearchScreen = ({ navigation }) => {
       case 'frequency': setSelectedFrequency(value); break;
       case 'members': setSelectedMembers(value); break;
       case 'genderRatio': setSelectedGenderRatio(value); break;
+      case 'activityDays': setSelectedActivityDays(value); break;
       default: break;
     }
   };
@@ -104,6 +110,7 @@ const SearchScreen = ({ navigation }) => {
     setSelectedFrequency([]);
     setSelectedMembers([]);
     setSelectedGenderRatio([]);
+    setSelectedActivityDays([]);
   };
 
   const handleSearch = async () => {
@@ -147,7 +154,11 @@ const SearchScreen = ({ navigation }) => {
           ? selectedGenderRatio.includes(circle.genderratio) 
           : true;
 
-        return matchesSearchText && matchesUniversity && matchesGenre && matchesFeatures && matchesFrequency && matchesMembers && matchesGenderRatio;
+        const matchesActivityDays = selectedActivityDays.length > 0 
+          ? selectedActivityDays.some(day => circle.activityDays?.includes(day)) 
+          : true;
+
+        return matchesSearchText && matchesUniversity && matchesGenre && matchesFeatures && matchesFrequency && matchesMembers && matchesGenderRatio && matchesActivityDays;
       });
       
       navigation.navigate('SearchResults', { circles: latestFiltered });
@@ -169,7 +180,8 @@ const SearchScreen = ({ navigation }) => {
       case '大学': return <Ionicons name="school-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
       case 'ジャンル': return <Ionicons name="grid-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
       case '特色': return <Ionicons name="star-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
-      case '活動頻度': return <Ionicons name="calendar-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
+      case '活動頻度': return <Ionicons name="time-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
+      case '活動曜日': return <Ionicons name="calendar-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
       case '人数': return <Ionicons name="people-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
       case '男女比': return <Ionicons name="male-female-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
       default: return null;
@@ -211,6 +223,7 @@ const SearchScreen = ({ navigation }) => {
           <FilterItem label="ジャンル" value={selectedGenres} onPress={() => navigation.navigate('GenreSelection', { currentSelection: selectedGenres, onComplete: (value) => updateFilter('genres', value) })} />
           <FilterItem label="特色" value={selectedFeatures} onPress={() => navigation.navigate('FeatureSelection', { currentSelection: selectedFeatures, onComplete: (value) => updateFilter('features', value) })} />
           <FilterItem label="活動頻度" value={selectedFrequency} onPress={() => navigation.navigate('FrequencySelection', { currentSelection: selectedFrequency, onComplete: (value) => updateFilter('frequency', value) })} />
+          <FilterItem label="活動曜日" value={selectedActivityDays} onPress={() => navigation.navigate('ActivityDaySelection', { currentSelection: selectedActivityDays, onComplete: (value) => updateFilter('activityDays', value) })} />
           <FilterItem label="人数" value={selectedMembers} onPress={() => navigation.navigate('MembersSelection', { currentSelection: selectedMembers, onComplete: (value) => updateFilter('members', value) })} />
           <FilterItem label="男女比" value={selectedGenderRatio} onPress={() => navigation.navigate('GenderRatioSelection', { currentSelection: selectedGenderRatio, onComplete: (value) => updateFilter('genderRatio', value) })} />
         </ScrollView>

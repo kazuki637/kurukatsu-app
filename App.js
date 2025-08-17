@@ -28,6 +28,7 @@ import CircleProfileScreen from './screens/CircleProfileScreen';
 import FeatureSelectionScreen from './screens/FeatureSelectionScreen';
 import FrequencySelectionScreen from './screens/FrequencySelectionScreen';
 import GenderRatioSelectionScreen from './screens/GenderRatioSelectionScreen';
+import ActivityDaySelectionScreen from './screens/ActivityDaySelectionScreen';
 import HelpScreen from './screens/HelpScreen';
 import LoginScreen from './screens/LoginScreen';
 import MembersSelectionScreen from './screens/MembersSelectionScreen';
@@ -98,6 +99,7 @@ function SearchStackScreen() {
       <SearchStack.Screen name="FrequencySelection" component={FrequencySelectionScreen} />
       <SearchStack.Screen name="MembersSelection" component={MembersSelectionScreen} />
       <SearchStack.Screen name="GenderRatioSelection" component={GenderRatioSelectionScreen} />
+      <SearchStack.Screen name="ActivityDaySelection" component={ActivityDaySelectionScreen} />
       <SearchStack.Screen name="SearchResults" component={SearchResultsScreen} />
       <SearchStack.Screen name="CircleDetail" component={CircleProfileScreen} />
     </SearchStack.Navigator>

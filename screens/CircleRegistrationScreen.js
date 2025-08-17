@@ -16,6 +16,7 @@ export default function CircleRegistrationScreen() {
 
   const [features, setFeatures] = useState([]);
   const [frequency, setFrequency] = useState('');
+  const [activityDays, setActivityDays] = useState([]);
   const [genderratio, setGenderratio] = useState('');
   const [genre, setGenre] = useState('');
   const [members, setMembers] = useState('');
@@ -51,6 +52,17 @@ export default function CircleRegistrationScreen() {
     '週２回',
     '週３回',
     '月１回',
+    '不定期',
+  ];
+
+  const ACTIVITY_WEEKDAYS = [
+    '月曜日',
+    '火曜日',
+    '水曜日',
+    '木曜日',
+    '金曜日',
+    '土曜日',
+    '日曜日',
     '不定期',
   ];
 
@@ -163,6 +175,7 @@ export default function CircleRegistrationScreen() {
         universityName,
         features,
         frequency,
+        activityDays,
         genderratio,
         genre,
         members,
@@ -206,6 +219,7 @@ export default function CircleRegistrationScreen() {
 
       setFeatures([]);
       setFrequency('');
+      setActivityDays([]);
       setGenderratio('');
       setGenre('');
       setMembers('');
@@ -326,6 +340,25 @@ export default function CircleRegistrationScreen() {
                 onPress={() => setFrequency(item)}
               >
                 <Text style={[styles.optionButtonText, frequency === item && styles.optionButtonTextActive]}>{item}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>活動曜日（複数選択可）</Text>
+          <View style={styles.optionsContainer}>
+            {ACTIVITY_WEEKDAYS.map((item) => (
+              <TouchableOpacity
+                key={item}
+                style={[styles.optionButton, activityDays.includes(item) && styles.optionButtonActive]}
+                onPress={() => {
+                  setActivityDays((prev) =>
+                    prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
+                  );
+                }}
+              >
+                <Text style={[styles.optionButtonText, activityDays.includes(item) && styles.optionButtonTextActive]}>{item}</Text>
               </TouchableOpacity>
             ))}
           </View>
