@@ -270,7 +270,7 @@ const Calendar = ({ selectedDate, onDateSelect, events }) => {
 };
 
 export default function CircleMemberScreen({ route, navigation }) {
-  const { circleId } = route.params;
+  const { circleId, initialTab } = route.params;
   const { height } = Dimensions.get('window');
   const SHEET_HEIGHT = height * 0.8;
   
@@ -278,14 +278,20 @@ export default function CircleMemberScreen({ route, navigation }) {
   const attendanceModalizeRef = useRef(null);
   
   const [circleName, setCircleName] = useState('メンバー');
-  const [tabIndex, setTabIndex] = useState(0);
+  const [tabIndex, setTabIndex] = useState(() => {
+    // initialTabパラメータに基づいて初期タブを設定
+    if (initialTab === 'contact') {
+      return 1; // 連絡タブ
+    }
+    return 0; // デフォルトはカレンダータブ
+  });
   const tabs = [
     { key: 'calendar', title: 'カレンダー' },
     { key: 'news', title: '連絡' },
     { key: 'members', title: 'メンバー' },
   ];
   const [messages, setMessages] = useState([]);
-  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [messagesLoading, setMessagesLoading] = useState(true);
   const [imageErrorMap, setImageErrorMap] = useState({});
   const [events, setEvents] = useState([]);
   const [eventsLoading, setEventsLoading] = useState(false);
@@ -294,7 +300,7 @@ export default function CircleMemberScreen({ route, navigation }) {
   
   // メンバー関連の状態
   const [members, setMembers] = useState([]);
-  const [membersLoading, setMembersLoading] = useState(false);
+  const [membersLoading, setMembersLoading] = useState(true);
   const [memberSearchText, setMemberSearchText] = useState('');
   const [leaveModalVisible, setLeaveModalVisible] = useState(false);
 
@@ -349,10 +355,17 @@ export default function CircleMemberScreen({ route, navigation }) {
 
   useEffect(() => {
     if (tabIndex !== 1) return;
+    
+    // データが既に存在する場合はローディングを表示しない
+    if (messages.length > 0) {
+      setMessagesLoading(false);
+      return;
+    }
+    
     const fetchMessages = async () => {
       const user = auth.currentUser;
       if (!user) return;
-      setMessagesLoading(true);
+      
       try {
         const q = query(
           collection(db, 'users', user.uid, 'circleMessages'),
@@ -418,8 +431,14 @@ export default function CircleMemberScreen({ route, navigation }) {
   // メンバー取得
   useEffect(() => {
     if (tabIndex !== 2) return;
+    
+    // データが既に存在する場合はローディングを表示しない
+    if (members.length > 0) {
+      setMembersLoading(false);
+      return;
+    }
+    
     const fetchMembers = async () => {
-      setMembersLoading(true);
       try {
         const membersRef = collection(db, 'circles', circleId, 'members');
         const membersSnap = await getDocs(membersRef);
@@ -875,12 +894,9 @@ export default function CircleMemberScreen({ route, navigation }) {
         );
       case 1:
         return (
-          <View style={[styles.tabContent, { justifyContent: 'flex-start', alignItems: 'stretch', padding: 16 }]}>
+          <View style={[styles.tabContent, { justifyContent: 'flex-start', alignItems: 'stretch' }]}>
             {messagesLoading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#007bff" />
-                <Text style={styles.loadingText}>連絡を読み込み中...</Text>
-              </View>
+              <ActivityIndicator size="small" color="#999" style={{ marginTop: 40 }} />
             ) : messages.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Ionicons name="chatbubble-outline" size={80} color="#ccc" />
@@ -912,29 +928,64 @@ export default function CircleMemberScreen({ route, navigation }) {
                         }
                       }}
                     >
-                      {/* メッセージタイプバッジ */}
-                      <View style={[styles.messageTypeBadge, isAttendance ? styles.attendanceBadge : styles.normalBadge]}>
-                        <Ionicons 
-                          name={isAttendance ? "calendar-outline" : "chatbubble-outline"} 
-                          size={14} 
-                          color={isAttendance ? "#fff" : "#007bff"} 
-                        />
-                        <Text style={[styles.messageTypeText, isAttendance ? styles.attendanceBadgeText : styles.normalBadgeText]}>
-                          {isAttendance ? '出欠確認' : '通常連絡'}
-                        </Text>
+                      {/* アイコンと情報の横並びレイアウト */}
+                      <View style={styles.messageContentContainer}>
+                        {/* アイコン */}
+                        <View style={styles.messageIconContainer}>
+                          {hasImage ? (
+                            <Image
+                              source={{ uri: senderInfo.profileImageUrl }}
+                              style={styles.messageIcon}
+                              onError={() => setImageErrorMap(prev => ({ ...prev, [item.id]: true }))}
+                            />
+                          ) : (
+                            <View style={styles.messageIconPlaceholder}>
+                              <Ionicons name="person-outline" size={30} color="#aaa" />
+                            </View>
+                          )}
+                        </View>
+
+                        {/* 送信者氏名とタイトル */}
+                        <View style={styles.messageInfoContainer}>
+                          <Text style={styles.messageSenderName}>{senderInfo?.name || '不明'}</Text>
+                          <Text style={styles.messageTitle} numberOfLines={1} ellipsizeMode="tail">
+                            {item.title}
+                          </Text>
+                          {item.body && (
+                            <Text style={styles.messageContentPreview} numberOfLines={1} ellipsizeMode="tail">
+                              {item.body.replace(/\n/g, ' ')}
+                            </Text>
+                          )}
+                        </View>
+                        
+                        {/* 右側の連絡種別と送信日時 */}
+                        <View style={styles.messageRightContainer}>
+                          {/* 連絡種別バッジ */}
+                          <View style={[styles.messageTypeBadge, isAttendance ? styles.attendanceBadge : styles.normalBadge]}>
+                            <Ionicons 
+                              name={isAttendance ? "calendar-outline" : "chatbubble-outline"} 
+                              size={14} 
+                              color={isAttendance ? "#fff" : "#007bff"} 
+                            />
+                            <Text style={[styles.messageTypeText, isAttendance ? styles.attendanceBadgeText : styles.normalBadgeText]}>
+                              {isAttendance ? '出欠確認' : '通常連絡'}
+                            </Text>
+                          </View>
+                          
+                          <View style={styles.messageMeta}>
+                            <Text style={styles.messageDate}>
+                              {item.sentAt && item.sentAt.toDate ? 
+                                item.sentAt.toDate().toLocaleDateString('ja-JP') : ''
+                              }
+                            </Text>
+                            <Text style={styles.messageTime}>
+                              {item.sentAt && item.sentAt.toDate ? 
+                                item.sentAt.toDate().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : ''
+                              }
+                            </Text>
+                          </View>
+                        </View>
                       </View>
-
-                      {/* タイトル */}
-                      <Text style={styles.messageTitle} numberOfLines={2} ellipsizeMode="tail">
-                        {item.title}
-                      </Text>
-
-                      {/* 説明文（存在する場合） */}
-                      {item.body && (
-                        <Text style={styles.messageBody} numberOfLines={3} ellipsizeMode="tail">
-                          {item.body}
-                        </Text>
-                      )}
 
                       {/* 出欠確認の期限表示 */}
                       {isAttendance && item.deadline && (
@@ -945,40 +996,6 @@ export default function CircleMemberScreen({ route, navigation }) {
                           </Text>
                         </View>
                       )}
-
-                      {/* 送信者情報と日時 */}
-                      <View style={styles.messageFooter}>
-                        <View style={styles.senderContainer}>
-                          {hasImage ? (
-                            <Image
-                              source={{ uri: senderInfo.profileImageUrl }}
-                              style={styles.senderImage}
-                              onError={() => setImageErrorMap(prev => ({ ...prev, [item.id]: true }))}
-                            />
-                          ) : (
-                            <View style={styles.senderImagePlaceholder}>
-                              <Ionicons name="person-outline" size={20} color="#aaa" />
-                            </View>
-                          )}
-                          <View style={styles.senderInfo}>
-                            <Text style={styles.senderName}>{senderInfo?.name || '不明'}</Text>
-                            <Text style={styles.senderRole}>{senderInfo?.role ? getRoleDisplayName(senderInfo.role) : ''}</Text>
-                          </View>
-                        </View>
-                        
-                        <View style={styles.messageMeta}>
-                          <Text style={styles.messageDate}>
-                            {item.sentAt && item.sentAt.toDate ? 
-                              item.sentAt.toDate().toLocaleDateString('ja-JP') : ''
-                            }
-                          </Text>
-                          <Text style={styles.messageTime}>
-                            {item.sentAt && item.sentAt.toDate ? 
-                              item.sentAt.toDate().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : ''
-                            }
-                          </Text>
-                        </View>
-                      </View>
 
                       {/* 新着インジケーター */}
                       {item.isNew && (
@@ -1707,36 +1724,26 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   messageCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   urgentMessageCard: {
-    borderColor: '#ff6b6b',
-    borderWidth: 2,
     backgroundColor: '#fff9f9',
+    borderLeftWidth: 4,
+    borderLeftColor: '#ff6b6b',
+    paddingLeft: 12,
   },
   messageTypeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginBottom: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
+    marginBottom: 8,
   },
   normalBadge: {
-    backgroundColor: '#f0f8ff',
-    borderWidth: 1,
-    borderColor: '#007bff',
+    backgroundColor: '#e3f2fd',
   },
   attendanceBadge: {
     backgroundColor: '#007bff',
@@ -1752,18 +1759,69 @@ const styles = StyleSheet.create({
   attendanceBadgeText: {
     color: '#fff',
   },
+  messageContentContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start', // 上端揃えに変更
+  },
+  messageIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#e9ecef',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  messageIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  messageIconPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#e9ecef',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  messageInfoContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  messageSenderName: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+    fontWeight: '500',
+  },
   messageTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 12,
-    lineHeight: 24,
+    lineHeight: 26,
   },
-  messageBody: {
+  messageContentPreview: {
     fontSize: 14,
-    color: '#666',
+    color: '#888',
+    marginTop: 4,
     lineHeight: 20,
-    marginBottom: 16,
+  },
+  messageRightContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-end',
+    minWidth: 90, // 最小幅を確保
+  },
+  messageMeta: {
+    alignItems: 'flex-end',
+  },
+  messageDate: {
+    fontSize: 12,
+    color: '#999',
+  },
+  messageTime: {
+    fontSize: 12,
+    color: '#999',
   },
   deadlineContainer: {
     flexDirection: 'row',
@@ -1772,7 +1830,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 8,
-    marginBottom: 16,
+    marginTop: 12,
     borderWidth: 1,
     borderColor: '#ffebeb',
   },
@@ -1782,65 +1840,16 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginLeft: 6,
   },
-  messageFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-  },
-  senderContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  senderImage: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-  },
-  senderImagePlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  senderInfo: {
-    flex: 1,
-  },
-  senderName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 2,
-  },
-  senderRole: {
-    fontSize: 12,
-    color: '#007bff',
-    fontWeight: '500',
-  },
-  messageMeta: {
-    alignItems: 'flex-end',
-  },
-  messageDate: {
-    fontSize: 12,
-    color: '#999',
-    marginBottom: 2,
-  },
-  messageTime: {
-    fontSize: 12,
-    color: '#999',
-  },
   newIndicator: {
     position: 'absolute',
-    top: 16,
-    right: 16,
+    top: -8,
+    left: -8,
     backgroundColor: '#ff4757',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   newIndicatorText: {
     color: '#fff',

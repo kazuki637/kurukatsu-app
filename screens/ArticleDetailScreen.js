@@ -9,6 +9,60 @@ import { onAuthStateChanged } from 'firebase/auth';
 
 const { width: screenWidth } = Dimensions.get('window');
 
+// 日付をフォーマットする関数
+const formatDate = (dateValue) => {
+  if (!dateValue) return '';
+  
+  try {
+    let date;
+    
+    // FirestoreのTimestampの場合
+    if (dateValue.toDate) {
+      date = dateValue.toDate();
+    }
+    // 文字列の場合
+    else if (typeof dateValue === 'string') {
+      date = new Date(dateValue);
+    }
+    // Dateオブジェクトの場合
+    else if (dateValue instanceof Date) {
+      date = dateValue;
+    }
+    // 数値（タイムスタンプ）の場合
+    else if (typeof dateValue === 'number') {
+      date = new Date(dateValue);
+    }
+    else {
+      return dateValue; // フォーマットできない場合はそのまま返す
+    }
+    
+    // 日付が有効かチェック
+    if (isNaN(date.getTime())) {
+      return dateValue;
+    }
+    
+    // 日本語の曜日配列
+    const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+    
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const weekday = weekdays[date.getDay()];
+    
+    return `${year}年${month}月${day}日（${weekday}）`;
+    
+  } catch (error) {
+    console.error('日付のフォーマットに失敗:', error);
+    return dateValue; // エラーの場合は元の値を返す
+  }
+};
+
+// 閲覧回数をフォーマットする関数
+const formatViewCount = (count) => {
+  if (count === 0) return '0';
+  return count.toLocaleString();
+};
+
 const ArticleDetailScreen = ({ route, navigation }) => {
   const { articleId } = route.params || {};
   const [article, setArticle] = useState(null);
@@ -20,6 +74,8 @@ const ArticleDetailScreen = ({ route, navigation }) => {
   const [user, setUser] = useState(null);
   const [isLiked, setIsLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [viewCount, setViewCount] = useState(0);
+  const [hasViewed, setHasViewed] = useState(false);
 
   // いいねボタンの処理
   const handleLike = async () => {
@@ -123,6 +179,18 @@ const ArticleDetailScreen = ({ route, navigation }) => {
         const articleData = { id: articleDoc.id, ...articleDoc.data() };
         setArticle(articleData);
         setLikeCount(articleData.likes || 0);
+        setViewCount(articleData.viewCount || 0); // 閲覧回数をstateに設定
+
+        // 閲覧回数を一度だけ増加
+        if (!hasViewed) {
+          await updateDoc(doc(db, 'articles', articleId), {
+            viewCount: increment(1)
+          });
+          
+          // 閲覧回数を更新
+          setViewCount((articleData.viewCount || 0) + 1);
+          setHasViewed(true);
+        }
 
         // ヘッダー画像を取得
         if (articleData.title) {
@@ -195,7 +263,7 @@ const ArticleDetailScreen = ({ route, navigation }) => {
     };
 
     fetchArticle();
-  }, [articleId, user]);
+  }, [articleId]);
 
   if (loading) {
     return (
@@ -274,9 +342,20 @@ const ArticleDetailScreen = ({ route, navigation }) => {
             {article.subtitle && (
               <Text style={styles.articleSubtitle}>{article.subtitle}</Text>
             )}
-            {article.date && (
-              <Text style={styles.articleDate}>{article.date}</Text>
-            )}
+            
+            {/* 掲載日と閲覧回数を横並びで表示 */}
+            <View style={styles.dateAndViewContainer}>
+              {article.createdAt && (
+                <Text style={styles.articleDate}>
+                  {formatDate(article.createdAt)}
+                </Text>
+              )}
+              
+              {/* 閲覧回数 */}
+              <Text style={styles.viewCount}>
+                <Text style={styles.viewCountNumber}>{formatViewCount(viewCount)}</Text> Views
+              </Text>
+            </View>
             
             {/* いいねボタン */}
             <View style={styles.likeContainer}>
@@ -362,7 +441,13 @@ const styles = StyleSheet.create({
   articleDate: {
     fontSize: 14,
     color: '#999',
-    marginBottom: 20,
+  },
+  viewCount: {
+    fontSize: 14,
+    color: '#999',
+  },
+  viewCountNumber: {
+    fontWeight: 'bold',
   },
   contentDivider: {
     height: 1,
@@ -420,6 +505,12 @@ const styles = StyleSheet.create({
   },
   likeTextActive: {
     color: '#ff6b9d',
+  },
+  dateAndViewContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
 });
 

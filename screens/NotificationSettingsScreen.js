@@ -16,6 +16,7 @@ export default function NotificationSettingsScreen() {
       newMemberJoin: true,      // 新規メンバーの入会
       roleChanges: true,        // サークルにおける役割の変更
       forcedRemoval: true,      // サークルからの強制退会
+      joinRequests: true,       // 入会申請
     },
     // サークル別設定
     circles: {}
@@ -189,7 +190,8 @@ export default function NotificationSettingsScreen() {
       deadlineReminders: '出欠確認リマインド（前日）',
       newMemberJoin: '新規メンバーの入会',
       roleChanges: 'サークルにおける役割の変更',
-      forcedRemoval: 'サークルからの強制退会'
+      forcedRemoval: 'サークルからの強制退会',
+      joinRequests: '入会申請（代表者・管理者のみ）'
     };
     return labelMap[key] || key;
   };
@@ -199,9 +201,10 @@ export default function NotificationSettingsScreen() {
     const iconMap = {
       circleContact: 'chatbubble-outline',
       deadlineReminders: 'time-outline',
-      newMemberJoin: 'person-add-outline',
+      joinRequests: 'mail-outline', // 入会申請はメールアイコン
+      newMemberJoin: 'person-add-outline', // 新規メンバーの入会は人を追加するアイコン
       roleChanges: 'shield-outline',
-      forcedRemoval: 'exit-outline'
+      forcedRemoval: 'exit-outline',
     };
     return iconMap[key] || 'settings-outline';
   };
@@ -211,9 +214,10 @@ export default function NotificationSettingsScreen() {
     const colorMap = {
       circleContact: '#007bff',
       deadlineReminders: '#ff9500',
-      newMemberJoin: '#34c759',
+      joinRequests: '#ff6b35', // 入会申請はオレンジ色
+      newMemberJoin: '#34c759', // 新規メンバーの入会は緑色
       roleChanges: '#af52de',
-      forcedRemoval: '#ff3b30'
+      forcedRemoval: '#ff3b30',
     };
     return colorMap[key] || '#666';
   };
@@ -246,10 +250,10 @@ export default function NotificationSettingsScreen() {
       <ScrollView style={styles.container}>
         {/* 設定セクション */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>通知設定</Text>
+          <Text style={styles.sectionTitle}>プッシュ通知</Text>
           
-          {['circleContact', 'deadlineReminders', 'newMemberJoin', 'roleChanges', 'forcedRemoval'].map(key => (
-            <View key={key}>
+          {['circleContact', 'deadlineReminders', 'joinRequests', 'newMemberJoin', 'roleChanges', 'forcedRemoval'].map(key => (
+            <View key={key} style={styles.settingItemContainer}>
               {/* 全体設定項目 */}
               <View style={styles.settingItem}>
                 <View style={styles.settingInfo}>
@@ -263,45 +267,52 @@ export default function NotificationSettingsScreen() {
                   </Text>
                 </View>
                 <View style={styles.settingControls}>
-                  <TouchableOpacity
-                    style={styles.expandButton}
-                    onPress={() => toggleExpanded(key)}
-                  >
-                    <Ionicons 
-                      name={isExpanded(key) ? 'chevron-up' : 'chevron-down'} 
-                      size={20} 
-                      color="#666" 
-                    />
-                  </TouchableOpacity>
                   <Switch
                     value={getSettingValue('global', key)}
                     onValueChange={() => handleSettingToggle('global', key)}
                     trackColor={{ false: '#e0e0e0', true: '#007bff' }}
                     thumbColor="#ffffff"
                   />
+                  <TouchableOpacity
+                    style={[
+                      styles.expandButton,
+                      isExpanded(key) && styles.expandButtonActive
+                    ]}
+                    onPress={() => toggleExpanded(key)}
+                  >
+                    <Ionicons 
+                      name={isExpanded(key) ? 'chevron-up' : 'chevron-down'} 
+                      size={24} 
+                      color={isExpanded(key) ? '#007bff' : '#666'} 
+                    />
+                  </TouchableOpacity>
                 </View>
               </View>
 
               {/* 個別サークル設定（展開時のみ表示） */}
-              {isExpanded(key) && circles.map(circle => (
-                <View key={`${key}-${circle.id}`} style={styles.circleSettingItem}>
-                  <View style={styles.circleSettingInfo}>
-                    <Text style={styles.circleSettingLabel}>
-                      {circle.name}
-                    </Text>
-                  </View>
-                  <Switch
-                    value={getSettingValue(circle.id, key)}
-                    onValueChange={() => handleSettingToggle(circle.id, key)}
-                    trackColor={{ 
-                      false: isDisabled(circle.id, key) ? '#f0f0f0' : '#e0e0e0', 
-                      true: isDisabled(circle.id, key) ? '#ccc' : '#007bff' 
-                    }}
-                    thumbColor="#ffffff"
-                    disabled={isDisabled(circle.id, key)}
-                  />
+              {isExpanded(key) && (
+                <View style={styles.circleSettingsContainer}>
+                  {circles.map(circle => (
+                    <View key={`${key}-${circle.id}`} style={styles.circleSettingItem}>
+                      <View style={styles.circleSettingInfo}>
+                        <Text style={styles.circleSettingLabel}>
+                          {circle.name}
+                        </Text>
+                      </View>
+                      <Switch
+                        value={getSettingValue(circle.id, key)}
+                        onValueChange={() => handleSettingToggle(circle.id, key)}
+                        trackColor={{ 
+                          false: isDisabled(circle.id, key) ? '#f0f0f0' : '#e0e0e0', 
+                          true: isDisabled(circle.id, key) ? '#ccc' : '#007bff' 
+                        }}
+                        thumbColor="#ffffff"
+                        disabled={isDisabled(circle.id, key)}
+                      />
+                    </View>
+                  ))}
                 </View>
-              ))}
+              )}
             </View>
           ))}
         </View>
@@ -316,15 +327,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   section: {
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
     margin: 16,
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    padding: 0,
   },
   sectionTitle: {
     fontSize: 18,
@@ -332,11 +337,20 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 16,
   },
+  settingItemContainer: {
+    marginBottom: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    overflow: 'hidden',
+  },
   settingItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
@@ -356,17 +370,31 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   expandButton: {
-    marginRight: 10,
+    marginLeft: 10,
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  expandButtonActive: {
+    backgroundColor: '#e0f7fa', // 展開中のボタンの背景色
+    borderColor: '#007bff',
+    borderWidth: 1,
+  },
+  circleSettingsContainer: {
+    marginTop: 0,
+    paddingLeft: 46, // アイコンの幅 + マージン分のインデント
+    backgroundColor: '#f8f9fa',
   },
   circleSettingItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 12,
-    paddingLeft: 46, // アイコンの幅 + マージン分のインデント
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    backgroundColor: '#f8f9fa',
+    borderBottomColor: '#e9ecef',
   },
   circleSettingInfo: {
     flexDirection: 'row',
