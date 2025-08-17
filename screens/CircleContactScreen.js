@@ -31,13 +31,17 @@ export default function CircleContactScreen({ route, navigation }) {
         content: {
           title: title,
           body: body,
-          data: data,
+          data: {
+            ...data,
+            type: 'circleContact', // 通知タイプ
+            circleId: circleId,     // サークルID
+            timestamp: Date.now(),  // タイムスタンプ
+          }
         },
-        trigger: null, // 即座に送信
+        trigger: null, // 即時通知
       });
-      console.log('通知を送信しました:', title);
     } catch (error) {
-      console.error('通知の送信でエラーが発生しました:', error);
+      console.error('通知の送信に失敗しました:', error);
     }
   };
 

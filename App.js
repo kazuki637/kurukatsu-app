@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
@@ -63,6 +63,9 @@ const SettingsStack = createStackNavigator();
 const CircleManagementStack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 const RootStack = createStackNavigator(); // For modals
+
+// グローバルナビゲーション参照
+let navigationRef = null;
 
 // Authentication Stack
 function AuthStackScreen() {
@@ -221,6 +224,15 @@ const initializeNotifications = async () => {
       }),
     });
 
+    // 通知をタップした時の処理を設定
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data;
+      console.log('通知がタップされました:', data);
+      
+      // 通知の種類に応じて適切な画面に遷移
+      handleNotificationTap(data);
+    });
+
     // Android用の通知チャンネル設定
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
@@ -248,8 +260,42 @@ const initializeNotifications = async () => {
     }
 
     console.log('通知システムの初期化が完了しました');
+    
+    // クリーンアップ関数を返す
+    return () => subscription.remove();
   } catch (error) {
     console.error('通知システムの初期化でエラーが発生しました:', error);
+  }
+};
+
+// 通知をタップした時の遷移処理
+const handleNotificationTap = (data) => {
+  if (!navigationRef) {
+    console.log('ナビゲーション参照が利用できません');
+    return;
+  }
+
+  try {
+    const { type, circleId } = data;
+    
+    switch (type) {
+      case 'circleContact':
+        // サークルからの連絡の通知をタップした場合
+        if (circleId) {
+          // CircleMemberScreenに直接遷移
+          navigationRef.navigate('CircleMember', {
+            circleId: circleId,
+            initialTab: 'contact' // 連絡タブを指定
+          });
+        }
+        break;
+      
+      default:
+        console.log('未対応の通知タイプ:', type);
+        break;
+    }
+  } catch (error) {
+    console.error('通知タップ処理でエラーが発生しました:', error);
   }
 };
 
@@ -315,6 +361,11 @@ function AppNavigator() {
           <RootStack.Screen 
             name="ArticleDetail" 
             component={ArticleDetailScreen} 
+            options={{ headerShown: false }} 
+          />
+          <RootStack.Screen 
+            name="CircleMember" 
+            component={CircleMemberScreen} 
             options={{ headerShown: false }} 
           />
         </>
@@ -390,7 +441,11 @@ function MainTabNavigatorWithProfileCheck() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
+      <NavigationContainer
+        ref={navigation => {
+          navigationRef = navigation;
+        }}
+      >
         <AppNavigator />
       </NavigationContainer>
     </SafeAreaProvider>

@@ -492,7 +492,9 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
           ) : senderInfo?.profileImageUrl ? (
             <Image source={{ uri: senderInfo.profileImageUrl }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }} />
           ) : (
-            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#ccc', marginRight: 10 }} />
+            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#e0e0e0', marginRight: 10, justifyContent: 'center', alignItems: 'center' }}>
+              <Ionicons name="person-outline" size={20} color="#999" />
+            </View>
           )}
           <Text style={{ fontWeight: 'bold', fontSize: 18 }}>{senderInfo?.name || '不明'}</Text>
         </View>
