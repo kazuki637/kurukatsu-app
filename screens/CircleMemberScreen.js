@@ -877,21 +877,34 @@ export default function CircleMemberScreen({ route, navigation }) {
         return (
           <View style={[styles.tabContent, { justifyContent: 'flex-start', alignItems: 'stretch', padding: 16 }]}>
             {messagesLoading ? (
-              <ActivityIndicator size="small" color="#999" style={{ marginTop: 40 }} />
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#007bff" />
+                <Text style={styles.loadingText}>連絡を読み込み中...</Text>
+              </View>
             ) : messages.length === 0 ? (
-              <Text style={{ color: '#888', textAlign: 'center', marginTop: 40 }}>お知らせはありません</Text>
+              <View style={styles.emptyContainer}>
+                <Ionicons name="chatbubble-outline" size={80} color="#ccc" />
+                <Text style={styles.emptyTitle}>お知らせはありません</Text>
+                <Text style={styles.emptySubText}>サークルからの連絡が届くとここに表示されます</Text>
+              </View>
             ) : (
               <FlatList
                 data={messages}
                 keyExtractor={item => item.id}
+                showsVerticalScrollIndicator={false}
                 renderItem={({ item }) => {
                   const senderInfo = item.senderInfo;
                   const hasImage = senderInfo?.profileImageUrl && senderInfo.profileImageUrl.trim() !== '' && !imageErrorMap[item.id];
+                  const isAttendance = item.type === 'attendance';
+                  const isUrgent = item.type === 'attendance' && item.deadline;
                   
                   return (
                     <TouchableOpacity
-                      activeOpacity={0.7}
-                      style={{ backgroundColor: '#f8f8f8', borderRadius: 10, padding: 14, marginBottom: 14 }}
+                      activeOpacity={0.8}
+                      style={[
+                        styles.messageCard,
+                        isUrgent && styles.urgentMessageCard
+                      ]}
                       onPress={() => {
                         const currentUser = auth.currentUser;
                         if (currentUser) {
@@ -899,37 +912,80 @@ export default function CircleMemberScreen({ route, navigation }) {
                         }
                       }}
                     >
-                      {/* 右下：送信日時 */}
-                      <View style={{ position: 'absolute', bottom: 10, right: 14 }}>
-                        <Text style={{ color: '#888', fontSize: 12 }}>
-                          {item.sentAt && item.sentAt.toDate ? item.sentAt.toDate().toLocaleString('ja-JP') : ''}
+                      {/* メッセージタイプバッジ */}
+                      <View style={[styles.messageTypeBadge, isAttendance ? styles.attendanceBadge : styles.normalBadge]}>
+                        <Ionicons 
+                          name={isAttendance ? "calendar-outline" : "chatbubble-outline"} 
+                          size={14} 
+                          color={isAttendance ? "#fff" : "#007bff"} 
+                        />
+                        <Text style={[styles.messageTypeText, isAttendance ? styles.attendanceBadgeText : styles.normalBadgeText]}>
+                          {isAttendance ? '出欠確認' : '通常連絡'}
                         </Text>
                       </View>
-                      {/* 上部：種別＋タイトル（横並び） */}
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                        <Text style={{ color: '#007bff', fontSize: 18, fontWeight: 'bold' }}>
-                          {item.type === 'attendance' ? '出欠確認' : '通常連絡'}
+
+                      {/* タイトル */}
+                      <Text style={styles.messageTitle} numberOfLines={2} ellipsizeMode="tail">
+                        {item.title}
+                      </Text>
+
+                      {/* 説明文（存在する場合） */}
+                      {item.body && (
+                        <Text style={styles.messageBody} numberOfLines={3} ellipsizeMode="tail">
+                          {item.body}
                         </Text>
-                        <View style={{ width: 1.5, height: 24, backgroundColor: '#d0d7de', marginHorizontal: 12, borderRadius: 1 }} />
-                        <Text style={{ color: '#222', fontSize: 18, fontWeight: 'bold', flex: 1 }} numberOfLines={1} ellipsizeMode="tail">
-                          {item.title}
-                        </Text>
-                      </View>
-                      {/* 下部：送信者アイコン＋送信者名 */}
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        {hasImage ? (
-                          <Image
-                            source={{ uri: senderInfo.profileImageUrl }}
-                            style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }}
-                            onError={() => setImageErrorMap(prev => ({ ...prev, [item.id]: true }))}
-                          />
-                        ) : (
-                          <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#e0e0e0', marginRight: 10, justifyContent: 'center', alignItems: 'center', overflow: 'hidden' }}>
-                            <Ionicons name="person-outline" size={22} color="#aaa" />
+                      )}
+
+                      {/* 出欠確認の期限表示 */}
+                      {isAttendance && item.deadline && (
+                        <View style={styles.deadlineContainer}>
+                          <Ionicons name="time-outline" size={16} color="#ff6b6b" />
+                          <Text style={styles.deadlineText}>
+                            回答期限: {new Date(item.deadline).toLocaleDateString('ja-JP')}
+                          </Text>
+                        </View>
+                      )}
+
+                      {/* 送信者情報と日時 */}
+                      <View style={styles.messageFooter}>
+                        <View style={styles.senderContainer}>
+                          {hasImage ? (
+                            <Image
+                              source={{ uri: senderInfo.profileImageUrl }}
+                              style={styles.senderImage}
+                              onError={() => setImageErrorMap(prev => ({ ...prev, [item.id]: true }))}
+                            />
+                          ) : (
+                            <View style={styles.senderImagePlaceholder}>
+                              <Ionicons name="person-outline" size={20} color="#aaa" />
+                            </View>
+                          )}
+                          <View style={styles.senderInfo}>
+                            <Text style={styles.senderName}>{senderInfo?.name || '不明'}</Text>
+                            <Text style={styles.senderRole}>{senderInfo?.role ? getRoleDisplayName(senderInfo.role) : ''}</Text>
                           </View>
-                        )}
-                        <Text style={{ fontWeight: 'bold', fontSize: 18 }}>{senderInfo?.name || '不明'}</Text>
+                        </View>
+                        
+                        <View style={styles.messageMeta}>
+                          <Text style={styles.messageDate}>
+                            {item.sentAt && item.sentAt.toDate ? 
+                              item.sentAt.toDate().toLocaleDateString('ja-JP') : ''
+                            }
+                          </Text>
+                          <Text style={styles.messageTime}>
+                            {item.sentAt && item.sentAt.toDate ? 
+                              item.sentAt.toDate().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : ''
+                            }
+                          </Text>
+                        </View>
                       </View>
+
+                      {/* 新着インジケーター */}
+                      {item.isNew && (
+                        <View style={styles.newIndicator}>
+                          <Text style={styles.newIndicatorText}>NEW</Text>
+                        </View>
+                      )}
                     </TouchableOpacity>
                   );
                 }}
@@ -1619,5 +1675,176 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#fff',
+  },
+
+  // 連絡タブの新しいUIスタイル
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 80,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#666',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  messageCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  urgentMessageCard: {
+    borderColor: '#ff6b6b',
+    borderWidth: 2,
+    backgroundColor: '#fff9f9',
+  },
+  messageTypeBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 16,
+  },
+  normalBadge: {
+    backgroundColor: '#f0f8ff',
+    borderWidth: 1,
+    borderColor: '#007bff',
+  },
+  attendanceBadge: {
+    backgroundColor: '#007bff',
+  },
+  messageTypeText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginLeft: 6,
+  },
+  normalBadgeText: {
+    color: '#007bff',
+  },
+  attendanceBadgeText: {
+    color: '#fff',
+  },
+  messageTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+    lineHeight: 24,
+  },
+  messageBody: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+  deadlineContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff5f5',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#ffebeb',
+  },
+  deadlineText: {
+    fontSize: 13,
+    color: '#ff6b6b',
+    fontWeight: '500',
+    marginLeft: 6,
+  },
+  messageFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+  },
+  senderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  senderImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  senderImagePlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  senderInfo: {
+    flex: 1,
+  },
+  senderName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 2,
+  },
+  senderRole: {
+    fontSize: 12,
+    color: '#007bff',
+    fontWeight: '500',
+  },
+  messageMeta: {
+    alignItems: 'flex-end',
+  },
+  messageDate: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 2,
+  },
+  messageTime: {
+    fontSize: 12,
+    color: '#999',
+  },
+  newIndicator: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    backgroundColor: '#ff4757',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  newIndicatorText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 }); 

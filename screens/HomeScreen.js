@@ -103,15 +103,13 @@ const HomeScreen = ({ navigation }) => {
             articlesCache.current.set(articleData.id, thumbnailUrl);
           } catch (error) {
             console.log(`記事 ${articleData.title} のサムネイル画像が見つかりません:`, error);
-            thumbnailUrl = 'https://picsum.photos/300/200?random=1';
-            // エラー時もキャッシュに保存（デフォルト画像）
-            articlesCache.current.set(articleData.id, thumbnailUrl);
+            // エラー時はサムネイルなし
           }
         }
         
         articlesData.push({
           ...articleData,
-          thumbnailUrl: thumbnailUrl || 'https://picsum.photos/300/200?random=1'
+          thumbnailUrl: thumbnailUrl || null
         });
       }
       
@@ -256,13 +254,18 @@ const HomeScreen = ({ navigation }) => {
                     style={styles.infoCard}
                     onPress={() => navigation.navigate('ArticleDetail', { articleId: article.id })}
                   >
-                    <Image 
-                      source={{ uri: article.thumbnailUrl || 'https://picsum.photos/300/200?random=1' }} 
-                      style={styles.infoCardImage}
-                      defaultSource={require('../assets/pictures/1.png')}
-                      resizeMode="cover"
-                      fadeDuration={300}
-                    />
+                    {article.thumbnailUrl ? (
+                      <Image 
+                        source={{ uri: article.thumbnailUrl }} 
+                        style={styles.infoCardImage}
+                        resizeMode="cover"
+                        fadeDuration={300}
+                      />
+                    ) : (
+                      <View style={[styles.infoCardImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+                        <Ionicons name="document-text-outline" size={40} color="#ccc" />
+                      </View>
+                    )}
                     <View style={styles.infoCardContent}>
                       <Text style={styles.infoCardTitle} numberOfLines={2}>{article.title}</Text>
                       {article.subtitle && (
@@ -694,7 +697,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     resizeMode: 'contain',
     marginTop: -5,
-    marginBottom: 10,
+    marginBottom: 0,
   },
   // 人気サークルの新しいスタイル（検索結果画面と完全に同じ）
   circleHeaderContainer: {
