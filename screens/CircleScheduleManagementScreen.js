@@ -437,13 +437,14 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
         }
       }
       
-      setAttendanceUsers({
+      return {
         attending: attendingUsers,
         absent: absentUsers,
         pending: pendingUsers
-      });
+      };
     } catch (error) {
       console.error('Error fetching attendance data:', error);
+      throw error; // エラーを再スローして呼び出し元で処理
     }
   };
 
@@ -451,13 +452,13 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
   const handleShowAttendanceStatus = async (eventId) => {
     try {
       // 出席状況データを取得
-      await fetchAttendanceData(eventId);
+      const attendanceData = await fetchAttendanceData(eventId);
       
       // 全回答者を一つのリストにまとめる
       const allAttendanceUsers = [
-        ...attendanceUsers.attending.map(user => ({ ...user, status: 'attending' })),
-        ...attendanceUsers.absent.map(user => ({ ...user, status: 'absent' })),
-        ...attendanceUsers.pending.map(user => ({ ...user, status: 'pending' }))
+        ...attendanceData.attending.map(user => ({ ...user, status: 'attending' })),
+        ...attendanceData.absent.map(user => ({ ...user, status: 'absent' })),
+        ...attendanceData.pending.map(user => ({ ...user, status: 'pending' }))
       ];
       
       setUserList(allAttendanceUsers);

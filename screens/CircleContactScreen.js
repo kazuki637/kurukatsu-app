@@ -6,6 +6,7 @@ import { collection, getDocs, addDoc, serverTimestamp, doc, getDoc } from 'fireb
 import { auth } from '../firebaseConfig';
 import CommonHeader from '../components/CommonHeader';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import * as Notifications from 'expo-notifications';
 
 export default function CircleContactScreen({ route, navigation }) {
   const { circleId } = route.params;
@@ -22,6 +23,53 @@ export default function CircleContactScreen({ route, navigation }) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const maxBodyLength = 1000;
   const [imageErrorMap, setImageErrorMap] = useState({});
+
+  // 通知送信の共通関数
+  const sendNotification = async (title, body, data = {}) => {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: title,
+          body: body,
+          data: data,
+        },
+        trigger: null, // 即座に送信
+      });
+      console.log('通知を送信しました:', title);
+    } catch (error) {
+      console.error('通知の送信でエラーが発生しました:', error);
+    }
+  };
+
+  // 出欠確認期限前の通知をスケジュール
+  const scheduleDeadlineReminder = async (eventName, deadline) => {
+    try {
+      // 期限1日前のリマインダー
+      const reminderTime = new Date(deadline);
+      reminderTime.setDate(reminderTime.getDate() - 1);
+      
+      // 現在時刻より後の場合のみスケジュール
+      if (reminderTime > new Date()) {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: '出欠確認期限のリマインダー',
+            body: `${eventName}の出欠確認期限が明日です`,
+            data: { 
+              type: 'deadline_reminder',
+              eventName: eventName,
+              deadline: deadline 
+            },
+          },
+          trigger: {
+            date: reminderTime,
+          },
+        });
+        console.log('出欠確認期限前の通知をスケジュールしました:', reminderTime);
+      }
+    } catch (error) {
+      console.error('出欠確認期限前の通知スケジュールでエラーが発生しました:', error);
+    }
+  };
 
   // 宛先未選択（自分だけしか選択されてない状態）かどうかを判定
   const isOnlySelfSelected = () => {
@@ -166,7 +214,37 @@ export default function CircleContactScreen({ route, navigation }) {
           messageId: messageId, // サークルコレクションのメッセージIDを参照
         });
       }
+
+      // 3. 通知の送信
+      // 自分以外の宛先ユーザーに通知を送信
+      const currentUser = auth.currentUser;
+      const recipients = selectedUids.filter(uid => uid !== currentUser?.uid);
       
+      if (recipients.length > 0) {
+        // メッセージ受信通知を送信
+        for (const uid of recipients) {
+          const recipientMember = members.find(m => m.uid === uid);
+          const recipientName = recipientMember?.name || 'メンバー';
+          
+          await sendNotification(
+            '新しいメッセージが届きました',
+            `${senderName}から「${title}」が届きました`,
+            {
+              type: 'new_message',
+              messageId: messageId,
+              circleId: circleId,
+              senderName: senderName,
+              title: title
+            }
+          );
+        }
+      }
+
+      // 4. 出欠確認の場合は期限前の通知をスケジュール
+      if (messageType === 'attendance' && deadline) {
+        await scheduleDeadlineReminder(title, deadline);
+      }
+
       setTitle('');
       setBody('');
       setSelectedUids([]);

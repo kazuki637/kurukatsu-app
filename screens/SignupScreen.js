@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, TouchableWithoutFeedback, Keyboard, ScrollView, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, TouchableWithoutFeedback, Keyboard, ScrollView, Image, Linking } from 'react-native';
 import { auth, db } from '../firebaseConfig';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
@@ -67,6 +67,14 @@ const SignupScreen = ({ navigation }) => {
     }
   };
 
+  const openTermsOfService = () => {
+    Linking.openURL('https://kazuki637.github.io/kurukatsu-docs/terms.html');
+  };
+
+  const openPrivacyPolicy = () => {
+    Linking.openURL('https://kazuki637.github.io/kurukatsu-docs/privacy.html');
+  };
+
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <ScrollView 
@@ -122,9 +130,15 @@ const SignupScreen = ({ navigation }) => {
             <Text style={styles.registerButtonText}>登録</Text>
           )}
         </TouchableOpacity>
-        <Text style={styles.termsText}>
-          続行することでクルカツの利用規約に同意し、クルカツのプライバシーポリシーを読んだものとみなされます。
-        </Text>
+        <View style={styles.termsContainer}>
+          <Text style={styles.termsText}>
+            続行することでクルカツの
+            <Text style={styles.linkText} onPress={openTermsOfService}>利用規約</Text>
+            に同意し、クルカツの{'\n'}
+            <Text style={styles.linkText} onPress={openPrivacyPolicy}>プライバシーポリシー</Text>
+            を読んだものとみなされます。
+          </Text>
+        </View>
         <TouchableOpacity
           style={styles.loginLinkButton}
           onPress={() => navigation.navigate('Login')}
@@ -204,6 +218,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingHorizontal: 20,
     lineHeight: 16,
+  },
+  linkText: {
+    color: '#007bff',
+    fontSize: 12,
+    textDecorationLine: 'underline',
   },
 });
 
