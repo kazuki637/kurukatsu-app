@@ -10,6 +10,8 @@ import { auth, db } from './firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 import OnboardingScreen from './screens/OnboardingScreen';
 
 // Import all your screens
@@ -22,7 +24,6 @@ import UniversitySelectionScreen from './screens/UniversitySelectionScreen';
 import GenreSelectionScreen from './screens/GenreSelectionScreen';
 import ProfileEditScreen from './screens/ProfileEditScreen';
 import NotificationSettingsScreen from './screens/NotificationSettingsScreen';
-import PrivacySettingsScreen from './screens/PrivacySettingsScreen';
 import CircleProfileScreen from './screens/CircleProfileScreen';
 import FeatureSelectionScreen from './screens/FeatureSelectionScreen';
 import FrequencySelectionScreen from './screens/FrequencySelectionScreen';
@@ -113,7 +114,6 @@ function MyPageStackScreen() {
       <MyPageStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} />
       <MyPageStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
       <MyPageStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
-      <MyPageStack.Screen name="PrivacySettings" component={PrivacySettingsScreen} />
       <MyPageStack.Screen name="Settings" component={SettingsScreen} />
     </MyPageStack.Navigator>
   );
@@ -125,7 +125,6 @@ function SettingsStackScreen() {
     <SettingsStack.Navigator screenOptions={{ headerShown: false }}>
       <SettingsStack.Screen name="Settings" component={SettingsScreen} />
       <SettingsStack.Screen name="NotificationSettingsScreen" component={NotificationSettingsScreen} />
-      <SettingsStack.Screen name="PrivacySettingsScreen" component={PrivacySettingsScreen} />
       <SettingsStack.Screen name="HelpScreen" component={HelpScreen} />
       <SettingsStack.Screen name="PrivacyPolicyScreen" component={PrivacyPolicyScreen} />
       <SettingsStack.Screen name="TermsOfServiceScreen" component={TermsOfServiceScreen} />
@@ -206,9 +205,49 @@ function ProfileEditScreenModal() {
   );
 }
 
+// 通知システムの初期化
+const initializeNotifications = async () => {
+  try {
+    // 通知ハンドラーの設定
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      }),
+    });
 
+    // Android用の通知チャンネル設定
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
 
+      // メッセージ通知用のチャンネル
+      await Notifications.setNotificationChannelAsync('messages', {
+        name: 'メッセージ',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
 
+      // サークル関連通知用のチャンネル
+      await Notifications.setNotificationChannelAsync('circle', {
+        name: 'サークル',
+        importance: Notifications.AndroidImportance.DEFAULT,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
+    }
+
+    console.log('通知システムの初期化が完了しました');
+  } catch (error) {
+    console.error('通知システムの初期化でエラーが発生しました:', error);
+  }
+};
 
 // Root Stack Navigator (for modals and initial auth flow)
 function AppNavigator() {
@@ -222,6 +261,9 @@ function AppNavigator() {
       setShowOnboarding(seen !== 'true');
     };
     checkOnboarding();
+
+    // 通知システムの初期化
+    initializeNotifications();
 
     const subscriber = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);

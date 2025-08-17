@@ -46,8 +46,7 @@ export default function SettingsScreen({ navigation }) {
 
   const settingsOptions = [
     { label: '通知設定', icon: 'notifications-outline', screen: 'NotificationSettingsScreen' },
-    { label: 'プライバシー設定', icon: 'lock-closed-outline', screen: 'PrivacySettingsScreen' },
-    { label: 'ヘルプ・お問い合わせ', icon: 'help-circle-outline', screen: 'HelpScreen' },
+    { label: 'お問い合わせ', icon: 'help-circle-outline', screen: 'HelpScreen' },
     { label: '利用規約', icon: 'document-text-outline', screen: 'TermsOfServiceScreen' },
     { label: 'プライバシーポリシー', icon: 'shield-checkmark-outline', screen: 'PrivacyPolicyScreen' },
   ];

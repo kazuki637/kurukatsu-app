@@ -5,6 +5,7 @@ import { db, auth } from '../firebaseConfig';
 import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc, setDoc, arrayRemove, arrayUnion } from 'firebase/firestore';
 import CommonHeader from '../components/CommonHeader';
 import { checkUserPermission, getUserRole, getRoleDisplayName } from '../utils/permissionUtils';
+import * as Notifications from 'expo-notifications';
 
 export default function CircleMemberManagementScreen({ route, navigation }) {
   const { circleId } = route.params;
@@ -18,11 +19,76 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
   const [roleChangeModalVisible, setRoleChangeModalVisible] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [currentUserRole, setCurrentUserRole] = useState(null);
+  const [circleName, setCircleName] = useState('');
+
+  // 通知送信の共通関数
+  const sendNotification = async (title, body, data = {}) => {
+    try {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: title,
+          body: body,
+          data: data,
+        },
+        trigger: null, // 即座に送信
+      });
+      console.log('通知を送信しました:', title);
+    } catch (error) {
+      console.error('通知の送信でエラーが発生しました:', error);
+    }
+  };
+
+  // メンバー変更時の通知送信
+  const sendMemberChangeNotification = async (memberName, changeType, circleName) => {
+    await sendNotification(
+      'メンバー変更のお知らせ',
+      `${memberName}が${changeType}しました`,
+      {
+        type: 'member_change',
+        memberName: memberName,
+        changeType: changeType,
+        circleName: circleName
+      }
+    );
+  };
+
+  // 役割変更時の通知送信
+  const sendRoleChangeNotification = async (memberName, newRole, circleName) => {
+    await sendNotification(
+      '役割変更のお知らせ',
+      `${memberName}の役割が${getRoleDisplayName(newRole)}に変更されました`,
+      {
+        type: 'role_change',
+        memberName: memberName,
+        newRole: newRole,
+        circleName: circleName
+      }
+    );
+  };
+
+  // 強制退会時の通知送信
+  const sendForcedRemovalNotification = async (memberName, circleName) => {
+    await sendNotification(
+      'サークルから退会されました',
+      `${circleName}から退会されました`,
+      {
+        type: 'forced_removal',
+        memberName: memberName,
+        circleName: circleName
+      }
+    );
+  };
 
   useEffect(() => {
     const fetchMembers = async () => {
       setLoading(true);
       try {
+        // サークル名を取得
+        const circleDoc = await getDoc(doc(db, 'circles', circleId));
+        if (circleDoc.exists()) {
+          setCircleName(circleDoc.data().name || 'サークル');
+        }
+
         // 現在のユーザーの役割を取得
         const user = auth.currentUser;
         if (user) {
@@ -108,6 +174,10 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
           style: 'destructive',
           onPress: async () => {
             try {
+              // 削除されるメンバーの情報を取得
+              const memberToRemove = members.find(m => m.id === memberId);
+              const memberName = memberToRemove?.name || 'メンバー';
+              
               // サークルのメンバーコレクションから削除
               await deleteDoc(doc(db, 'circles', circleId, 'members', memberId));
               
@@ -116,6 +186,11 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
               await updateDoc(userDocRef, {
                 joinedCircleIds: arrayRemove(circleId)
               });
+              
+              // 強制退会の通知を送信（削除されたメンバーに）
+              if (memberToRemove) {
+                await sendForcedRemovalNotification(memberName, circleName);
+              }
               
               setMembers(prev => prev.filter(m => m.id !== memberId));
               Alert.alert('削除完了', 'メンバーを削除しました');
@@ -141,11 +216,18 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
     }
 
     try {
+      // 変更されるメンバーの情報を取得
+      const memberToChange = members.find(m => m.id === memberId);
+      const memberName = memberToChange?.name || 'メンバー';
+      
       await updateDoc(doc(db, 'circles', circleId, 'members', memberId), {
         role: newRole,
         assignedAt: new Date(),
         assignedBy: user.uid
       });
+      
+      // 役割変更の通知を送信
+      await sendRoleChangeNotification(memberName, newRole, circleName);
       
       setMembers(prev => prev.map(m => 
         m.id === memberId ? { ...m, role: newRole } : m
@@ -226,6 +308,9 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
         setMembers(membersList);
       };
       await fetchMembers();
+      
+      // 入会申請承認の通知を送信
+      await sendMemberChangeNotification(request.name, 'サークルに参加', circleName);
       
       Alert.alert('許可完了', '入会申請を許可しました');
     } catch (e) {
