@@ -50,6 +50,8 @@ import CircleSettingsScreen from './screens/CircleSettingsScreen';
 import CircleMessageDetailScreen from './screens/CircleMessageDetailScreen';
 import CircleManagementDetailScreen from './screens/CircleManagementDetailScreen';
 import CircleLeadershipTransferScreen from './screens/CircleLeadershipTransferScreen';
+import ReportScreen from './screens/ReportScreen';
+import BlockManagementScreen from './screens/BlockManagementScreen';
 
 import ImageCropScreen from './screens/ImageCropScreen';
 import StudentIdCameraScreen from './screens/StudentIdCameraScreen';
@@ -291,6 +293,16 @@ function AppNavigator() {
           <RootStack.Screen 
             name="CircleMember" 
             component={CircleMemberScreen} 
+            options={{ headerShown: false }} 
+          />
+          <RootStack.Screen 
+            name="Report" 
+            component={ReportScreen} 
+            options={{ headerShown: false }} 
+          />
+          <RootStack.Screen 
+            name="BlockManagement" 
+            component={BlockManagementScreen} 
             options={{ headerShown: false }} 
           />
         </>

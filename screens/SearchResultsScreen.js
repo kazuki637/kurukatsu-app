@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, Alert, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, Alert, StatusBar, Modal } from 'react-native';
 import { Image } from 'expo-image'; // expo-image を使用
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '../firebaseConfig';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, collection, getDocs, setDoc, serverTimestamp } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import CommonHeader from '../components/CommonHeader';
 
@@ -11,6 +11,16 @@ const SearchResultsScreen = ({ route, navigation }) => {
   const { circles } = route.params;
   const [user, setUser] = useState(null);
   const [showOnlyRecruiting, setShowOnlyRecruiting] = useState(false);
+  
+  // アクションメニューの状態管理
+  const [actionMenuVisible, setActionMenuVisible] = useState(false);
+  const [selectedCircle, setSelectedCircle] = useState(null);
+  
+  // ブロック機能の状態管理
+  const [userBlockedCircleIds, setUserBlockedCircleIds] = useState([]);
+  
+  // ユーザープロフィールの状態管理
+  const [userProfile, setUserProfile] = useState(null);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -19,14 +29,135 @@ const SearchResultsScreen = ({ route, navigation }) => {
     return unsubscribeAuth;
   }, []);
 
+  // ブロック状態の取得
+  useEffect(() => {
+    if (user) {
+      const fetchUserBlocks = async () => {
+        try {
+          const blocksRef = collection(db, 'users', user.uid, 'blocks');
+          const blocksSnapshot = await getDocs(blocksRef);
+          const blockedIds = blocksSnapshot.docs.map(doc => doc.id);
+          setUserBlockedCircleIds(blockedIds);
+        } catch (error) {
+          console.error('Error fetching user blocks:', error);
+        }
+      };
+      fetchUserBlocks();
+    } else {
+      setUserBlockedCircleIds([]);
+    }
+  }, [user]);
+
+  // ユーザープロフィールの取得
+  useEffect(() => {
+    let unsubscribe;
+    if (user) {
+      try {
+        const userDoc = doc(db, 'users', user.uid);
+        unsubscribe = onSnapshot(userDoc, (docSnap) => {
+          if (docSnap.exists()) {
+            setUserProfile(docSnap.data());
+          }
+        });
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      }
+    } else {
+      setUserProfile(null);
+    }
+    
+    // クリーンアップ関数
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [user]);
 
 
-  // フィルタリングされたサークルリストを計算（いいね数でソート）
+
+  // フィルタリングされたサークルリストを計算（いいね数でソート、ブロックしたサークルを除外）
   const filteredCircles = (showOnlyRecruiting 
-    ? circles.filter(circle => circle.welcome?.isRecruiting === true)
-    : circles
+    ? circles.filter(circle => 
+        circle.welcome?.isRecruiting === true && 
+        !userBlockedCircleIds.includes(circle.id)
+      )
+    : circles.filter(circle => 
+        !userBlockedCircleIds.includes(circle.id)
+      )
   ).sort((a, b) => (b.likes || 0) - (a.likes || 0));
 
+  // アクションシートの表示
+  const showActionSheetForCircle = (circle) => {
+    setSelectedCircle(circle);
+    setActionMenuVisible(true);
+  };
+
+  // アクションシートの非表示
+  const hideActionSheet = () => {
+    setActionMenuVisible(false);
+    // フェードアニメーション完了後にselectedCircleをクリア
+    setTimeout(() => {
+      setSelectedCircle(null);
+    }, 300); // fadeアニメーションの標準時間
+  };
+
+  // ブロック機能
+  const handleBlock = async () => {
+    if (!selectedCircle || !user) return;
+    
+    // 所属チェック
+    if (isUserMemberOfCircle(selectedCircle.id)) {
+      Alert.alert('ブロック不可', '所属しているサークルはブロックできません。');
+      return;
+    }
+    
+    // 既にブロック済みかチェック
+    if (userBlockedCircleIds.includes(selectedCircle.id)) {
+      Alert.alert('エラー', '既にブロック済みのサークルです。');
+      return;
+    }
+    
+    try {
+      // ブロックデータを作成
+      const blockData = {
+        blockedCircleId: selectedCircle.id,
+        blockedCircleName: selectedCircle.name,
+        createdAt: serverTimestamp()
+      };
+      
+      await setDoc(doc(db, 'users', user.uid, 'blocks', selectedCircle.id), blockData);
+      
+      // ローカル状態を更新
+      setUserBlockedCircleIds(prev => [...prev, selectedCircle.id]);
+      
+      Alert.alert('ブロック完了', `${selectedCircle.name}をブロックしました。`);
+      hideActionSheet();
+    } catch (error) {
+      console.error('Error blocking circle:', error);
+      Alert.alert('エラー', 'ブロックに失敗しました。');
+    }
+  };
+
+  // 所属チェック関数
+  const isUserMemberOfCircle = (circleId) => {
+    // ユーザープロフィールから所属サークルIDを取得してチェック
+    if (userProfile && userProfile.joinedCircleIds) {
+      return userProfile.joinedCircleIds.includes(circleId);
+    }
+    return false;
+  };
+
+  // 報告機能
+  const handleReport = () => {
+    if (selectedCircle) {
+      hideActionSheet();
+      navigation.navigate('Report', {
+        circleId: selectedCircle.id,
+        circleName: selectedCircle.name
+      });
+    }
+  };
 
 
   const renderItem = ({ item }) => {
@@ -35,6 +166,17 @@ const SearchResultsScreen = ({ route, navigation }) => {
       style={styles.resultItem}
       onPress={() => navigation.navigate('CircleDetail', { circleId: item.id })}
     >
+      {/* 「・・・」ボタン（右上） */}
+      <TouchableOpacity
+        style={styles.actionButton}
+        onPress={(e) => {
+          e.stopPropagation(); // サークルアイテムのタップを防ぐ
+          showActionSheetForCircle(item);
+        }}
+      >
+        <Ionicons name="ellipsis-horizontal" size={24} color="#666" />
+      </TouchableOpacity>
+
       <View style={styles.headerContainer}>
         {item.imageUrl ? (
           <Image source={{ uri: item.imageUrl }} style={styles.accountImage} />
@@ -47,6 +189,7 @@ const SearchResultsScreen = ({ route, navigation }) => {
           <Text style={styles.resultTitle}>{item.name}</Text>
           <Text style={styles.resultDetail}>{item.universityName} - {item.genre}</Text>
         </View>
+        
       </View>
 
       {/* ヘッダー画像（サークル詳細画面のheaderImageUrl） */}
@@ -124,6 +267,55 @@ const SearchResultsScreen = ({ route, navigation }) => {
           )}
         />
       </SafeAreaView>
+      
+      {/* アクションメニュー */}
+      <Modal
+        visible={actionMenuVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setActionMenuVisible(false);
+          // フェードアニメーション完了後にselectedCircleをクリア
+          setTimeout(() => {
+            setSelectedCircle(null);
+          }, 300);
+        }}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={hideActionSheet}
+        >
+          <View style={styles.actionMenuContainer}>
+            {/* 所属していないサークルのみブロックオプションを表示 */}
+            {selectedCircle && !isUserMemberOfCircle(selectedCircle.id) && (
+              <TouchableOpacity
+                style={styles.actionMenuItemWithBorder}
+                onPress={handleBlock}
+              >
+                <Ionicons name="ban-outline" size={20} color="#dc3545" />
+                <Text style={[styles.actionMenuText, styles.actionMenuTextRed]}>ブロック</Text>
+              </TouchableOpacity>
+            )}
+            
+            <TouchableOpacity
+              style={styles.actionMenuItemWithBorder}
+              onPress={handleReport}
+            >
+              <Ionicons name="flag-outline" size={20} color="#dc3545" />
+              <Text style={[styles.actionMenuText, styles.actionMenuTextRed]}>報告する</Text>
+            </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.actionMenuItem}
+                onPress={hideActionSheet}
+              >
+                <Ionicons name="close-outline" size={20} color="#666" />
+                <Text style={styles.actionMenuText}>キャンセル</Text>
+              </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 };
@@ -289,6 +481,55 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginLeft: 4,
+  },
+  actionButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 10,
+    padding: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionMenuContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    width: '80%',
+    alignSelf: 'center',
+    paddingVertical: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  actionMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    minHeight: 56,
+  },
+  actionMenuItemWithBorder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    minHeight: 56,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  actionMenuText: {
+    fontSize: 16,
+    color: '#333',
+    marginLeft: 15,
+  },
+  actionMenuTextRed: {
+    color: '#dc3545',
   },
 });
 
