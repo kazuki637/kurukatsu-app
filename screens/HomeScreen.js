@@ -18,6 +18,9 @@ const HomeScreen = ({ navigation }) => {
   const [articlesLoading, setArticlesLoading] = useState(true);
   const [articlesInitialized, setArticlesInitialized] = useState(false);
   const articlesCache = useRef(new Map());
+  
+  // ブロック機能の状態管理
+  const [userBlockedCircleIds, setUserBlockedCircleIds] = useState([]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -34,6 +37,18 @@ const HomeScreen = ({ navigation }) => {
           if (userDoc.exists()) {
             userData = userDoc.data();
             setUserUniversity(userData.university || '');
+          }
+
+          // ブロック状態の取得
+          let blockedIds = [];
+          try {
+            const blocksRef = collection(db, 'users', auth.currentUser.uid, 'blocks');
+            const blocksSnapshot = await getDocs(blocksRef);
+            blockedIds = blocksSnapshot.docs.map(doc => doc.id);
+            setUserBlockedCircleIds(blockedIds);
+          } catch (error) {
+            console.error('Error fetching user blocks:', error);
+            setUserBlockedCircleIds([]);
           }
 
           // すべてのサークルを取得
@@ -61,12 +76,20 @@ const HomeScreen = ({ navigation }) => {
           // 大学別の人気サークルを取得
           if (userData && userData.university) {
             const universityPopularCircles = await fetchPopularCirclesByUniversity(userData.university);
-            setPopularCircles(universityPopularCircles);
+            // ブロックしたサークルを除外（ローカル変数を使用）
+            const filteredPopularCircles = universityPopularCircles.filter(circle => 
+              !blockedIds.includes(circle.id)
+            );
+            setPopularCircles(filteredPopularCircles);
           }
 
           // 新着のサークルを取得
           const newCirclesList = await fetchNewCircles();
-          setNewCircles(newCirclesList);
+          // ブロックしたサークルを除外（ローカル変数を使用）
+          const filteredNewCircles = newCirclesList.filter(circle => 
+            !blockedIds.includes(circle.id)
+          );
+          setNewCircles(filteredNewCircles);
         } catch (error) {
           console.error("Error fetching user data: ", error);
         } finally {
@@ -142,6 +165,42 @@ const HomeScreen = ({ navigation }) => {
       fetchArticlesData();
     }
   }, [articlesInitialized]);
+
+  // 画面がフォーカスされたときにブロック状態を再取得
+  useFocusEffect(
+    React.useCallback(() => {
+      if (auth.currentUser) {
+        const fetchBlockedCircles = async () => {
+          try {
+            const blocksRef = collection(db, 'users', auth.currentUser.uid, 'blocks');
+            const blocksSnapshot = await getDocs(blocksRef);
+            const blockedIds = blocksSnapshot.docs.map(doc => doc.id);
+            setUserBlockedCircleIds(blockedIds);
+            
+            // ブロック状態が変更された場合、人気サークルと新着サークルを再フィルタリング
+            if (userUniversity && popularCircles.length > 0) {
+              const universityPopularCircles = await fetchPopularCirclesByUniversity(userUniversity);
+              const filteredPopularCircles = universityPopularCircles.filter(circle => 
+                !blockedIds.includes(circle.id)
+              );
+              setPopularCircles(filteredPopularCircles);
+            }
+            
+            if (newCircles.length > 0) {
+              const newCirclesList = await fetchNewCircles();
+              const filteredNewCircles = newCirclesList.filter(circle => 
+                !blockedIds.includes(circle.id)
+              );
+              setNewCircles(filteredNewCircles);
+            }
+          } catch (error) {
+            console.error('Error fetching blocked circles on focus:', error);
+          }
+        };
+        fetchBlockedCircles();
+      }
+    }, [auth.currentUser, userUniversity, popularCircles.length, newCircles.length])
+  );
 
   // 大学別の人気サークルを取得する関数
   const fetchPopularCirclesByUniversity = async (university) => {

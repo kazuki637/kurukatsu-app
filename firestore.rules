@@ -126,5 +126,34 @@ service cloud.firestore {
           exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid));
       }
     }
+
+    // サークル報告
+    match /reports/{reportId} {
+      // 認証済みユーザーのみ作成可能
+      allow create: if request.auth != null;
+      
+      // 作成者は自分の報告のみ読み取り可能
+      allow read: if request.auth != null && 
+                   request.auth.uid == resource.data.reporterId;
+      
+      // 更新・削除は作成者のみ
+      allow update, delete: if request.auth != null && 
+                            request.auth.uid == resource.data.reporterId;
+    }
+
+    // ユーザーのブロック機能
+    match /users/{userId}/blocks/{blockedCircleId} {
+      // 自分のブロックデータのみ作成可能
+      allow create: if request.auth != null && 
+                     request.auth.uid == userId;
+      
+      // 自分のブロックデータのみ読み取り可能
+      allow read: if request.auth != null && 
+                   request.auth.uid == userId;
+      
+      // 自分のブロックデータのみ削除可能
+      allow delete: if request.auth != null && 
+                    request.auth.uid == userId;
+    }
   }
 } 

@@ -49,7 +49,7 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const settingsOptions = [
-    
+    { label: 'ブロックリスト', icon: 'lock-closed-outline', screen: 'BlockManagement' },
     { label: 'お問い合わせ', icon: 'help-circle-outline', screen: 'HelpScreen' },
     { label: '利用規約', icon: 'document-text-outline', screen: 'TermsOfServiceScreen' },
     { label: 'プライバシーポリシー', icon: 'shield-checkmark-outline', screen: 'PrivacyPolicyScreen' },

@@ -44,6 +44,9 @@ export default function MyPageScreen({ navigation, route }) {
   const [circlesLoading, setCirclesLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [imageError, setImageError] = useState(false);
+  
+  // ブロック機能の状態管理
+  const [userBlockedCircleIds, setUserBlockedCircleIds] = useState([]);
 
   // 画面がフォーカスされたときにデータをリロード
   useFocusEffect(
@@ -68,6 +71,18 @@ export default function MyPageScreen({ navigation, route }) {
       }
       
       try {
+        // ブロック状態の取得
+        let blockedIds = [];
+        try {
+          const blocksRef = collection(db, 'users', userId, 'blocks');
+          const blocksSnapshot = await getDocs(blocksRef);
+          blockedIds = blocksSnapshot.docs.map(doc => doc.id);
+          setUserBlockedCircleIds(blockedIds);
+        } catch (error) {
+          console.error('Error fetching user blocks:', error);
+          setUserBlockedCircleIds([]);
+        }
+
         // joinedCircles
         let joined = [];
         if (userProfile.joinedCircleIds && userProfile.joinedCircleIds.length > 0) {
@@ -93,7 +108,11 @@ export default function MyPageScreen({ navigation, route }) {
             saved.push(...querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
           }
         }
-        setSavedCircles(saved);
+        // ブロックしたサークルを除外（ローカル変数を使用）
+        const filteredSavedCircles = saved.filter(circle => 
+          !blockedIds.includes(circle.id)
+        );
+        setSavedCircles(filteredSavedCircles);
 
         // いいねした記事を取得
         let liked = [];
@@ -145,7 +164,44 @@ export default function MyPageScreen({ navigation, route }) {
     }
   }, [userProfile?.joinedCircleIds?.length, userProfile?.favoriteCircleIds?.length, userProfile?.likedArticleIds?.length]);
 
-  // useFocusEffectや冗長なキャッシュ・ローディング処理を削除
+  // 画面がフォーカスされたときにブロック状態を再取得
+  useFocusEffect(
+    React.useCallback(() => {
+      if (userId) {
+        const fetchBlockedCircles = async () => {
+          try {
+            const blocksRef = collection(db, 'users', userId, 'blocks');
+            const blocksSnapshot = await getDocs(blocksRef);
+            const blockedIds = blocksSnapshot.docs.map(doc => doc.id);
+            setUserBlockedCircleIds(blockedIds);
+            
+            // ブロック状態が変更された場合、お気に入りサークルを再取得・再フィルタリング
+            if (userProfile?.favoriteCircleIds && userProfile.favoriteCircleIds.length > 0) {
+              // お気に入りサークルのデータを再取得
+              let saved = [];
+              const batchSize = 10;
+              for (let i = 0; i < userProfile.favoriteCircleIds.length; i += batchSize) {
+                const batch = userProfile.favoriteCircleIds.slice(i, i + batchSize);
+                const circlesRef = collection(db, 'circles');
+                const q = query(circlesRef, where('__name__', 'in', batch));
+                const querySnapshot = await getDocs(q);
+                saved.push(...querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+              }
+              
+              // ブロックしたサークルを除外
+              const filteredSavedCircles = saved.filter(circle => 
+                !blockedIds.includes(circle.id)
+              );
+              setSavedCircles(filteredSavedCircles);
+            }
+          } catch (error) {
+            console.error('Error fetching blocked circles on focus:', error);
+          }
+        };
+        fetchBlockedCircles();
+      }
+    }, [userId, userProfile?.favoriteCircleIds])
+  );
 
   // 初回ロード完了後はisInitialLoadをfalseに設定
   React.useEffect(() => {

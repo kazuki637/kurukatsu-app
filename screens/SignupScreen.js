@@ -10,6 +10,10 @@ const SignupScreen = ({ navigation }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [passwordErrors, setPasswordErrors] = useState([]);
+  
+  // 同意フローの強化: 個別同意状態の管理
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [agreedToPrivacyPolicy, setAgreedToPrivacyPolicy] = useState(false);
 
   // パスワード検証関数
   const validatePassword = (password) => {
@@ -46,6 +50,17 @@ const SignupScreen = ({ navigation }) => {
     // パスワード条件チェック
     if (passwordErrors.length > 0) {
       Alert.alert('エラー', 'パスワードの条件を満たしていません。');
+      return;
+    }
+
+    // 同意フローの強化: 同意チェック
+    if (!agreedToTerms) {
+      Alert.alert('エラー', '利用規約に同意してください。');
+      return;
+    }
+
+    if (!agreedToPrivacyPolicy) {
+      Alert.alert('エラー', 'プライバシーポリシーに同意してください。');
       return;
     }
 
@@ -152,10 +167,10 @@ const SignupScreen = ({ navigation }) => {
         <TouchableOpacity
           style={[
             styles.registerButton,
-            (!email || !password || !confirmPassword || passwordErrors.length > 0) && styles.registerButtonDisabled
+            (!email || !password || !confirmPassword || passwordErrors.length > 0 || !agreedToTerms || !agreedToPrivacyPolicy) && styles.registerButtonDisabled
           ]}
           onPress={handleSignup}
-          disabled={loading || !email || !password || !confirmPassword || passwordErrors.length > 0}
+          disabled={loading || !email || !password || !confirmPassword || passwordErrors.length > 0 || !agreedToTerms || !agreedToPrivacyPolicy}
         >
           {loading ? (
             <ActivityIndicator size="small" color="#fff" />
@@ -163,7 +178,48 @@ const SignupScreen = ({ navigation }) => {
             <Text style={styles.registerButtonText}>登録</Text>
           )}
         </TouchableOpacity>
-        <View style={styles.termsContainer}>
+
+        {/* 同意フローの強化: 個別同意チェックボックス */}
+        <View style={styles.agreementContainer}>
+          <Text style={styles.agreementTitle}>以下の内容に同意してください</Text>
+          
+          <View style={styles.agreementItem}>
+            <TouchableOpacity
+              style={styles.checkbox}
+              onPress={() => setAgreedToTerms(!agreedToTerms)}
+            >
+              {agreedToTerms ? (
+                <Text style={styles.checkboxChecked}>✓</Text>
+              ) : (
+                <View style={styles.checkboxUnchecked} />
+              )}
+            </TouchableOpacity>
+            <Text style={styles.agreementText}>
+              <Text style={styles.linkText} onPress={openTermsOfService}>利用規約</Text>
+              に同意します
+            </Text>
+          </View>
+
+          <View style={styles.agreementItem}>
+            <TouchableOpacity
+              style={styles.checkbox}
+              onPress={() => setAgreedToPrivacyPolicy(!agreedToPrivacyPolicy)}
+            >
+              {agreedToPrivacyPolicy ? (
+                <Text style={styles.checkboxChecked}>✓</Text>
+              ) : (
+                <View style={styles.checkboxUnchecked} />
+              )}
+            </TouchableOpacity>
+            <Text style={styles.agreementText}>
+              <Text style={styles.linkText} onPress={openPrivacyPolicy}>プライバシーポリシー</Text>
+              に同意します
+            </Text>
+          </View>
+        </View>
+
+        {/* 旧来の曖昧な同意テキストを削除 */}
+        {/* <View style={styles.termsContainer}>
           <Text style={styles.termsText}>
             続行することでクルカツの
             <Text style={styles.linkText} onPress={openTermsOfService}>利用規約</Text>
@@ -171,7 +227,7 @@ const SignupScreen = ({ navigation }) => {
             <Text style={styles.linkText} onPress={openPrivacyPolicy}>プライバシーポリシー</Text>
             を読んだものとみなされます。
           </Text>
-        </View>
+        </View> */}
         <TouchableOpacity
           style={styles.loginLinkButton}
           onPress={() => navigation.navigate('Login')}
@@ -254,7 +310,7 @@ const styles = StyleSheet.create({
   },
   linkText: {
     color: '#007bff',
-    fontSize: 12,
+    fontSize: 14,
     textDecorationLine: 'underline',
   },
   errorContainer: {
@@ -270,6 +326,54 @@ const styles = StyleSheet.create({
     color: '#ef5350',
     fontSize: 12,
     marginBottom: 2,
+  },
+  agreementContainer: {
+    width: '90%',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+  },
+  agreementTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center',
+    color: '#495057',
+  },
+  agreementItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#007bff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    backgroundColor: '#fff',
+  },
+  checkboxUnchecked: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'transparent',
+  },
+  checkboxChecked: {
+    fontSize: 16,
+    color: '#007bff',
+    fontWeight: 'bold',
+  },
+  agreementText: {
+    fontSize: 14,
+    color: '#495057',
+    flex: 1,
+    lineHeight: 20,
   },
 });
 
