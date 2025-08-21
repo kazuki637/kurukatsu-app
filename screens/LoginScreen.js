@@ -15,7 +15,33 @@ const LoginScreen = ({ navigation }) => {
       await signInWithEmailAndPassword(auth, email, password);
       
     } catch (error) {
-      Alert.alert('ログインエラー', error.message);
+      let errorMessage = 'ログインに失敗しました。';
+      
+      // Firebaseのエラーコードに基づいて日本語メッセージを設定
+      switch (error.code) {
+        case 'auth/invalid-email':
+          errorMessage = 'メールアドレスの形式が正しくありません。';
+          break;
+        case 'auth/user-disabled':
+          errorMessage = 'このアカウントは無効化されています。';
+          break;
+        case 'auth/user-not-found':
+          errorMessage = 'メールアドレスまたはパスワードが正しくありません。';
+          break;
+        case 'auth/wrong-password':
+          errorMessage = 'メールアドレスまたはパスワードが正しくありません。';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = 'ログイン試行回数が多すぎます。しばらく時間をおいてから再度お試しください。';
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = 'ネットワークエラーが発生しました。インターネット接続を確認してください。';
+          break;
+        default:
+          errorMessage = 'ログインに失敗しました。しばらく時間をおいてから再度お試しください。';
+      }
+      
+      Alert.alert('ログインエラー', errorMessage);
     } finally {
       setLoading(false);
     }
