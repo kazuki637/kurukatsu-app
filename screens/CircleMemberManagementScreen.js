@@ -5,79 +5,30 @@ import { db, auth } from '../firebaseConfig';
 import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc, setDoc, arrayRemove, arrayUnion } from 'firebase/firestore';
 import CommonHeader from '../components/CommonHeader';
 import { checkUserPermission, getUserRole, getRoleDisplayName } from '../utils/permissionUtils';
-import * as Notifications from 'expo-notifications';
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function CircleMemberManagementScreen({ route, navigation }) {
-  const { circleId } = route.params;
+  const { circleId, initialTab } = route.params;
   const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState([]);
   const [joinRequests, setJoinRequests] = useState([]);
   const [searchText, setSearchText] = useState('');
   const [requestSearchText, setRequestSearchText] = useState('');
-  const [selectedTab, setSelectedTab] = useState('members');
+  const [selectedTab, setSelectedTab] = useState(() => {
+    // initialTabパラメータに基づいて初期タブを設定
+    if (initialTab === 'requests') {
+      return 'requests'; // 入会申請タブ
+    }
+    return 'members'; // デフォルトはメンバータブ
+  });
   const [imageErrorMap, setImageErrorMap] = useState({});
   const [roleChangeModalVisible, setRoleChangeModalVisible] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [currentUserRole, setCurrentUserRole] = useState(null);
   const [circleName, setCircleName] = useState('');
 
-  // 通知送信の共通関数
-  const sendNotification = async (title, body, data = {}) => {
-    try {
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: title,
-          body: body,
-          data: data,
-        },
-        trigger: null, // 即座に送信
-      });
-      console.log('通知を送信しました:', title);
-    } catch (error) {
-      console.error('通知の送信でエラーが発生しました:', error);
-    }
-  };
-
-  // メンバー変更時の通知送信
-  const sendMemberChangeNotification = async (memberName, changeType, circleName) => {
-    await sendNotification(
-      'メンバー変更のお知らせ',
-      `${memberName}が${changeType}しました`,
-      {
-        type: 'member_change',
-        memberName: memberName,
-        changeType: changeType,
-        circleName: circleName
-      }
-    );
-  };
-
-  // 役割変更時の通知送信
-  const sendRoleChangeNotification = async (memberName, newRole, circleName) => {
-    await sendNotification(
-      '役割変更のお知らせ',
-      `${memberName}の役割が${getRoleDisplayName(newRole)}に変更されました`,
-      {
-        type: 'role_change',
-        memberName: memberName,
-        newRole: newRole,
-        circleName: circleName
-      }
-    );
-  };
-
-  // 強制退会時の通知送信
-  const sendForcedRemovalNotification = async (memberName, circleName) => {
-    await sendNotification(
-      'サークルから退会されました',
-      `${circleName}から退会されました`,
-      {
-        type: 'forced_removal',
-        memberName: memberName,
-        circleName: circleName
-      }
-    );
-  };
+  // 通知送信処理は一時的に無効化されています
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -160,7 +111,7 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
     // 権限チェック
     const hasPermission = await checkUserPermission(circleId, user.uid, 'leader');
     if (!hasPermission) {
-      Alert.alert('権限エラー', 'メンバーを削除する権限がありません');
+      Alert.alert('エラー', '代表者のみメンバーを削除できます');
       return;
     }
 
@@ -188,9 +139,7 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
               });
               
               // 強制退会の通知を送信（削除されたメンバーに）
-              if (memberToRemove) {
-                await sendForcedRemovalNotification(memberName, circleName);
-              }
+              console.log('通知送信処理は一時的に無効化されています');
               
               setMembers(prev => prev.filter(m => m.id !== memberId));
               Alert.alert('削除完了', 'メンバーを削除しました');
@@ -211,7 +160,7 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
     // 権限チェック
     const hasPermission = await checkUserPermission(circleId, user.uid, 'leader');
     if (!hasPermission) {
-      Alert.alert('権限エラー', '役割を変更する権限がありません');
+      Alert.alert('エラー', '代表者のみ役割を変更できます');
       return;
     }
 
@@ -227,7 +176,7 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
       });
       
       // 役割変更の通知を送信
-      await sendRoleChangeNotification(memberName, newRole, circleName);
+      console.log('通知送信処理は一時的に無効化されています');
       
       setMembers(prev => prev.map(m => 
         m.id === memberId ? { ...m, role: newRole } : m
@@ -245,10 +194,11 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
     const user = auth.currentUser;
     if (!user) return;
 
-    // 権限チェック
-    const hasPermission = await checkUserPermission(circleId, user.uid, 'leader');
+    // 権限チェック（代表者または管理者）
+    const hasPermission = await checkUserPermission(circleId, user.uid, 'leader') || 
+                         await checkUserPermission(circleId, user.uid, 'admin');
     if (!hasPermission) {
-      Alert.alert('権限エラー', '申請を許可する権限がありません');
+      Alert.alert('権限エラー', '申請を許可する権限がありません（代表者または管理者のみ）');
       return;
     }
 
@@ -309,8 +259,11 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
       };
       await fetchMembers();
       
-      // 入会申請承認の通知を送信
-      await sendMemberChangeNotification(request.name, 'サークルに参加', circleName);
+      // 入会申請を削除
+      await deleteDoc(doc(db, 'circles', circleId, 'joinRequests', request.id));
+      
+      // 申請者本人に承認通知を送信（通知設定に関係なく常に送信）
+      console.log('通知送信処理は一時的に無効化されています');
       
       Alert.alert('許可完了', '入会申請を許可しました');
     } catch (e) {
@@ -325,10 +278,11 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
     const user = auth.currentUser;
     if (!user) return;
 
-    // 権限チェック
-    const hasPermission = await checkUserPermission(circleId, user.uid, 'leader');
+    // 権限チェック（代表者または管理者）
+    const hasPermission = await checkUserPermission(circleId, user.uid, 'leader') || 
+                         await checkUserPermission(circleId, user.uid, 'admin');
     if (!hasPermission) {
-      Alert.alert('権限エラー', '申請を却下する権限がありません');
+      Alert.alert('権限エラー', '申請を却下する権限がありません（代表者または管理者のみ）');
       return;
     }
 
@@ -373,7 +327,7 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
     request.grade.toLowerCase().includes(requestSearchText.toLowerCase())
   );
 
-  const canManageRoles = currentUserRole === 'leader';
+  const canManageRoles = currentUserRole === 'leader' || currentUserRole === 'admin';
 
   if (loading) {
     return <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator size="small" color="#999" /></View>;

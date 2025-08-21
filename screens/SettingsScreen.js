@@ -5,6 +5,7 @@ import { auth } from '../firebaseConfig';
 import { signOut } from 'firebase/auth';
 import CommonHeader from '../components/CommonHeader';
 
+
 const SettingItem = ({ label, icon, onPress, isDestructive = false }) => (
   <TouchableOpacity style={styles.settingItem} onPress={onPress}>
     <View style={styles.settingItemContent}>
@@ -30,6 +31,9 @@ export default function SettingsScreen({ navigation }) {
           text: "ログアウト", 
           onPress: async () => {
             try {
+              // FCMトークンを削除
+        
+              // ログアウト
               await signOut(auth);
               // ログアウト成功後、ログイン画面にリダイレクトするなどの処理が必要な場合がある
               // この例では、ナビゲーションスタックの制御はApp.js側で行うことを想定
@@ -45,7 +49,7 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const settingsOptions = [
-    { label: '通知設定', icon: 'notifications-outline', screen: 'NotificationSettingsScreen' },
+    
     { label: 'お問い合わせ', icon: 'help-circle-outline', screen: 'HelpScreen' },
     { label: '利用規約', icon: 'document-text-outline', screen: 'TermsOfServiceScreen' },
     { label: 'プライバシーポリシー', icon: 'shield-checkmark-outline', screen: 'PrivacyPolicyScreen' },

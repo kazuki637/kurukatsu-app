@@ -16,6 +16,14 @@ export default function useFirestoreDoc(db, docPath, options = {}) {
   const [error, setError] = useState(null);
 
   const fetchDoc = async () => {
+    // docPathが空文字列の場合は処理をスキップ
+    if (!docPath || docPath.trim() === '') {
+      setLoading(false);
+      setData(null);
+      setError(null);
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -49,13 +57,21 @@ export default function useFirestoreDoc(db, docPath, options = {}) {
   };
 
   useEffect(() => {
-    fetchDoc();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // docPathが有効な場合のみfetchDocを実行
+    if (docPath && docPath.trim() !== '') {
+      fetchDoc();
+    } else {
+      setLoading(false);
+      setData(null);
+      setError(null);
+    }
   }, [docPath]);
 
   const reload = () => {
-    cacheRef.current[docPath] = undefined;
-    fetchDoc();
+    if (docPath && docPath.trim() !== '') {
+      cacheRef.current[docPath] = undefined;
+      fetchDoc();
+    }
   };
 
   return { data, loading, error, reload };

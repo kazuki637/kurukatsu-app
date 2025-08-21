@@ -313,15 +313,10 @@ const styles = StyleSheet.create({
   managementGridItem3col: {
     width: BUTTON_SIZE_3COL,
     height: BUTTON_SIZE_3COL,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: '#ffffff',
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
   },
   managementGridItemText: {
     fontSize: 10,

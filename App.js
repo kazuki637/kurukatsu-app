@@ -10,9 +10,10 @@ import { auth, db } from './firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Notifications from 'expo-notifications';
+
 import { Platform } from 'react-native';
 import OnboardingScreen from './screens/OnboardingScreen';
+
 
 // Import all your screens
 import HomeScreen from './screens/HomeScreen';
@@ -23,7 +24,7 @@ import SettingsScreen from './screens/SettingsScreen';
 import UniversitySelectionScreen from './screens/UniversitySelectionScreen';
 import GenreSelectionScreen from './screens/GenreSelectionScreen';
 import ProfileEditScreen from './screens/ProfileEditScreen';
-import NotificationSettingsScreen from './screens/NotificationSettingsScreen';
+
 import CircleProfileScreen from './screens/CircleProfileScreen';
 import FeatureSelectionScreen from './screens/FeatureSelectionScreen';
 import FrequencySelectionScreen from './screens/FrequencySelectionScreen';
@@ -120,7 +121,7 @@ function MyPageStackScreen() {
       <MyPageStack.Screen name="CircleMember" component={CircleMemberScreen} />
       <MyPageStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} />
       <MyPageStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
-      <MyPageStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+      
       <MyPageStack.Screen name="Settings" component={SettingsScreen} />
     </MyPageStack.Navigator>
   );
@@ -131,7 +132,7 @@ function SettingsStackScreen() {
   return (
     <SettingsStack.Navigator screenOptions={{ headerShown: false }}>
       <SettingsStack.Screen name="Settings" component={SettingsScreen} />
-      <SettingsStack.Screen name="NotificationSettingsScreen" component={NotificationSettingsScreen} />
+      
       <SettingsStack.Screen name="HelpScreen" component={HelpScreen} />
       <SettingsStack.Screen name="PrivacyPolicyScreen" component={PrivacyPolicyScreen} />
       <SettingsStack.Screen name="TermsOfServiceScreen" component={TermsOfServiceScreen} />
@@ -212,92 +213,9 @@ function ProfileEditScreenModal() {
   );
 }
 
-// 通知システムの初期化
-const initializeNotifications = async () => {
-  try {
-    // 通知ハンドラーの設定
-    Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge: false,
-      }),
-    });
 
-    // 通知をタップした時の処理を設定
-    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-      const data = response.notification.request.content.data;
-      console.log('通知がタップされました:', data);
-      
-      // 通知の種類に応じて適切な画面に遷移
-      handleNotificationTap(data);
-    });
 
-    // Android用の通知チャンネル設定
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'default',
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
 
-      // メッセージ通知用のチャンネル
-      await Notifications.setNotificationChannelAsync('messages', {
-        name: 'メッセージ',
-        importance: Notifications.AndroidImportance.HIGH,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
-
-      // サークル関連通知用のチャンネル
-      await Notifications.setNotificationChannelAsync('circle', {
-        name: 'サークル',
-        importance: Notifications.AndroidImportance.DEFAULT,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF231F7C',
-      });
-    }
-
-    console.log('通知システムの初期化が完了しました');
-    
-    // クリーンアップ関数を返す
-    return () => subscription.remove();
-  } catch (error) {
-    console.error('通知システムの初期化でエラーが発生しました:', error);
-  }
-};
-
-// 通知をタップした時の遷移処理
-const handleNotificationTap = (data) => {
-  if (!navigationRef) {
-    console.log('ナビゲーション参照が利用できません');
-    return;
-  }
-
-  try {
-    const { type, circleId } = data;
-    
-    switch (type) {
-      case 'circleContact':
-        // サークルからの連絡の通知をタップした場合
-        if (circleId) {
-          // CircleMemberScreenに直接遷移
-          navigationRef.navigate('CircleMember', {
-            circleId: circleId,
-            initialTab: 'contact' // 連絡タブを指定
-          });
-        }
-        break;
-      
-      default:
-        console.log('未対応の通知タイプ:', type);
-        break;
-    }
-  } catch (error) {
-    console.error('通知タップ処理でエラーが発生しました:', error);
-  }
-};
 
 // Root Stack Navigator (for modals and initial auth flow)
 function AppNavigator() {
@@ -306,20 +224,27 @@ function AppNavigator() {
   const [showOnboarding, setShowOnboarding] = useState(null);
 
   useEffect(() => {
-    const checkOnboarding = async () => {
+
+
+    const initialize = async () => {
       const seen = await AsyncStorage.getItem('seenOnboarding');
       setShowOnboarding(seen !== 'true');
-    };
-    checkOnboarding();
 
-    // 通知システムの初期化
-    initializeNotifications();
+
+    };
+    
+    initialize();
 
     const subscriber = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (initializing) setInitializing(false);
     });
-    return subscriber;
+    
+    // クリーンアップ関数を返す
+    return () => {
+      subscriber();
+
+    };
   }, []);
 
   if (initializing || showOnboarding === null) return null;
