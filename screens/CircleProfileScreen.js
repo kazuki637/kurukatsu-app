@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Linking, ActivityIndicator, Alert, SafeAreaView, StatusBar, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Linking, ActivityIndicator, Alert, SafeAreaView, StatusBar, Dimensions, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as RNImage } from 'react-native';
 import { db, auth } from '../firebaseConfig';
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot, increment, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot, increment, collection, addDoc, getDocs, query, where, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import CommonHeader from '../components/CommonHeader';
 import { checkStudentIdVerification } from '../utils/permissionUtils';
@@ -32,6 +32,11 @@ export default function CircleProfileScreen({ route, navigation }) {
   const [members, setMembers] = useState([]);
   const [activeTab, setActiveTab] = useState('top');
   const [leaderProfileImage, setLeaderProfileImage] = useState(null);
+  
+  // アクションメニュー用の状態
+  const [actionMenuVisible, setActionMenuVisible] = useState(false);
+  const [userBlockedCircleIds, setUserBlockedCircleIds] = useState([]);
+  const [selectedCircle, setSelectedCircle] = useState(null);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -146,6 +151,25 @@ export default function CircleProfileScreen({ route, navigation }) {
       checkRequest();
     }
   }, [user, circleId]);
+  
+  // ブロック状態を取得
+  useEffect(() => {
+    if (!user) return;
+    
+    const fetchUserBlocks = async () => {
+      try {
+        const blocksRef = collection(db, 'users', user.uid, 'blocks');
+        const blocksSnapshot = await getDocs(blocksRef);
+        const blockedIds = blocksSnapshot.docs.map(doc => doc.id);
+        setUserBlockedCircleIds(blockedIds);
+      } catch (error) {
+        console.error('Error fetching user blocks:', error);
+        setUserBlockedCircleIds([]);
+      }
+    };
+    
+    fetchUserBlocks();
+  }, [user]);
 
   // 大学データを処理する関数
   const generateUniversityData = (members) => {
@@ -212,6 +236,69 @@ export default function CircleProfileScreen({ route, navigation }) {
   };
 
   // 既存の冗長なuseEffectやローディング・エラー処理を削除し、circleData, loading, errorを直接利用する形に整理
+
+  // アクションメニューの表示・非表示
+  const showActionSheetForCircle = () => {
+    setActionMenuVisible(true);
+  };
+
+  const hideActionSheet = () => {
+    setActionMenuVisible(false);
+    // フェードアニメーション完了後にselectedCircleをクリア
+    setTimeout(() => {
+      setSelectedCircle(null);
+    }, 300);
+  };
+
+  // ユーザーがサークルのメンバーかどうかをチェック
+  const isUserMemberOfCircle = (circleId) => {
+    return isMember;
+  };
+
+  // ブロック機能
+  const handleBlock = async () => {
+    if (!user || !circleData) return;
+
+    // 所属しているサークルはブロック不可
+    if (isUserMemberOfCircle(circleId)) {
+      Alert.alert('ブロック不可', '所属しているサークルはブロックできません。');
+      return;
+    }
+
+    // 既にブロックされているかチェック
+    if (userBlockedCircleIds.includes(circleId)) {
+      Alert.alert('既にブロック済み', 'このサークルは既にブロックされています。');
+      return;
+    }
+
+    try {
+      const blockData = {
+        blockedCircleId: circleId,
+        blockedCircleName: circleData.name,
+        createdAt: new Date(),
+      };
+
+      await setDoc(doc(db, 'users', user.uid, 'blocks', circleId), blockData);
+      
+      // ローカル状態を更新
+      setUserBlockedCircleIds(prev => [...prev, circleId]);
+      
+      Alert.alert('完了', 'サークルをブロックしました。');
+      hideActionSheet();
+    } catch (error) {
+      console.error('Error blocking circle:', error);
+      Alert.alert('エラー', 'ブロックに失敗しました');
+    }
+  };
+
+  // 報告機能
+  const handleReport = () => {
+    navigation.navigate('Report', {
+      circleId: circleId,
+      circleName: circleData?.name || '不明なサークル'
+    });
+    hideActionSheet();
+  };
 
   const toggleFavorite = async () => {
     if (!user) {
@@ -541,7 +628,13 @@ export default function CircleProfileScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-              <CommonHeader title={circleData && circleData.name ? circleData.name : 'サークル詳細'} showBackButton onBack={() => navigation.goBack()} />
+              <CommonHeader 
+        title={circleData && circleData.name ? circleData.name : 'サークル詳細'} 
+        showBackButton 
+        onBack={() => navigation.goBack()}
+        showActionButton={true}
+        onActionButtonPress={showActionSheetForCircle}
+      />
       
       <ScrollView 
         style={styles.scrollView}
@@ -615,6 +708,54 @@ export default function CircleProfileScreen({ route, navigation }) {
           {activeTab === 'welcome' && renderWelcomeTab()}
         </View>
       </ScrollView>
+
+      {/* アクションメニュー */}
+      <Modal
+        visible={actionMenuVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setActionMenuVisible(false);
+          // フェードアニメーション完了後にselectedCircleをクリア
+          setTimeout(() => {
+            setSelectedCircle(null);
+          }, 300);
+        }}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={hideActionSheet}
+        >
+          <View style={styles.actionMenuContainer}>
+            {/* 所属していないサークルのみブロックオプションを表示 */}
+            {!isUserMemberOfCircle(circleId) && (
+              <TouchableOpacity
+                style={styles.actionMenuItemWithBorder}
+                onPress={handleBlock}
+              >
+                <Ionicons name="ban-outline" size={20} color="#dc3545" />
+                <Text style={[styles.actionMenuText, styles.actionMenuTextRed]}>ブロック</Text>
+              </TouchableOpacity>
+            )}
+            
+            <TouchableOpacity
+              style={styles.actionMenuItem}
+              onPress={handleReport}
+            >
+              <Ionicons name="flag-outline" size={20} color="#dc3545" />
+              <Text style={[styles.actionMenuText, styles.actionMenuTextRed]}>報告する</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.actionMenuItem}
+              onPress={hideActionSheet}
+            >
+              <Text style={styles.actionMenuText}>キャンセル</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* アクションボタン */}
       <SafeAreaView style={styles.actionBar}>
@@ -1222,5 +1363,49 @@ const styles = StyleSheet.create({
     padding: 12,
     borderWidth: 1,
     borderColor: '#e9ecef',
+  },
+  
+  // アクションメニュー用のスタイル
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionMenuContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 15,
+    width: '80%',
+    alignSelf: 'center',
+    paddingVertical: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  actionMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    minHeight: 56,
+  },
+  actionMenuItemWithBorder: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    minHeight: 56,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  actionMenuText: {
+    fontSize: 16,
+    color: '#333',
+    marginLeft: 15,
+  },
+  actionMenuTextRed: {
+    color: '#dc3545',
   },
 });

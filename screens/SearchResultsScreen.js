@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, Alert, StatusBar, Modal } from 'react-native';
 import { Image } from 'expo-image'; // expo-image を使用
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '../firebaseConfig';
 import { doc, onSnapshot, collection, getDocs, setDoc, serverTimestamp } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
+import { useFocusEffect } from '@react-navigation/native';
 import CommonHeader from '../components/CommonHeader';
 
 const SearchResultsScreen = ({ route, navigation }) => {
@@ -47,6 +48,25 @@ const SearchResultsScreen = ({ route, navigation }) => {
       setUserBlockedCircleIds([]);
     }
   }, [user]);
+  
+  // 画面がフォーカスされたときにブロック状態を再取得
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        const fetchUserBlocks = async () => {
+          try {
+            const blocksRef = collection(db, 'users', user.uid, 'blocks');
+            const blocksSnapshot = await getDocs(blocksRef);
+            const blockedIds = blocksSnapshot.docs.map(doc => doc.id);
+            setUserBlockedCircleIds(blockedIds);
+          } catch (error) {
+            console.error('Error fetching user blocks on focus:', error);
+          }
+        };
+        fetchUserBlocks();
+      }
+    }, [user])
+  );
 
   // ユーザープロフィールの取得
   useEffect(() => {
