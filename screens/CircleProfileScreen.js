@@ -8,6 +8,8 @@ import { onAuthStateChanged } from 'firebase/auth';
 import CommonHeader from '../components/CommonHeader';
 import { checkStudentIdVerification } from '../utils/permissionUtils';
 import useFirestoreDoc from '../hooks/useFirestoreDoc';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 const { width } = Dimensions.get('window');
 
@@ -164,6 +166,8 @@ export default function CircleProfileScreen({ route, navigation }) {
     return sortedData;
   };
 
+
+
   const handleJoinRequest = async () => {
     if (!user) {
       Alert.alert('ログインが必要です', '入会申請にはログインが必要です。');
@@ -201,6 +205,7 @@ export default function CircleProfileScreen({ route, navigation }) {
       });
       setHasRequested(true);
       Alert.alert('申請完了', '入会申請を送信しました。');
+
     } catch (e) {
       Alert.alert('エラー', '申請の送信に失敗しました');
     }

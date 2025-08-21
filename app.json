@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash-icon.png",
       "contentFit": "contain",
@@ -15,10 +15,14 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.kurukatsu.app",
-      "buildNumber": "1",
+      "buildNumber": "3",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "FirebaseAppDelegateProxyEnabled": false,
+        "NSCameraUsageDescription": "写真撮影のためにカメラへのアクセスが必要です",
+        "NSPhotoLibraryUsageDescription": "写真選択のためにフォトライブラリへのアクセスが必要です"
       }
+
     },
     "android": {
       "adaptiveIcon": {
@@ -28,14 +32,13 @@
       "edgeToEdgeEnabled": true,
       "package": "com.kurukatsu.app",
       "versionCode": 1,
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ]
+      "permissions": []
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+
       [
         "expo-image-picker",
         {
@@ -48,8 +51,17 @@
         {
           "cameraPermission": "写真を撮影するためにカメラへのアクセスが必要です。"
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
       ]
     ],
+
     "extra": {
       "eas": {
         "projectId": "f94b703e-f3c4-4f9f-8bb5-8b53bf7ac727"

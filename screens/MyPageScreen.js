@@ -49,9 +49,12 @@ export default function MyPageScreen({ navigation, route }) {
   useFocusEffect(
     React.useCallback(() => {
       setImageError(false); // 画像エラー状態をリセット
-      // プロフィール編集画面から戻ってきた場合はデータをリロード
-      reload();
-    }, [reload])
+      // プロフィール編集画面から戻ってきた場合のみデータをリロード
+      // 初回ロード時はリロードしない
+      if (!isInitialLoad && userProfile) {
+        reload();
+      }
+    }, [reload, isInitialLoad, userProfile])
   );
 
   // userProfile取得後にサークル情報を取得
@@ -120,7 +123,7 @@ export default function MyPageScreen({ navigation, route }) {
             liked.push(...articlesData);
           }
         }
-        console.log('いいねした記事データ:', liked);
+
         setLikedArticles(liked);
       } catch (e) {
         console.error('Error fetching circles:', e);
@@ -131,8 +134,16 @@ export default function MyPageScreen({ navigation, route }) {
         setCirclesLoading(false);
       }
     };
-    fetchCircles();
-  }, [userProfile?.joinedCircleIds, userProfile?.favoriteCircleIds]);
+    
+    // userProfileが存在し、必要なIDが変更された場合のみ実行
+    if (userProfile && (
+      userProfile.joinedCircleIds !== undefined || 
+      userProfile.favoriteCircleIds !== undefined ||
+      userProfile.likedArticleIds !== undefined
+    )) {
+      fetchCircles();
+    }
+  }, [userProfile?.joinedCircleIds?.length, userProfile?.favoriteCircleIds?.length, userProfile?.likedArticleIds?.length]);
 
   // useFocusEffectや冗長なキャッシュ・ローディング処理を削除
 

@@ -97,16 +97,6 @@ const LoginScreen = ({ navigation }) => {
         >
           <Text style={styles.signupButtonText}>新規登録はこちら</Text>
         </TouchableOpacity>
-        {/* 開発用：オンボーディング再表示ボタン */}
-        <TouchableOpacity
-          style={{ marginTop: 30, padding: 12, backgroundColor: '#28a745', borderRadius: 8 }}
-          onPress={async () => {
-            await AsyncStorage.removeItem('seenOnboarding');
-            Alert.alert('オンボーディングフラグをリセットしました', '次回アプリ起動時にオンボーディング画面が再表示されます。');
-          }}
-        >
-          <Text style={{ color: '#fff', fontWeight: 'bold' }}>オンボーディング再表示（開発用）</Text>
-        </TouchableOpacity>
       </ScrollView>
     </TouchableWithoutFeedback>
   );

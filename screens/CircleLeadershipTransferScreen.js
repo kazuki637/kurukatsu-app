@@ -37,7 +37,6 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
   const [transferring, setTransferring] = useState(false);
   
   // アニメーション用の値
-  const [fadeAnim] = useState(new Animated.Value(0));
   const [scaleAnim] = useState(new Animated.Value(1));
   const [glowAnim] = useState(new Animated.Value(0));
 
@@ -101,12 +100,7 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
         }
         setMembers(membersList);
 
-        // フェードインアニメーション
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }).start();
+        // データ取得完了
 
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -314,7 +308,7 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
         }
       />
       <SafeAreaView style={styles.content}>
-        <Animated.View style={[styles.mainContent, { opacity: fadeAnim }]}>
+        <Animated.View style={[styles.mainContent, { opacity: 1 }]}>
           {/* 現在の代表者表示 */}
           <View style={styles.currentLeaderSection}>
             <View style={styles.currentLeaderContainer}>

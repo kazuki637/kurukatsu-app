@@ -282,6 +282,8 @@ export default function CircleMemberScreen({ route, navigation }) {
     // initialTabパラメータに基づいて初期タブを設定
     if (initialTab === 'contact') {
       return 1; // 連絡タブ
+    } else if (initialTab === 'members') {
+      return 2; // メンバータブ
     }
     return 0; // デフォルトはカレンダータブ
   });
