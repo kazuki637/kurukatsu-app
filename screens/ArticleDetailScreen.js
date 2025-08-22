@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, ScrollView, Image, ActivityIndica
 import { Ionicons } from '@expo/vector-icons';
 import CommonHeader from '../components/CommonHeader';
 import { db, storage, auth } from '../firebaseConfig';
-import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, onSnapshot, increment } from 'firebase/firestore';
 import { ref, getDownloadURL } from 'firebase/storage';
 import { onAuthStateChanged } from 'firebase/auth';
 
