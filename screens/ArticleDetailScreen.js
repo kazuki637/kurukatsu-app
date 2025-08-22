@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, ScrollView, Image, ActivityIndica
 import { Ionicons } from '@expo/vector-icons';
 import CommonHeader from '../components/CommonHeader';
 import { db, storage, auth } from '../firebaseConfig';
-import { doc, getDoc, updateDoc, increment, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { ref, getDownloadURL } from 'firebase/storage';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -72,55 +72,8 @@ const ArticleDetailScreen = ({ route, navigation }) => {
   const [imageDimensions, setImageDimensions] = useState({});
   const [blocks, setBlocks] = useState([]);
   const [user, setUser] = useState(null);
-  const [isLiked, setIsLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
   const [viewCount, setViewCount] = useState(0);
   const [hasViewed, setHasViewed] = useState(false);
-
-  // いいねボタンの処理
-  const handleLike = async () => {
-    if (!user) {
-      // ログインしていない場合は何もしない
-      return;
-    }
-
-    try {
-      const articleRef = doc(db, 'articles', articleId);
-      const userRef = doc(db, 'users', user.uid);
-
-      if (isLiked) {
-        // いいねを削除
-        await updateDoc(articleRef, { likes: increment(-1) });
-        // ユーザーのいいねした記事IDから削除
-        const userDoc = await getDoc(userRef);
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          const likedArticleIds = userData.likedArticleIds || [];
-          const updatedLikedArticleIds = likedArticleIds.filter(id => id !== articleId);
-          await updateDoc(userRef, { likedArticleIds: updatedLikedArticleIds });
-        }
-        setLikeCount(prev => prev - 1);
-        setIsLiked(false);
-      } else {
-        // いいねを追加
-        await updateDoc(articleRef, { likes: increment(1) });
-        // ユーザーのいいねした記事IDに追加
-        const userDoc = await getDoc(userRef);
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          const likedArticleIds = userData.likedArticleIds || [];
-          if (!likedArticleIds.includes(articleId)) {
-            const updatedLikedArticleIds = [...likedArticleIds, articleId];
-            await updateDoc(userRef, { likedArticleIds: updatedLikedArticleIds });
-          }
-        }
-        setLikeCount(prev => prev + 1);
-        setIsLiked(true);
-      }
-    } catch (error) {
-      console.error('いいねの処理に失敗しました:', error);
-    }
-  };
 
   // 画像のサイズを動的に計算する関数
   const getImageStyle = (imageUrl) => {
@@ -178,7 +131,6 @@ const ArticleDetailScreen = ({ route, navigation }) => {
 
         const articleData = { id: articleDoc.id, ...articleDoc.data() };
         setArticle(articleData);
-        setLikeCount(articleData.likes || 0);
         setViewCount(articleData.viewCount || 0); // 閲覧回数をstateに設定
 
         // 閲覧回数を一度だけ増加
@@ -201,16 +153,6 @@ const ArticleDetailScreen = ({ route, navigation }) => {
           } catch (headerError) {
             console.log('ヘッダー画像が見つかりません:', headerError);
             // ヘッダー画像がなくてもエラーにはしない
-          }
-        }
-
-        // いいねの状態を監視
-        if (user) {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            const likedArticles = userData.likedArticleIds || [];
-            setIsLiked(likedArticles.includes(articleId));
           }
         }
 
@@ -357,26 +299,6 @@ const ArticleDetailScreen = ({ route, navigation }) => {
               </Text>
             </View>
             
-            {/* いいねボタン */}
-            <View style={styles.likeContainer}>
-              <TouchableOpacity 
-                style={styles.likeButton} 
-                onPress={handleLike}
-                disabled={!user}
-              >
-                <Ionicons 
-                  name={isLiked ? 'heart' : 'heart-outline'} 
-                  size={24} 
-                  color={isLiked ? '#ff6b9d' : '#666'} 
-                />
-                <Text style={[styles.likeText, isLiked && styles.likeTextActive]}>
-                  {likeCount}
-                </Text>
-              </TouchableOpacity>
-            </View>
-            
-            <View style={styles.contentDivider} />
-            
             {/* ブロックコンテンツ */}
             {blocks.map((block, index) => (
               <View key={index} style={styles.paragraphContainer}>
@@ -479,32 +401,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
-  },
-  // いいねボタンのスタイル
-  likeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 8,
-    marginBottom: 12,
-  },
-  likeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 25,
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-  },
-  likeText: {
-    fontSize: 16,
-    color: '#666',
-    marginLeft: 8,
-    fontWeight: '600',
-  },
-  likeTextActive: {
-    color: '#ff6b9d',
   },
   dateAndViewContainer: {
     flexDirection: 'row',
