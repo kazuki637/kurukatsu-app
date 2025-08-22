@@ -40,43 +40,23 @@ export default function MyPageScreen({ navigation, route }) {
   // プロフィール編集画面から渡された更新データを処理（削除）
   const [savedCircles, setSavedCircles] = useState([]);
   const [joinedCircles, setJoinedCircles] = useState([]);
-  const [likedArticles, setLikedArticles] = useState([]);
   const [circlesLoading, setCirclesLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [imageError, setImageError] = useState(false);
   
-  // ブロック機能の状態管理
-  const [userBlockedCircleIds, setUserBlockedCircleIds] = useState([]);
-
   // 画面がフォーカスされたときにデータをリロード
   useFocusEffect(
     React.useCallback(() => {
       setImageError(false); // 画像エラー状態をリセット
-      
       // プロフィール編集画面から戻ってきた場合のみデータをリロード
+      // 初回ロード時はリロードしない
       if (!isInitialLoad && userProfile) {
         reload();
       }
-      
-      // ブロック状態の取得（統合）
-      if (userId) {
-        const fetchBlockedCircles = async () => {
-          try {
-            const blocksRef = collection(db, 'users', userId, 'blocks');
-            const blocksSnapshot = await getDocs(blocksRef);
-            const blockedIds = blocksSnapshot.docs.map(doc => doc.id);
-            setUserBlockedCircleIds(blockedIds);
-          } catch (error) {
-            console.error('Error fetching blocked circles on focus:', error);
-            setUserBlockedCircleIds([]);
-          }
-        };
-        fetchBlockedCircles();
-      }
-    }, [reload, isInitialLoad, userProfile, userId])
+    }, [reload, isInitialLoad, userProfile])
   );
 
-  // userProfile取得後にサークル情報を取得（最適化版）
+  // userProfile取得後にサークル情報を取得
   React.useEffect(() => {
     const fetchCircles = async () => {
       if (!userProfile) return;
@@ -87,24 +67,10 @@ export default function MyPageScreen({ navigation, route }) {
       }
       
       try {
-        // ブロック状態の取得（既に取得済みの場合はスキップ）
-        let blockedIds = userBlockedCircleIds;
-        if (blockedIds.length === 0) {
-          try {
-            const blocksRef = collection(db, 'users', userId, 'blocks');
-            const blocksSnapshot = await getDocs(blocksRef);
-            blockedIds = blocksSnapshot.docs.map(doc => doc.id);
-            setUserBlockedCircleIds(blockedIds);
-          } catch (error) {
-            console.error('Error fetching user blocks:', error);
-            setUserBlockedCircleIds([]);
-          }
-        }
-
-        // joinedCircles（最適化）
+        // joinedCircles
         let joined = [];
         if (userProfile.joinedCircleIds && userProfile.joinedCircleIds.length > 0) {
-          const batchSize = 20; // バッチサイズを増加
+          const batchSize = 10;
           for (let i = 0; i < userProfile.joinedCircleIds.length; i += batchSize) {
             const batch = userProfile.joinedCircleIds.slice(i, i + batchSize);
             const circlesRef = collection(db, 'circles');
@@ -114,11 +80,10 @@ export default function MyPageScreen({ navigation, route }) {
           }
         }
         setJoinedCircles(joined);
-        
-        // savedCircles（最適化）
+        // savedCircles
         let saved = [];
         if (userProfile.favoriteCircleIds && userProfile.favoriteCircleIds.length > 0) {
-          const batchSize = 20; // バッチサイズを増加
+          const batchSize = 10;
           for (let i = 0; i < userProfile.favoriteCircleIds.length; i += batchSize) {
             const batch = userProfile.favoriteCircleIds.slice(i, i + batchSize);
             const circlesRef = collection(db, 'circles');
@@ -127,55 +92,12 @@ export default function MyPageScreen({ navigation, route }) {
             saved.push(...querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
           }
         }
-        
-        // ブロックしたサークルを除外
-        const filteredSavedCircles = saved.filter(circle => 
-          !blockedIds.includes(circle.id)
-        );
-        setSavedCircles(filteredSavedCircles);
+        setSavedCircles(saved);
 
-        // いいねした記事を取得（最適化）
-        let liked = [];
-        if (userProfile.likedArticleIds && userProfile.likedArticleIds.length > 0) {
-          const batchSize = 20; // バッチサイズを増加
-          for (let i = 0; i < userProfile.likedArticleIds.length; i += batchSize) {
-            const batch = userProfile.likedArticleIds.slice(i, i + batchSize);
-            const articlesRef = collection(db, 'articles');
-            const q = query(articlesRef, where('__name__', 'in', batch));
-            const querySnapshot = await getDocs(q);
-            const articlesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            
-            // 画像URLの取得を最適化（エラーが発生しても処理を継続）
-            const articlesWithImages = await Promise.allSettled(
-              articlesData.map(async (article) => {
-                if (article.title) {
-                  try {
-                    const headerImageRef = ref(storage, `articles/${article.title}/header`);
-                    const headerUrl = await getDownloadURL(headerImageRef);
-                    return { ...article, headerImageUrl: headerUrl };
-                  } catch (error) {
-                    console.log(`記事 ${article.title} のヘッダー画像が見つかりません:`, error);
-                    return article; // 画像なしでも記事は表示
-                  }
-                }
-                return article;
-              })
-            );
-            
-            // 成功した記事のみを追加
-            liked.push(...articlesWithImages
-              .filter(result => result.status === 'fulfilled')
-              .map(result => result.value)
-            );
-          }
-        }
-
-        setLikedArticles(liked);
       } catch (e) {
         console.error('Error fetching circles:', e);
         setJoinedCircles([]);
         setSavedCircles([]);
-        setLikedArticles([]);
       } finally {
         setCirclesLoading(false);
       }
@@ -184,12 +106,11 @@ export default function MyPageScreen({ navigation, route }) {
     // userProfileが存在し、必要なIDが変更された場合のみ実行
     if (userProfile && (
       userProfile.joinedCircleIds !== undefined || 
-      userProfile.favoriteCircleIds !== undefined ||
-      userProfile.likedArticleIds !== undefined
+      userProfile.favoriteCircleIds !== undefined
     )) {
       fetchCircles();
     }
-  }, [userProfile?.joinedCircleIds, userProfile?.favoriteCircleIds, userProfile?.likedArticleIds]); // userBlockedCircleIdsを依存関係から削除
+  }, [userProfile?.joinedCircleIds?.length, userProfile?.favoriteCircleIds?.length]);
 
   // 初回ロード完了後はisInitialLoadをfalseに設定
   React.useEffect(() => {
@@ -197,26 +118,6 @@ export default function MyPageScreen({ navigation, route }) {
       setIsInitialLoad(false);
     }
   }, [loading, isInitialLoad]);
-
-  // ナビゲーション関数をメモ化（遷移の安定性向上）
-  const navigateToProfileEdit = useCallback(() => {
-    navigation.navigate('ProfileEdit');
-  }, [navigation]);
-
-  const navigateToCircleMember = useCallback((circleId) => {
-    navigation.navigate('CircleMember', { circleId });
-  }, [navigation]);
-
-  const navigateToCircleDetail = useCallback((circleId) => {
-    navigation.navigate('CircleDetail', { circleId });
-  }, [navigation]);
-
-  const navigateToArticleDetail = useCallback((articleId) => {
-    navigation.dispatch(CommonActions.navigate({
-      name: 'ArticleDetail',
-      params: { articleId }
-    }));
-  }, [navigation]);
   
   // 初回ロード時のみローディング画面を表示
   if (loading && isInitialLoad) {
@@ -294,7 +195,7 @@ export default function MyPageScreen({ navigation, route }) {
                 {userProfile?.grade || ''}
               </Text>
             )}
-            <TouchableOpacity style={styles.editProfileButton} onPress={navigateToProfileEdit}>
+            <TouchableOpacity style={styles.editProfileButton} onPress={() => navigation.navigate('ProfileEdit')}>
               <Text style={styles.editProfileButtonText}>プロフィールを編集</Text>
             </TouchableOpacity>
           </View>
@@ -305,7 +206,7 @@ export default function MyPageScreen({ navigation, route }) {
                 <TouchableOpacity 
                   key={circle.id} 
                   style={styles.circleCardContainer}
-                  onPress={() => navigateToCircleMember(circle.id)}
+                  onPress={() => navigation.navigate('CircleMember', { circleId: circle.id })}
                 >
                   <View style={styles.circleCard}>
                     {circle.imageUrl ? (
@@ -346,7 +247,7 @@ export default function MyPageScreen({ navigation, route }) {
                   <TouchableOpacity 
                     key={circle.id} 
                     style={styles.popularCircleCard}
-                    onPress={() => navigateToCircleDetail(circle.id)}
+                    onPress={() => navigation.navigate('CircleDetail', { circleId: circle.id })}
                   >
                     {circle.imageUrl ? (
                       <Image source={{ uri: circle.imageUrl }} style={styles.popularCircleImage} />
@@ -363,40 +264,6 @@ export default function MyPageScreen({ navigation, route }) {
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>いいね！したサークルはありません</Text>
                 <Text style={styles.emptySubText}>気になるサークルを保存しましょう</Text>
-              </View>
-            )}
-          </View>
-          <View style={styles.contentArea}>
-            <Text style={styles.sectionTitle}>いいね！した記事</Text>
-            {likedArticles.length > 0 ? (
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.popularCirclesScrollContainer}
-                style={styles.popularCirclesScrollView}
-              >
-                {likedArticles.map((article, index) => (
-                  <TouchableOpacity 
-                    key={article.id} 
-                    style={styles.articleCard}
-                    onPress={() => navigateToArticleDetail(article.id)}
-                  >
-                    {article.headerImageUrl ? (
-                      <Image source={{ uri: article.headerImageUrl }} style={styles.articleImage} />
-                    ) : (
-                      <View style={[styles.articleImage, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
-                        <Ionicons name="document-text-outline" size={40} color="#aaa" />
-                      </View>
-                    )}
-                    <Text style={styles.articleTitle} numberOfLines={2}>{article.title}</Text>
-                    <Text style={styles.articleDate}>{article.date}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            ) : (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>いいね！した記事はありません</Text>
-                <Text style={styles.emptySubText}>気になる記事を保存しましょう</Text>
               </View>
             )}
           </View>
@@ -449,30 +316,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 4,
   },
-  // 記事カードのスタイル
-  articleCard: {
-    alignItems: 'center',
-    width: 120,
-    marginRight: 15,
-  },
-  articleImage: {
-    width: 120,
-    height: 72,
-    marginBottom: 8,
-  },
-  articleTitle: {
-    fontSize: 12,
-    color: '#333',
-    textAlign: 'left',
-    marginBottom: 4,
-    fontWeight: '600',
-    lineHeight: 16,
-  },
-  articleDate: {
-    fontSize: 10,
-    color: '#666',
-    textAlign: 'center',
-  },
+
   // サークルカードスタイル（ホーム画面と同じ）
   circleCardContainer: {
     marginBottom: 12,

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, Alert
 import { Image } from 'expo-image'; // expo-image を使用
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '../firebaseConfig';
-import { doc, onSnapshot, collection, getDocs, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, onSnapshot, collection, getDocs, setDoc, serverTimestamp, updateDoc, arrayRemove, increment } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useFocusEffect } from '@react-navigation/native';
 import CommonHeader from '../components/CommonHeader';
@@ -147,6 +147,14 @@ const SearchResultsScreen = ({ route, navigation }) => {
       };
       
       await setDoc(doc(db, 'users', user.uid, 'blocks', selectedCircle.id), blockData);
+      
+      // いいね！している場合は削除
+      if (userProfile && userProfile.favoriteCircleIds && userProfile.favoriteCircleIds.includes(selectedCircle.id)) {
+        const userDocRef = doc(db, 'users', user.uid);
+        const circleDocRef = doc(db, 'circles', selectedCircle.id);
+        await updateDoc(userDocRef, { favoriteCircleIds: arrayRemove(selectedCircle.id) });
+        await updateDoc(circleDocRef, { likes: increment(-1) });
+      }
       
       // ローカル状態を更新
       setUserBlockedCircleIds(prev => [...prev, selectedCircle.id]);

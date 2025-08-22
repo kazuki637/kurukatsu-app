@@ -280,6 +280,14 @@ export default function CircleProfileScreen({ route, navigation }) {
 
       await setDoc(doc(db, 'users', user.uid, 'blocks', circleId), blockData);
       
+      // いいね！している場合は削除
+      if (isFavorite) {
+        const userDocRef = doc(db, 'users', user.uid);
+        const circleDocRef = doc(db, 'circles', circleId);
+        await updateDoc(userDocRef, { favoriteCircleIds: arrayRemove(circleId) });
+        await updateDoc(circleDocRef, { likes: increment(-1) });
+      }
+      
       // ローカル状態を更新
       setUserBlockedCircleIds(prev => [...prev, circleId]);
       
@@ -313,11 +321,9 @@ export default function CircleProfileScreen({ route, navigation }) {
       if (isFavorite) {
         await updateDoc(userDocRef, { favoriteCircleIds: arrayRemove(circleId) });
         await updateDoc(circleDocRef, { likes: increment(-1) });
-        Alert.alert("お気に入り解除", "サークルをお気に入りから削除しました。");
       } else {
         await updateDoc(userDocRef, { favoriteCircleIds: arrayUnion(circleId) });
         await updateDoc(circleDocRef, { likes: increment(1) });
-        Alert.alert("お気に入り登録", "サークルをお気に入りに追加しました！");
       }
     } catch (error) {
       console.error("Error toggling favorite: ", error);
@@ -740,7 +746,7 @@ export default function CircleProfileScreen({ route, navigation }) {
             )}
             
             <TouchableOpacity
-              style={styles.actionMenuItem}
+              style={styles.actionMenuItemWithBorder}
               onPress={handleReport}
             >
               <Ionicons name="flag-outline" size={20} color="#dc3545" />
@@ -767,7 +773,7 @@ export default function CircleProfileScreen({ route, navigation }) {
               color={isFavorite ? "#ff6b9d" : "#666"} 
             />
             <Text style={[styles.favoriteButtonText, isFavorite && styles.favoriteButtonTextActive]}>
-              {isFavorite ? "いいね！済み" : "いいね！"}
+              {isFavorite ? "いいね！" : "いいね！"}
             </Text>
           </TouchableOpacity>
           
