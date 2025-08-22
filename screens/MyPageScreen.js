@@ -52,15 +52,31 @@ export default function MyPageScreen({ navigation, route }) {
   useFocusEffect(
     React.useCallback(() => {
       setImageError(false); // 画像エラー状態をリセット
+      
       // プロフィール編集画面から戻ってきた場合のみデータをリロード
-      // 初回ロード時はリロードしない
       if (!isInitialLoad && userProfile) {
         reload();
       }
-    }, [reload, isInitialLoad, userProfile])
+      
+      // ブロック状態の取得（統合）
+      if (userId) {
+        const fetchBlockedCircles = async () => {
+          try {
+            const blocksRef = collection(db, 'users', userId, 'blocks');
+            const blocksSnapshot = await getDocs(blocksRef);
+            const blockedIds = blocksSnapshot.docs.map(doc => doc.id);
+            setUserBlockedCircleIds(blockedIds);
+          } catch (error) {
+            console.error('Error fetching blocked circles on focus:', error);
+            setUserBlockedCircleIds([]);
+          }
+        };
+        fetchBlockedCircles();
+      }
+    }, [reload, isInitialLoad, userProfile, userId])
   );
 
-  // userProfile取得後にサークル情報を取得
+  // userProfile取得後にサークル情報を取得（最適化版）
   React.useEffect(() => {
     const fetchCircles = async () => {
       if (!userProfile) return;
@@ -71,22 +87,24 @@ export default function MyPageScreen({ navigation, route }) {
       }
       
       try {
-        // ブロック状態の取得
-        let blockedIds = [];
-        try {
-          const blocksRef = collection(db, 'users', userId, 'blocks');
-          const blocksSnapshot = await getDocs(blocksRef);
-          blockedIds = blocksSnapshot.docs.map(doc => doc.id);
-          setUserBlockedCircleIds(blockedIds);
-        } catch (error) {
-          console.error('Error fetching user blocks:', error);
-          setUserBlockedCircleIds([]);
+        // ブロック状態の取得（既に取得済みの場合はスキップ）
+        let blockedIds = userBlockedCircleIds;
+        if (blockedIds.length === 0) {
+          try {
+            const blocksRef = collection(db, 'users', userId, 'blocks');
+            const blocksSnapshot = await getDocs(blocksRef);
+            blockedIds = blocksSnapshot.docs.map(doc => doc.id);
+            setUserBlockedCircleIds(blockedIds);
+          } catch (error) {
+            console.error('Error fetching user blocks:', error);
+            setUserBlockedCircleIds([]);
+          }
         }
 
-        // joinedCircles
+        // joinedCircles（最適化）
         let joined = [];
         if (userProfile.joinedCircleIds && userProfile.joinedCircleIds.length > 0) {
-          const batchSize = 10;
+          const batchSize = 20; // バッチサイズを増加
           for (let i = 0; i < userProfile.joinedCircleIds.length; i += batchSize) {
             const batch = userProfile.joinedCircleIds.slice(i, i + batchSize);
             const circlesRef = collection(db, 'circles');
@@ -96,10 +114,11 @@ export default function MyPageScreen({ navigation, route }) {
           }
         }
         setJoinedCircles(joined);
-        // savedCircles
+        
+        // savedCircles（最適化）
         let saved = [];
         if (userProfile.favoriteCircleIds && userProfile.favoriteCircleIds.length > 0) {
-          const batchSize = 10;
+          const batchSize = 20; // バッチサイズを増加
           for (let i = 0; i < userProfile.favoriteCircleIds.length; i += batchSize) {
             const batch = userProfile.favoriteCircleIds.slice(i, i + batchSize);
             const circlesRef = collection(db, 'circles');
@@ -108,16 +127,17 @@ export default function MyPageScreen({ navigation, route }) {
             saved.push(...querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
           }
         }
-        // ブロックしたサークルを除外（ローカル変数を使用）
+        
+        // ブロックしたサークルを除外
         const filteredSavedCircles = saved.filter(circle => 
           !blockedIds.includes(circle.id)
         );
         setSavedCircles(filteredSavedCircles);
 
-        // いいねした記事を取得
+        // いいねした記事を取得（最適化）
         let liked = [];
         if (userProfile.likedArticleIds && userProfile.likedArticleIds.length > 0) {
-          const batchSize = 10;
+          const batchSize = 20; // バッチサイズを増加
           for (let i = 0; i < userProfile.likedArticleIds.length; i += batchSize) {
             const batch = userProfile.likedArticleIds.slice(i, i + batchSize);
             const articlesRef = collection(db, 'articles');
@@ -125,21 +145,28 @@ export default function MyPageScreen({ navigation, route }) {
             const querySnapshot = await getDocs(q);
             const articlesData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             
-            // 各記事のヘッダー画像URLを取得
-            for (let article of articlesData) {
-              if (article.title) {
-                try {
-                  const headerImageRef = ref(storage, `articles/${article.title}/header`);
-                  const headerUrl = await getDownloadURL(headerImageRef);
-                  article.headerImageUrl = headerUrl;
-                } catch (error) {
-                  console.log(`記事 ${article.title} のヘッダー画像が見つかりません:`, error);
-                  // ヘッダー画像がなくてもエラーにはしない
+            // 画像URLの取得を最適化（エラーが発生しても処理を継続）
+            const articlesWithImages = await Promise.allSettled(
+              articlesData.map(async (article) => {
+                if (article.title) {
+                  try {
+                    const headerImageRef = ref(storage, `articles/${article.title}/header`);
+                    const headerUrl = await getDownloadURL(headerImageRef);
+                    return { ...article, headerImageUrl: headerUrl };
+                  } catch (error) {
+                    console.log(`記事 ${article.title} のヘッダー画像が見つかりません:`, error);
+                    return article; // 画像なしでも記事は表示
+                  }
                 }
-              }
-            }
+                return article;
+              })
+            );
             
-            liked.push(...articlesData);
+            // 成功した記事のみを追加
+            liked.push(...articlesWithImages
+              .filter(result => result.status === 'fulfilled')
+              .map(result => result.value)
+            );
           }
         }
 
@@ -162,46 +189,7 @@ export default function MyPageScreen({ navigation, route }) {
     )) {
       fetchCircles();
     }
-  }, [userProfile?.joinedCircleIds?.length, userProfile?.favoriteCircleIds?.length, userProfile?.likedArticleIds?.length]);
-
-  // 画面がフォーカスされたときにブロック状態を再取得
-  useFocusEffect(
-    React.useCallback(() => {
-      if (userId) {
-        const fetchBlockedCircles = async () => {
-          try {
-            const blocksRef = collection(db, 'users', userId, 'blocks');
-            const blocksSnapshot = await getDocs(blocksRef);
-            const blockedIds = blocksSnapshot.docs.map(doc => doc.id);
-            setUserBlockedCircleIds(blockedIds);
-            
-            // ブロック状態が変更された場合、お気に入りサークルを再取得・再フィルタリング
-            if (userProfile?.favoriteCircleIds && userProfile.favoriteCircleIds.length > 0) {
-              // お気に入りサークルのデータを再取得
-              let saved = [];
-              const batchSize = 10;
-              for (let i = 0; i < userProfile.favoriteCircleIds.length; i += batchSize) {
-                const batch = userProfile.favoriteCircleIds.slice(i, i + batchSize);
-                const circlesRef = collection(db, 'circles');
-                const q = query(circlesRef, where('__name__', 'in', batch));
-                const querySnapshot = await getDocs(q);
-                saved.push(...querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-              }
-              
-              // ブロックしたサークルを除外
-              const filteredSavedCircles = saved.filter(circle => 
-                !blockedIds.includes(circle.id)
-              );
-              setSavedCircles(filteredSavedCircles);
-            }
-          } catch (error) {
-            console.error('Error fetching blocked circles on focus:', error);
-          }
-        };
-        fetchBlockedCircles();
-      }
-    }, [userId, userProfile?.favoriteCircleIds])
-  );
+  }, [userProfile?.joinedCircleIds, userProfile?.favoriteCircleIds, userProfile?.likedArticleIds]); // userBlockedCircleIdsを依存関係から削除
 
   // 初回ロード完了後はisInitialLoadをfalseに設定
   React.useEffect(() => {
@@ -209,6 +197,26 @@ export default function MyPageScreen({ navigation, route }) {
       setIsInitialLoad(false);
     }
   }, [loading, isInitialLoad]);
+
+  // ナビゲーション関数をメモ化（遷移の安定性向上）
+  const navigateToProfileEdit = useCallback(() => {
+    navigation.navigate('ProfileEdit');
+  }, [navigation]);
+
+  const navigateToCircleMember = useCallback((circleId) => {
+    navigation.navigate('CircleMember', { circleId });
+  }, [navigation]);
+
+  const navigateToCircleDetail = useCallback((circleId) => {
+    navigation.navigate('CircleDetail', { circleId });
+  }, [navigation]);
+
+  const navigateToArticleDetail = useCallback((articleId) => {
+    navigation.dispatch(CommonActions.navigate({
+      name: 'ArticleDetail',
+      params: { articleId }
+    }));
+  }, [navigation]);
   
   // 初回ロード時のみローディング画面を表示
   if (loading && isInitialLoad) {
@@ -286,7 +294,7 @@ export default function MyPageScreen({ navigation, route }) {
                 {userProfile?.grade || ''}
               </Text>
             )}
-            <TouchableOpacity style={styles.editProfileButton} onPress={() => navigation.navigate('ProfileEdit')}>
+            <TouchableOpacity style={styles.editProfileButton} onPress={navigateToProfileEdit}>
               <Text style={styles.editProfileButtonText}>プロフィールを編集</Text>
             </TouchableOpacity>
           </View>
@@ -297,7 +305,7 @@ export default function MyPageScreen({ navigation, route }) {
                 <TouchableOpacity 
                   key={circle.id} 
                   style={styles.circleCardContainer}
-                  onPress={() => navigation.navigate('CircleMember', { circleId: circle.id })}
+                  onPress={() => navigateToCircleMember(circle.id)}
                 >
                   <View style={styles.circleCard}>
                     {circle.imageUrl ? (
@@ -338,7 +346,7 @@ export default function MyPageScreen({ navigation, route }) {
                   <TouchableOpacity 
                     key={circle.id} 
                     style={styles.popularCircleCard}
-                    onPress={() => navigation.navigate('CircleDetail', { circleId: circle.id })}
+                    onPress={() => navigateToCircleDetail(circle.id)}
                   >
                     {circle.imageUrl ? (
                       <Image source={{ uri: circle.imageUrl }} style={styles.popularCircleImage} />
@@ -371,10 +379,7 @@ export default function MyPageScreen({ navigation, route }) {
                   <TouchableOpacity 
                     key={article.id} 
                     style={styles.articleCard}
-                    onPress={() => navigation.dispatch(CommonActions.navigate({
-                      name: 'ArticleDetail',
-                      params: { articleId: article.id }
-                    }))}
+                    onPress={() => navigateToArticleDetail(article.id)}
                   >
                     {article.headerImageUrl ? (
                       <Image source={{ uri: article.headerImageUrl }} style={styles.articleImage} />
