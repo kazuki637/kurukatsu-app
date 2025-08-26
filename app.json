@@ -20,7 +20,8 @@
         "ITSAppUsesNonExemptEncryption": false,
         "FirebaseAppDelegateProxyEnabled": false,
         "NSCameraUsageDescription": "写真撮影のためにカメラへのアクセスが必要です",
-        "NSPhotoLibraryUsageDescription": "写真選択のためにフォトライブラリへのアクセスが必要です"
+        "NSPhotoLibraryUsageDescription": "写真選択のためにフォトライブラリへのアクセスが必要です",
+        "UIBackgroundModes": ["remote-notification"]
       }
 
     },
@@ -32,7 +33,7 @@
       "edgeToEdgeEnabled": true,
       "package": "com.kurukatsu.app",
       "versionCode": 1,
-      "permissions": []
+      "permissions": ["NOTIFICATIONS"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -59,6 +60,9 @@
             "useFrameworks": "static"
           }
         }
+      ],
+      [
+        "expo-notifications"
       ]
     ],
 

@@ -10,6 +10,16 @@ service cloud.firestore {
 
     }
 
+    // ユーザーの通知トークン
+    match /users/{userId}/notificationTokens/{tokenId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // 通知トークンの読み取り（連絡送信用）
+    match /users/{userId}/notificationTokens/{tokenId} {
+      allow read: if request.auth != null;
+    }
+
     // ユーザーへのサークルメッセージ
     match /users/{userId}/circleMessages/{messageId} {
       allow create: if request.auth != null;

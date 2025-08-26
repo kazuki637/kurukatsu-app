@@ -6,6 +6,7 @@ import { collection, getDocs, addDoc, serverTimestamp, doc, getDoc } from 'fireb
 import { auth } from '../firebaseConfig';
 import CommonHeader from '../components/CommonHeader';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { getUserNotificationTokens, sendPushNotification } from '../utils/notificationUtils';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -167,6 +168,35 @@ export default function CircleContactScreen({ route, navigation }) {
           ...messageData,
           messageId: messageId, // サークルコレクションのメッセージIDを参照
         });
+      }
+
+      // 3. 宛先ユーザーにプッシュ通知を送信
+      try {
+        const notificationTokens = [];
+        for (const uid of selectedUids) {
+          const tokens = await getUserNotificationTokens(uid);
+          notificationTokens.push(...tokens);
+        }
+
+        if (notificationTokens.length > 0) {
+          const circleDoc = await getDoc(doc(db, 'circles', circleId));
+          const circleName = circleDoc.exists() ? circleDoc.data().name : 'サークル';
+          
+          await sendPushNotification(
+            notificationTokens,
+            '新しい連絡があります',
+            `${circleName}から連絡が届いています`,
+            {
+              type: 'contact',
+              circleId,
+              messageId,
+              senderName,
+            }
+          );
+        }
+      } catch (notificationError) {
+        console.error('通知送信エラー:', notificationError);
+        // 通知送信に失敗しても連絡送信は成功とする
       }
 
 
