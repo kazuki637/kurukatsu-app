@@ -72,11 +72,8 @@ export const compressImageToOneMB = async (imageUri, imageType = 'profile') => {
     
     // 1MB以下ならそのまま返す
     if (originalSize <= TARGET_SIZE) {
-      console.log('元画像は既に1MB以下です:', originalSize / 1024, 'KB');
       return imageUri;
     }
-    
-    console.log('元画像サイズ:', originalSize / 1024, 'KB');
     
     // 画像タイプに基づく初期設定
     const settings = IMAGE_SETTINGS[imageType] || IMAGE_SETTINGS.header; // デフォルトはheader設定
@@ -92,7 +89,7 @@ export const compressImageToOneMB = async (imageUri, imageType = 'profile') => {
       originalSize
     );
     
-    console.log('圧縮設定:', { dimensions, quality });
+
     
     // 一発で圧縮
     const result = await ImageManipulator.manipulateAsync(
@@ -103,11 +100,9 @@ export const compressImageToOneMB = async (imageUri, imageType = 'profile') => {
     
     // 圧縮後のサイズをチェック
     const compressedSize = await getFileSize(result.uri);
-    console.log('圧縮後サイズ:', compressedSize / 1024, 'KB');
     
     // まだ1MBを超えている場合は品質を下げて再圧縮
     if (compressedSize > TARGET_SIZE) {
-      console.log('再圧縮が必要です');
       const finalResult = await ImageManipulator.manipulateAsync(
         imageUri,
         [{ resize: { width: Math.round(dimensions.width * 0.8), height: Math.round(dimensions.height * 0.8) } }],
@@ -115,7 +110,6 @@ export const compressImageToOneMB = async (imageUri, imageType = 'profile') => {
       );
       
       const finalSize = await getFileSize(finalResult.uri);
-      console.log('最終圧縮サイズ:', finalSize / 1024, 'KB');
       
       return finalResult.uri;
     }

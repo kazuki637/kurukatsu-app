@@ -68,14 +68,7 @@ export const cropImage = async (imageUri, crop, imageWidth, imageHeight, imageTy
     const adjustedCropWidth = Math.min(finalCropWidth, imageInfo.width - adjustedCropX);
     const adjustedCropHeight = Math.min(finalCropHeight, imageInfo.height - adjustedCropY);
 
-    console.log('切り抜き座標:', {
-      original: { originX: crop.originX, originY: crop.originY, width: crop.width, height: crop.height },
-      scaled: { x: cropX, y: cropY, width: cropWidth, height: cropHeight },
-      final: { x: adjustedCropX, y: adjustedCropY, width: adjustedCropWidth, height: adjustedCropHeight },
-      imageSize: { width: imageInfo.width, height: imageInfo.height },
-      displaySize: { width: imageWidth, height: imageHeight },
-      imageType
-    });
+
 
     // 画像を指定されたアスペクト比で切り抜く
     const result = await ImageManipulator.manipulateAsync(
@@ -91,7 +84,7 @@ export const cropImage = async (imageUri, crop, imageWidth, imageHeight, imageTy
       { format: 'jpeg', compress: 0.9 } // qualityをcompressに変更
     );
 
-    console.log(`${imageType}画像切り抜き完了:`, result.uri);
+
     return result.uri;
 
   } catch (error) {
@@ -107,7 +100,7 @@ export const cropImage = async (imageUri, crop, imageWidth, imageHeight, imageTy
  */
 export const deleteExistingProfileImages = async (userId) => {
   try {
-    console.log('既存のプロフィール画像削除開始:', userId);
+
     
     const profileImagesRef = ref(storage, `profile_images/${userId}`);
     const result = await listAll(profileImagesRef);
@@ -116,7 +109,7 @@ export const deleteExistingProfileImages = async (userId) => {
     const deletePromises = result.items.map(itemRef => deleteObject(itemRef));
     await Promise.all(deletePromises);
     
-    console.log('既存のプロフィール画像削除完了:', result.items.length, '個のファイル');
+
   } catch (error) {
     console.error('既存のプロフィール画像削除エラー:', error);
     // 削除に失敗しても処理を続行
@@ -131,7 +124,7 @@ export const deleteExistingProfileImages = async (userId) => {
  */
 export const uploadImageToFirebase = async (imageUri, path) => {
   try {
-    console.log('Firebase Storageアップロード開始:', { imageUri, path });
+
     
     // 画像URIからblobを取得
     const response = await fetch(imageUri);
@@ -140,18 +133,18 @@ export const uploadImageToFirebase = async (imageUri, path) => {
     }
     
     const blob = await response.blob();
-    console.log('Blob取得完了:', { size: blob.size, type: blob.type });
+
 
     // Firebase Storageにアップロード
     const storageRef = ref(storage, path);
     const uploadTask = uploadBytes(storageRef, blob);
 
     const snapshot = await uploadTask;
-    console.log('アップロード完了:', { bytesTransferred: snapshot.bytesTransferred, totalBytes: snapshot.totalBytes });
+
     
     // ダウンロードURLを取得
     const downloadURL = await getDownloadURL(snapshot.ref);
-    console.log('ダウンロードURL取得完了:', downloadURL);
+
     
     return downloadURL;
   } catch (error) {
@@ -171,16 +164,16 @@ export const uploadImageToFirebase = async (imageUri, path) => {
  */
 export const cropAndCompressImage = async (imageUri, crop, imageWidth, imageHeight, imageType = 'profile') => {
   try {
-    console.log('画像処理開始:', { imageType, crop, imageWidth, imageHeight });
+
     
     // まず切り抜き（画像タイプに応じたアスペクト比）
     const croppedUri = await cropImage(imageUri, crop, imageWidth, imageHeight, imageType);
-    console.log('切り抜き完了:', croppedUri);
+
     
     // 次に圧縮（既存のcompressImageToOneMB関数を使用）
     const { compressImageToOneMB } = await import('./imageCompression.js');
     const compressedUri = await compressImageToOneMB(croppedUri, imageType);
-    console.log('圧縮完了:', compressedUri);
+
     
     return compressedUri;
   } catch (error) {

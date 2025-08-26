@@ -317,15 +317,7 @@ const ImageCropScreen = ({ route, navigation }) => {
         height: finalCropHeight,
       };
 
-      console.log('クロップデータ:', {
-        cropData,
-        imageDimensions,
-        scale: scale.value,
-        translateX: translateX.value,
-        translateY: translateY.value,
-        cropAreaConfig,
-        cropCenterInImage: { x: cropCenterInImageX, y: cropCenterInImageY }
-      });
+
 
       const croppedUri = await cropAndCompressImage(
         selectedImage,

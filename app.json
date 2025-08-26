@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "KurukatsuApp",
+    "name": "クルカツ",
     "slug": "kurukatsuapp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.kurukatsu.app",
-      "buildNumber": "8",
+      "buildNumber": "9",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "FirebaseAppDelegateProxyEnabled": false,

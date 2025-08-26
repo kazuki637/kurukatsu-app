@@ -16,7 +16,7 @@ const ImageCropGuide = ({
   initialCrop = null,
   isCircular = false
 }) => {
-  console.log('ImageCropGuide props:', { imageWidth, imageHeight, initialCrop, isCircular });
+
   
   // 画面中心に固定されたガイド枠のサイズ
   const [guideSize, setGuideSize] = useState(200);
@@ -126,7 +126,7 @@ const ImageCropGuide = ({
 
 
 
-  console.log('ImageCropGuide render:', { imageOffset, imageScale, guideSize, isCircular });
+
   
   // ガイド枠の中心位置を計算
   const guideCenterX = imageWidth / 2;

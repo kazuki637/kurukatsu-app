@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, StatusBar, ActivityIndicator, Image, Alert, Dimensions, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { db, auth } from '../firebaseConfig';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
+import { useFocusEffect } from '@react-navigation/native';
 import CommonHeader from '../components/CommonHeader';
 
 const BUTTON_SIZE = (Dimensions.get('window').width - 40) / 2.5; // 2列+等間隔
@@ -22,6 +23,7 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
   const [loading, setLoading] = useState(true);
   const [circleData, setCircleData] = useState(null);
   const [userRole, setUserRole] = useState(null);
+  const [joinRequestsCount, setJoinRequestsCount] = useState(0);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -58,6 +60,11 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
             setUserRole(memberDoc.data().role || 'member');
           }
         });
+
+        // 入会申請の数を取得
+        getDocs(collection(db, 'circles', circleId, 'joinRequests')).then((requestsSnapshot) => {
+          setJoinRequestsCount(requestsSnapshot.size);
+        });
       } catch (error) {
         console.error('Error fetching circle data:', error);
         Alert.alert('エラー', 'サークル情報の取得に失敗しました');
@@ -71,6 +78,18 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
 
     return () => unsubscribe();
   }, [user?.uid, circleId]);
+
+  // 画面がフォーカスされたときにデータを更新
+  useFocusEffect(
+    useCallback(() => {
+      if (user && circleId) {
+        // 入会申請の数を再取得
+        getDocs(collection(db, 'circles', circleId, 'joinRequests')).then((requestsSnapshot) => {
+          setJoinRequestsCount(requestsSnapshot.size);
+        });
+      }
+    }, [user, circleId])
+  );
 
   if (loading) {
     return (
@@ -208,8 +227,13 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
                       style={styles.managementGridItem3col}
                       onPress={btn.onPress}
                     >
-                      <Ionicons name={btn.icon} size={28} color="#007bff" />
-                      <Text style={styles.managementGridItemText}>{btn.label}</Text>
+                      <View style={styles.buttonContent}>
+                        <Ionicons name={btn.icon} size={28} color="#007bff" />
+                        <Text style={styles.managementGridItemText}>{btn.label}</Text>
+                        {btn.label === 'メンバー管理' && joinRequestsCount > 0 && (
+                          <View style={styles.notificationBadge} />
+                        )}
+                      </View>
                     </TouchableOpacity>
                   ) : (
                     <View key={`empty-${colIdx}`} style={styles.managementGridItem3col} />
@@ -324,6 +348,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 4,
     fontWeight: '500',
+  },
+  buttonContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ff3b30',
   },
 
 }); 
