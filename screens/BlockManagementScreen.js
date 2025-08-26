@@ -143,7 +143,7 @@ export default function BlockManagementScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.container}>
-        <CommonHeader title="ブロック管理" navigation={navigation} />
+        <CommonHeader title="ブロックリスト" navigation={navigation} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
           <Text style={styles.loadingText}>読み込み中...</Text>
@@ -154,7 +154,7 @@ export default function BlockManagementScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <CommonHeader title="ブロック管理" navigation={navigation} />
+      <CommonHeader title="ブロックリスト" navigation={navigation} />
       
       {/* 固定ヘッダーセクション（常に表示） */}
       <View style={styles.fixedHeaderSection}>

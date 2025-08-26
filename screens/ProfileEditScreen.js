@@ -263,7 +263,7 @@ export default function ProfileEditScreen(props) {
           onCropComplete: (croppedUri) => {
             setProfileImage(croppedUri);
             setHasUnsavedChanges(true);
-            console.log('プロフィール編集画面: 画像切り抜き完了（ローカルURI）');
+
           }
         });
       }
@@ -364,14 +364,10 @@ export default function ProfileEditScreen(props) {
       if (profileImage) {
         try {
           // 既存のプロフィール画像を削除
-          console.log('プロフィール編集画面: 既存画像削除開始...');
           await deleteExistingProfileImages(user.uid);
-          console.log('プロフィール編集画面: 既存画像削除完了');
           
           // 画像を圧縮
-          console.log('プロフィール編集画面: 画像圧縮開始...');
           const compressedUri = await compressProfileImage(profileImage);
-          console.log('プロフィール編集画面: 画像圧縮完了');
           
           // 圧縮された画像をアップロード
           const response = await fetch(compressedUri);
@@ -387,7 +383,7 @@ export default function ProfileEditScreen(props) {
           setProfileImageUrl(imageUrl);
           setProfileImage(null); // ローカル画像をクリア
           
-          console.log('プロフィール編集画面: 画像アップロード完了');
+
         } catch (error) {
           console.error('プロフィール編集画面: 画像アップロードエラー:', error);
           Alert.alert('エラー', 'プロフィール画像のアップロードに失敗しました');
@@ -398,9 +394,7 @@ export default function ProfileEditScreen(props) {
       } else if (profileImage === '' && originalData && originalData.profileImageUrl) {
         // 画像が明示的に削除された場合のみ、既存の画像も削除して空文字列を設定
         try {
-          console.log('プロフィール編集画面: 画像削除開始...');
           await deleteExistingProfileImages(user.uid);
-          console.log('プロフィール編集画面: 画像削除完了');
         } catch (error) {
           console.error('プロフィール編集画面: 画像削除エラー:', error);
           // 削除に失敗しても処理を続行

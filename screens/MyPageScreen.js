@@ -221,9 +221,7 @@ export default function MyPageScreen({ navigation, route }) {
                       <Text style={styles.circleName}>{circle.name}</Text>
                       <Text style={styles.circleEvent}>{circle.universityName || '大学名未設定'}</Text>
                     </View>
-                    <TouchableOpacity style={styles.bookmarkButton}>
-                      <Ionicons name="chevron-forward" size={20} color="#007bff" />
-                    </TouchableOpacity>
+
                   </View>
                 </TouchableOpacity>
               ))

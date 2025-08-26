@@ -151,7 +151,7 @@ const ArticleDetailScreen = ({ route, navigation }) => {
             const headerUrl = await getDownloadURL(headerImageRef);
             setHeaderImageUrl(headerUrl);
           } catch (headerError) {
-            console.log('ヘッダー画像が見つかりません:', headerError);
+
             // ヘッダー画像がなくてもエラーにはしない
           }
         }
@@ -160,10 +160,8 @@ const ArticleDetailScreen = ({ route, navigation }) => {
         let blocksData = [];
         
         if (articleData.blocks && Array.isArray(articleData.blocks)) {
-          console.log('blocks配列を使用:', articleData.blocks);
           blocksData = articleData.blocks;
         } else {
-          console.log('後方互換性モード: 段落と画像を別々に読み込み');
           
           // 段落データを読み込み
           let paragraphIndex = 1;
