@@ -123,6 +123,28 @@ const LoginScreen = ({ navigation }) => {
         >
           <Text style={styles.signupButtonText}>新規登録はこちら</Text>
         </TouchableOpacity>
+        
+        {/* 開発用: オンボーディング画面確認ボタン */}
+        <TouchableOpacity
+          style={styles.devButton}
+          onPress={async () => {
+            try {
+              await AsyncStorage.removeItem('seenOnboarding');
+              Alert.alert(
+                'リセット完了',
+                'オンボーディング画面がリセットされました。アプリを再起動すると、オンボーディング画面が表示されます。',
+                [
+                  { text: 'OK' }
+                ]
+              );
+            } catch (error) {
+              console.error('リセットエラー:', error);
+              Alert.alert('エラー', 'リセットに失敗しました');
+            }
+          }}
+        >
+          <Text style={styles.devButtonText}>開発用: オンボーディングリセット</Text>
+        </TouchableOpacity>
       </ScrollView>
     </TouchableWithoutFeedback>
   );
@@ -207,6 +229,18 @@ const styles = StyleSheet.create({
     color: '#007bff',
     fontSize: 12,
     textDecorationLine: 'underline',
+  },
+  devButton: {
+    marginTop: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: '#ff6b6b',
+    borderRadius: 8,
+  },
+  devButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
 

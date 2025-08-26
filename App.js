@@ -10,6 +10,7 @@ import { auth, db } from './firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Notifications from 'expo-notifications';
 
 import { Platform } from 'react-native';
 import OnboardingScreen from './screens/OnboardingScreen';
@@ -66,6 +67,17 @@ const SettingsStack = createStackNavigator();
 const CircleManagementStack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 const RootStack = createStackNavigator(); // For modals
+
+// 通知の初期設定
+const initializeNotifications = () => {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+};
 
 // グローバルナビゲーション参照
 let navigationRef = null;
@@ -237,9 +249,19 @@ function AppNavigator() {
     
     initialize();
 
-    const subscriber = onAuthStateChanged(auth, (currentUser) => {
+    const subscriber = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (initializing) setInitializing(false);
+      
+      // ユーザーログイン時に通知トークンを取得・保存
+      if (currentUser) {
+        try {
+          const { registerForPushNotifications } = await import('./utils/notificationUtils');
+          await registerForPushNotifications(currentUser.uid);
+        } catch (error) {
+          console.error('通知トークンの取得に失敗:', error);
+        }
+      }
     });
     
     // クリーンアップ関数を返す
@@ -376,6 +398,47 @@ function MainTabNavigatorWithProfileCheck() {
 }
 
 export default function App() {
+  // 通知の初期化と受信処理
+  React.useEffect(() => {
+    initializeNotifications();
+    
+    // 通知受信時の処理
+    const notificationListener = Notifications.addNotificationReceivedListener(notification => {
+      console.log('通知を受信:', notification);
+    });
+
+    // 通知タップ時の処理
+    const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data;
+      
+      // 連絡通知の場合、CircleMessageDetailScreenに遷移
+      if (data.type === 'contact' && navigationRef) {
+        // 適切なナビゲーターに遷移
+        try {
+          navigationRef.navigate('Main', {
+            screen: 'Home',
+            params: {
+              screen: 'CircleMessageDetail',
+              params: {
+                circleId: data.circleId,
+                messageId: data.messageId,
+              }
+            }
+          });
+        } catch (error) {
+          console.error('通知タップ時の画面遷移エラー:', error);
+          // エラーが発生した場合はホーム画面に遷移
+          navigationRef.navigate('Main');
+        }
+      }
+    });
+
+    return () => {
+      notificationListener.remove();
+      responseListener.remove();
+    };
+  }, []);
+
   return (
     <SafeAreaProvider>
       <NavigationContainer
