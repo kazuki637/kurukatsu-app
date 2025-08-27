@@ -24,10 +24,23 @@ export const registerForPushNotifications = async (userId) => {
       return null;
     }
 
+    // 開発ビルドでの通知設定を強化
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#FF231F7C',
+      });
+    }
+
     // Expo Push Tokenを取得
     const token = await Notifications.getExpoPushTokenAsync({
       projectId: 'f94b703e-f3c4-4f9f-8bb5-8b53bf7ac727', // EASプロジェクトID
     });
+    
+    console.log('通知トークン取得成功:', token.data);
+    console.log('ユーザーID:', userId);
     
     // トークンをFirestoreに保存
     await saveTokenToFirestore(userId, token.data);
@@ -68,6 +81,12 @@ export const getUserNotificationTokens = async (userId) => {
 // 通知を送信
 export const sendPushNotification = async (tokens, title, body, data = {}) => {
   try {
+    console.log('通知送信開始');
+    console.log('送信先トークン数:', tokens.length);
+    console.log('通知タイトル:', title);
+    console.log('通知本文:', body);
+    console.log('通知データ:', data);
+
     const messages = tokens.map(token => ({
       to: token,
       sound: 'default',
@@ -86,10 +105,16 @@ export const sendPushNotification = async (tokens, title, body, data = {}) => {
       body: JSON.stringify(messages),
     });
 
+    console.log('通知送信レスポンス:', response.status, response.statusText);
+
     if (!response.ok) {
-      throw new Error(`通知送信に失敗: ${response.status}`);
+      const errorText = await response.text();
+      console.error('通知送信エラーレスポンス:', errorText);
+      throw new Error(`通知送信に失敗: ${response.status} - ${errorText}`);
     }
 
+    const responseData = await response.json();
+    console.log('通知送信成功:', responseData);
     return true;
   } catch (error) {
     console.error('通知送信エラー:', error);

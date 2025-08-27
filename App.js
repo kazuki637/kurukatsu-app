@@ -70,12 +70,26 @@ const RootStack = createStackNavigator(); // For modals
 
 // 通知の初期設定
 const initializeNotifications = () => {
+  // Android用の通知チャンネル設定
+  if (Platform.OS === 'android') {
+    Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+      sound: 'default',
+    });
+  }
+
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-    }),
+    handleNotification: async (notification) => {
+      console.log('通知ハンドラーが呼ばれました:', notification);
+      return {
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      };
+    },
   });
 };
 
@@ -402,13 +416,16 @@ export default function App() {
   React.useEffect(() => {
     initializeNotifications();
     
-    // 通知受信時の処理
+    // フォアグラウンドでの通知受信処理
     const notificationListener = Notifications.addNotificationReceivedListener(notification => {
-      console.log('通知を受信:', notification);
+      console.log('フォアグラウンドで通知を受信:', notification);
+      console.log('通知内容:', notification.request.content);
+      console.log('通知データ:', notification.request.content.data);
     });
 
-    // 通知タップ時の処理
+    // 通知タップ時の処理（バックグラウンド・フォアグラウンド両方）
     const responseListener = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('通知がタップされました:', response);
       const data = response.notification.request.content.data;
       
       // 連絡通知の場合、CircleMessageDetailScreenに遷移

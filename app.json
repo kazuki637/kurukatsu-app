@@ -21,9 +21,12 @@
         "FirebaseAppDelegateProxyEnabled": false,
         "NSCameraUsageDescription": "写真撮影のためにカメラへのアクセスが必要です",
         "NSPhotoLibraryUsageDescription": "写真選択のためにフォトライブラリへのアクセスが必要です",
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification",
+          "remote-notification"
+        ],
+        "NSUserNotificationUsageDescription": "サークルからの連絡をお知らせします"
       }
-
     },
     "android": {
       "adaptiveIcon": {
@@ -33,13 +36,22 @@
       "edgeToEdgeEnabled": true,
       "package": "com.kurukatsu.app",
       "versionCode": 1,
-      "permissions": ["NOTIFICATIONS"]
+      "permissions": [
+        "android.permission.NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA",
+        "android.permission.NOTIFICATIONS",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-
+      [
+        "expo-dev-client"
+      ],
       [
         "expo-image-picker",
         {
@@ -65,12 +77,17 @@
         "expo-notifications"
       ]
     ],
-
     "extra": {
       "eas": {
         "projectId": "f94b703e-f3c4-4f9f-8bb5-8b53bf7ac727"
       }
     },
-    "owner": "kazuki637"
+    "owner": "kazuki637",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/f94b703e-f3c4-4f9f-8bb5-8b53bf7ac727"
+    }
   }
 }
