@@ -94,6 +94,50 @@ export default function CircleManagementScreen({ navigation }) {
     return () => unsubscribe();
   }, [user?.uid]);
 
+  // 入会申請の変更をリアルタイムで監視
+  useEffect(() => {
+    if (!user || adminCircles.length === 0) return;
+
+    const unsubscribeListeners = [];
+    
+    // 各管理サークルの入会申請をリアルタイムで監視
+    adminCircles.forEach(circle => {
+      const unsubscribe = onSnapshot(
+        collection(db, 'circles', circle.id, 'joinRequests'),
+        async (snapshot) => {
+          try {
+            const joinRequestsCount = snapshot.size;
+            
+            // 該当サークルの入会申請数を更新
+            setAdminCircles(prev => prev.map(c => 
+              c.id === circle.id ? { ...c, joinRequestsCount } : c
+            ));
+            
+            // 全体の入会申請数を再計算
+            const updatedCircles = adminCircles.map(c => 
+              c.id === circle.id ? { ...c, joinRequestsCount } : c
+            );
+            const totalRequests = updatedCircles.reduce((sum, c) => sum + c.joinRequestsCount, 0);
+            
+            setTotalJoinRequestsCount(totalRequests);
+            global.totalJoinRequestsCount = totalRequests;
+          } catch (error) {
+            console.error(`Error listening to join requests for circle ${circle.id}:`, error);
+          }
+        },
+        (error) => {
+          console.error(`Error listening to join requests for circle ${circle.id}:`, error);
+        }
+      );
+      
+      unsubscribeListeners.push(unsubscribe);
+    });
+
+    return () => {
+      unsubscribeListeners.forEach(unsubscribe => unsubscribe());
+    };
+  }, [user?.uid, adminCircles]);
+
   const handleRegisterCirclePress = async () => {
     if (!user) {
       Alert.alert('ログインが必要です', 'サークル登録にはログインが必要です。');
