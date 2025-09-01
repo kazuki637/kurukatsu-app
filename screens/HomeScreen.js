@@ -22,9 +22,35 @@ const HomeScreen = ({ navigation }) => {
   
   // ブロック機能の状態管理
   const [userBlockedCircleIds, setUserBlockedCircleIds] = useState([]);
+  // 未読通知数を管理
+  const [unreadCounts, setUnreadCounts] = useState({});
 
   // 通知ナビゲーションフックを使用
   useNotificationNavigation();
+
+  // 未読通知数を取得する関数
+  const fetchUnreadCounts = async (circleIds) => {
+    if (!circleIds || circleIds.length === 0) return;
+    
+    try {
+      const unreadCountsData = {};
+      const q = query(
+        collection(db, 'users', auth.currentUser.uid, 'circleMessages'),
+        where('circleId', 'in', circleIds),
+        where('readAt', '==', null)
+      );
+      const snapshot = await getDocs(q);
+      
+      // サークルIDごとに未読数を集計
+      snapshot.docs.forEach(doc => {
+        const circleId = doc.data().circleId;
+        unreadCountsData[circleId] = (unreadCountsData[circleId] || 0) + 1;
+      });
+      setUnreadCounts(unreadCountsData);
+    } catch (error) {
+      console.error('Error fetching unread counts:', error);
+    }
+  };
 
   useFocusEffect(
     React.useCallback(() => {
@@ -76,6 +102,12 @@ const HomeScreen = ({ navigation }) => {
           }
           
           setUserCircles(userCirclesList);
+          
+          // 所属しているサークルの未読通知数を取得
+          if (userCirclesList.length > 0) {
+            const circleIds = userCirclesList.map(circle => circle.id);
+            await fetchUnreadCounts(circleIds);
+          }
           
           // 大学別の人気サークルを取得
           if (userData && userData.university) {
@@ -376,6 +408,13 @@ const HomeScreen = ({ navigation }) => {
                         <Text style={styles.circleName}>{circle.name}</Text>
                         <Text style={styles.circleEvent}>{circle.universityName || '大学名未設定'}</Text>
                       </View>
+                      
+                      {/* 未読通知バッジ */}
+                      {unreadCounts[circle.id] > 0 && (
+                        <View style={styles.unreadBadge}>
+                          <Text style={styles.unreadBadgeText}>{unreadCounts[circle.id]}</Text>
+                        </View>
+                      )}
                     </View>
                   </TouchableOpacity>
                 ))
@@ -811,6 +850,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginLeft: 4,
+  },
+  // 未読通知バッジ（MyPageScreenと同じスタイル）
+  unreadBadge: {
+    backgroundColor: '#ff4757',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 10,
+    paddingHorizontal: 4,
+  },
+  unreadBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });
 

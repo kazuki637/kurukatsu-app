@@ -225,6 +225,30 @@ function MainTabNavigator() {
             iconName = focused ? 'settings' : 'settings-outline';
           }
 
+          // サークル管理タブの場合は、アイコンと赤丸を組み合わせて表示
+          if (route.name === 'サークル管理') {
+            return (
+              <View style={{ alignItems: 'center' }}>
+                <Ionicons name={iconName} size={size} color={color} />
+                {/* 入会申請がある場合に赤丸を表示 */}
+                {global.totalJoinRequestsCount > 0 && (
+                  <View style={{
+                    position: 'absolute',
+                    top: 0,
+                    right: -5,
+                    backgroundColor: '#ff4757',
+                    borderRadius: 8,
+                    width: 6,
+                    height: 6,
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                  }}>
+                  </View>
+                )}
+              </View>
+            );
+          }
+
           return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: '#007bff',
