@@ -371,6 +371,10 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
         if (!readStatusSnap.exists()) {
           await setDoc(readStatusRef, { readAt: serverTimestamp() });
         }
+
+        // 1-2. 既読登録（ユーザーレベル）
+        const userMessageRef = doc(db, 'users', user.uid, 'circleMessages', message.id);
+        await setDoc(userMessageRef, { readAt: serverTimestamp() }, { merge: true });
         
         // 2. サークルメンバー一覧取得
         const membersRef = collection(db, 'circles', message.circleId, 'members');

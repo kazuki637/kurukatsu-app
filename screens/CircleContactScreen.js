@@ -167,6 +167,7 @@ export default function CircleContactScreen({ route, navigation }) {
         await addDoc(userMessageRef, {
           ...messageData,
           messageId: messageId, // サークルコレクションのメッセージIDを参照
+          readAt: null, // 未読状態で保存
         });
       }
 
@@ -174,7 +175,7 @@ export default function CircleContactScreen({ route, navigation }) {
       try {
         const notificationTokens = [];
         for (const uid of selectedUids) {
-          const tokens = await getUserNotificationTokens(uid);
+          const tokens = await getUserNotificationTokens(uid, 'contact');
           notificationTokens.push(...tokens);
         }
 

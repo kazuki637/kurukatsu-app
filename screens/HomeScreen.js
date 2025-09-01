@@ -6,6 +6,7 @@ import { auth, db, storage } from '../firebaseConfig';
 import { collection, query, where, getDocs, getDoc, doc, orderBy, limit } from 'firebase/firestore';
 import { ref, getDownloadURL } from 'firebase/storage';
 import { useFocusEffect } from '@react-navigation/native';
+import { useNotificationNavigation } from '../hooks/useNotificationNavigation';
 
 const HomeScreen = ({ navigation }) => {
   const [userCircles, setUserCircles] = useState([]);
@@ -21,6 +22,9 @@ const HomeScreen = ({ navigation }) => {
   
   // ブロック機能の状態管理
   const [userBlockedCircleIds, setUserBlockedCircleIds] = useState([]);
+
+  // 通知ナビゲーションフックを使用
+  useNotificationNavigation();
 
   useFocusEffect(
     React.useCallback(() => {
@@ -372,9 +376,6 @@ const HomeScreen = ({ navigation }) => {
                         <Text style={styles.circleName}>{circle.name}</Text>
                         <Text style={styles.circleEvent}>{circle.universityName || '大学名未設定'}</Text>
                       </View>
-                      <TouchableOpacity style={styles.bookmarkButton}>
-                        <Ionicons name="chevron-forward" size={20} color="#007bff" />
-                      </TouchableOpacity>
                     </View>
                   </TouchableOpacity>
                 ))

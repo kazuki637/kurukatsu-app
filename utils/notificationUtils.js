@@ -66,9 +66,36 @@ const saveTokenToFirestore = async (userId, token) => {
   }
 };
 
-// ユーザーの通知トークンを取得
-export const getUserNotificationTokens = async (userId) => {
+// ユーザーの通知設定をチェック
+export const checkUserNotificationSettings = async (userId, notificationType) => {
   try {
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      const notificationSettings = userData.notificationSettings || {};
+      
+      // 通知設定が明示的にfalseでない場合は通知を送信（デフォルトはtrue）
+      return notificationSettings[notificationType] !== false;
+    }
+    return true; // ユーザーデータが存在しない場合はデフォルトで通知を送信
+  } catch (error) {
+    console.error('通知設定の確認に失敗:', error);
+    return true; // エラーの場合はデフォルトで通知を送信
+  }
+};
+
+// ユーザーの通知トークンを取得（通知設定をチェック）
+export const getUserNotificationTokens = async (userId, notificationType = null) => {
+  try {
+    // 通知タイプが指定されている場合は設定をチェック
+    if (notificationType) {
+      const isNotificationEnabled = await checkUserNotificationSettings(userId, notificationType);
+      if (!isNotificationEnabled) {
+        console.log(`ユーザー ${userId} の ${notificationType} 通知は無効化されています`);
+        return [];
+      }
+    }
+    
     const tokensRef = collection(db, 'users', userId, 'notificationTokens');
     const tokensSnapshot = await getDocs(tokensRef);
     return tokensSnapshot.docs.map(doc => doc.data().token);

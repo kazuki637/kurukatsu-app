@@ -53,6 +53,7 @@ import CircleManagementDetailScreen from './screens/CircleManagementDetailScreen
 import CircleLeadershipTransferScreen from './screens/CircleLeadershipTransferScreen';
 import ReportScreen from './screens/ReportScreen';
 import BlockManagementScreen from './screens/BlockManagementScreen';
+import NotificationSettingsScreen from './screens/NotificationSettingsScreen';
 
 import ImageCropScreen from './screens/ImageCropScreen';
 import StudentIdCameraScreen from './screens/StudentIdCameraScreen';
@@ -84,6 +85,19 @@ const initializeNotifications = () => {
   Notifications.setNotificationHandler({
     handleNotification: async (notification) => {
       console.log('通知ハンドラーが呼ばれました:', notification);
+      
+      // 通知データに基づいて画面遷移の準備
+      if (notification.request.content.data) {
+        const data = notification.request.content.data;
+        console.log('通知データ:', data);
+        
+        // グローバル変数に通知データを保存（画面遷移時に使用）
+        global.pendingNotification = {
+          data: data,
+          timestamp: Date.now()
+        };
+      }
+      
       return {
         shouldShowAlert: true,
         shouldPlaySound: true,
@@ -161,6 +175,7 @@ function SettingsStackScreen() {
     <SettingsStack.Navigator screenOptions={{ headerShown: false }}>
       <SettingsStack.Screen name="Settings" component={SettingsScreen} />
       
+      <SettingsStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
       <SettingsStack.Screen name="HelpScreen" component={HelpScreen} />
       <SettingsStack.Screen name="PrivacyPolicyScreen" component={PrivacyPolicyScreen} />
       <SettingsStack.Screen name="TermsOfServiceScreen" component={TermsOfServiceScreen} />
