@@ -43,6 +43,7 @@ export default function MyPageScreen({ navigation, route }) {
   const [circlesLoading, setCirclesLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [imageError, setImageError] = useState(false);
+  const [unreadCounts, setUnreadCounts] = useState({}); // 未読通知数を管理
   
   // 画面がフォーカスされたときにデータをリロード
   useFocusEffect(
@@ -56,9 +57,11 @@ export default function MyPageScreen({ navigation, route }) {
     }, [reload, isInitialLoad, userProfile])
   );
 
-  // userProfile取得後にサークル情報を取得
+
+
+  // userProfile取得後にサークル情報と未読通知数を一括取得
   React.useEffect(() => {
-    const fetchCircles = async () => {
+    const fetchCirclesAndUnreadCounts = async () => {
       if (!userProfile) return;
       
       // 初回ロード時のみローディング状態を表示
@@ -67,37 +70,65 @@ export default function MyPageScreen({ navigation, route }) {
       }
       
       try {
-        // joinedCircles
-        let joined = [];
+        // 並列でサークル情報と未読通知数を取得
+        const promises = [];
+        
+        // joinedCircles取得のPromise
         if (userProfile.joinedCircleIds && userProfile.joinedCircleIds.length > 0) {
-          const batchSize = 10;
-          for (let i = 0; i < userProfile.joinedCircleIds.length; i += batchSize) {
-            const batch = userProfile.joinedCircleIds.slice(i, i + batchSize);
-            const circlesRef = collection(db, 'circles');
-            const q = query(circlesRef, where('__name__', 'in', batch));
-            const querySnapshot = await getDocs(q);
-            joined.push(...querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-          }
+          const circlesRef = collection(db, 'circles');
+          const q = query(circlesRef, where('__name__', 'in', userProfile.joinedCircleIds));
+          promises.push(getDocs(q));
+        } else {
+          promises.push(Promise.resolve({ docs: [] }));
         }
-        setJoinedCircles(joined);
-        // savedCircles
-        let saved = [];
+        
+        // 未読通知数取得のPromise
+        if (userProfile.joinedCircleIds && userProfile.joinedCircleIds.length > 0) {
+          const q = query(
+            collection(db, 'users', userId, 'circleMessages'),
+            where('circleId', 'in', userProfile.joinedCircleIds),
+            where('readAt', '==', null)
+          );
+          promises.push(getDocs(q));
+        } else {
+          promises.push(Promise.resolve({ docs: [] }));
+        }
+        
+        // savedCircles取得のPromise
         if (userProfile.favoriteCircleIds && userProfile.favoriteCircleIds.length > 0) {
-          const batchSize = 10;
-          for (let i = 0; i < userProfile.favoriteCircleIds.length; i += batchSize) {
-            const batch = userProfile.favoriteCircleIds.slice(i, i + batchSize);
-            const circlesRef = collection(db, 'circles');
-            const q = query(circlesRef, where('__name__', 'in', batch));
-            const querySnapshot = await getDocs(q);
-            saved.push(...querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-          }
+          const circlesRef = collection(db, 'circles');
+          const q = query(circlesRef, where('__name__', 'in', userProfile.favoriteCircleIds));
+          promises.push(getDocs(q));
+        } else {
+          promises.push(Promise.resolve({ docs: [] }));
         }
+        
+        // 並列実行
+        const [circlesSnapshot, unreadSnapshot, savedSnapshot] = await Promise.all(promises);
+        
+        // joinedCircles処理
+        const joined = circlesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setJoinedCircles(joined);
+        
+        // 未読通知数処理
+        if (unreadSnapshot.docs.length > 0) {
+          const unreadCountsData = {};
+          unreadSnapshot.docs.forEach(doc => {
+            const circleId = doc.data().circleId;
+            unreadCountsData[circleId] = (unreadCountsData[circleId] || 0) + 1;
+          });
+          setUnreadCounts(unreadCountsData);
+        }
+        
+        // savedCircles処理
+        const saved = savedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setSavedCircles(saved);
 
       } catch (e) {
-        console.error('Error fetching circles:', e);
+        console.error('Error fetching circles and unread counts:', e);
         setJoinedCircles([]);
         setSavedCircles([]);
+        setUnreadCounts({});
       } finally {
         setCirclesLoading(false);
       }
@@ -108,7 +139,7 @@ export default function MyPageScreen({ navigation, route }) {
       userProfile.joinedCircleIds !== undefined || 
       userProfile.favoriteCircleIds !== undefined
     )) {
-      fetchCircles();
+      fetchCirclesAndUnreadCounts();
     }
   }, [userProfile?.joinedCircleIds?.length, userProfile?.favoriteCircleIds?.length]);
 
@@ -221,7 +252,13 @@ export default function MyPageScreen({ navigation, route }) {
                       <Text style={styles.circleName}>{circle.name}</Text>
                       <Text style={styles.circleEvent}>{circle.universityName || '大学名未設定'}</Text>
                     </View>
-
+                    
+                    {/* 未読通知バッジ */}
+                    {unreadCounts[circle.id] > 0 && (
+                      <View style={styles.unreadBadge}>
+                        <Text style={styles.unreadBadgeText}>{unreadCounts[circle.id]}</Text>
+                      </View>
+                    )}
                   </View>
                 </TouchableOpacity>
               ))
@@ -374,5 +411,21 @@ const styles = StyleSheet.create({
   emptySubText: {
     fontSize: 14,
     color: '#999',
+  },
+  // 未読通知バッジ（CircleMemberScreenと同じスタイル）
+  unreadBadge: {
+    backgroundColor: '#ff4757',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 10,
+    paddingHorizontal: 4,
+  },
+  unreadBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });

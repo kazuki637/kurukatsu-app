@@ -9,6 +9,8 @@ import CommonHeader from '../components/CommonHeader';
 import { checkStudentIdVerification } from '../utils/permissionUtils';
 import useFirestoreDoc from '../hooks/useFirestoreDoc';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getUserNotificationTokens, sendPushNotification } from '../utils/notificationUtils';
+import { useFocusEffect } from '@react-navigation/native';
 
 
 const { width } = Dimensions.get('window');
@@ -100,25 +102,31 @@ export default function CircleProfileScreen({ route, navigation }) {
           const memberId = memberDoc.id;
           const memberData = memberDoc.data();
           
+          console.log(`メンバー ${memberId} のデータ:`, memberData);
+          
           // メンバードキュメントから直接性別と大学情報を取得
           // ユーザー情報も取得（名前など他の情報のため）
           const userDoc = await getDoc(doc(db, 'users', memberId));
           if (userDoc.exists()) {
             const userData = userDoc.data();
-            membersData.push({
+            const memberInfo = {
               id: memberId,
               gender: memberData.gender || userData.gender || null,
               university: memberData.university || userData.university || null,
               ...memberData,
               ...userData
-            });
+            };
+            console.log(`メンバー ${memberId} の統合データ:`, memberInfo);
+            membersData.push(memberInfo);
           }
         }
         
+        console.log('取得したメンバーデータ:', membersData);
         setMembers(membersData);
         
         // テスト用のダミーデータ（メンバーが0人の場合）
         if (membersData.length === 0) {
+          console.log('メンバーが0人のため、ダミーデータを設定');
           const dummyMembers = [
             { id: '1', gender: '男性', university: '東京大学' },
             { id: '2', gender: '男性', university: '東京大学' },
@@ -136,21 +144,32 @@ export default function CircleProfileScreen({ route, navigation }) {
     fetchMembers();
   }, [circleId]);
 
-  useEffect(() => {
-    if (user && circleId) {
-      const checkRequest = async () => {
-        try {
-          const requestsRef = collection(db, 'circles', circleId, 'joinRequests');
-          const q = query(requestsRef, where('userId', '==', user.uid));
-          const snapshot = await getDocs(q);
-          setHasRequested(!snapshot.empty);
-        } catch (e) {
-          setHasRequested(false);
-        }
-      };
-      checkRequest();
+  // 入会申請状態を確認する関数
+  const checkJoinRequestStatus = async () => {
+    if (!user || !circleId) return;
+    
+    try {
+      const requestsRef = collection(db, 'circles', circleId, 'joinRequests');
+      const q = query(requestsRef, where('userId', '==', user.uid));
+      const snapshot = await getDocs(q);
+      setHasRequested(!snapshot.empty);
+      console.log('入会申請状態確認:', !snapshot.empty ? '申請済み' : '未申請');
+    } catch (e) {
+      console.error('入会申請状態確認エラー:', e);
+      setHasRequested(false);
     }
+  };
+
+  useEffect(() => {
+    checkJoinRequestStatus();
   }, [user, circleId]);
+
+  // 画面フォーカス時に入会申請状態を再確認
+  useFocusEffect(
+    React.useCallback(() => {
+      checkJoinRequestStatus();
+    }, [user, circleId])
+  );
   
   // ブロック状態を取得
   useEffect(() => {
@@ -230,8 +249,73 @@ export default function CircleProfileScreen({ route, navigation }) {
       setHasRequested(true);
       Alert.alert('申請完了', '入会申請を送信しました。');
 
+      // サークル代表者・管理者へプッシュ通知を送信
+      await sendJoinRequestNotification(userData.name || '不明');
+
     } catch (e) {
       Alert.alert('エラー', '申請の送信に失敗しました');
+    }
+  };
+
+  // 入会申請通知を送信
+  const sendJoinRequestNotification = async (applicantName) => {
+    if (!circleData) return;
+
+    try {
+      console.log('入会申請通知送信開始');
+      console.log('サークルID:', circleId);
+      console.log('代表者ID:', circleData.leaderId);
+      console.log('メンバー数:', members.length);
+      
+      // サークルの代表者と管理者の通知トークンを取得
+      const leaderAndAdminTokens = [];
+      
+      // 代表者の通知トークンを取得
+      if (circleData.leaderId) {
+        console.log('代表者の通知トークンを取得中...');
+        const leaderTokens = await getUserNotificationTokens(circleData.leaderId, 'joinRequest');
+        console.log('代表者の通知トークン数:', leaderTokens.length);
+        leaderAndAdminTokens.push(...leaderTokens);
+      }
+      
+      // 管理者の通知トークンを取得
+      if (members.length > 0) {
+        console.log('全メンバー:', members.map(m => ({ id: m.id, role: m.role, name: m.name })));
+        const adminMembers = members.filter(member => member.role === 'admin');
+        console.log('管理者メンバー数:', adminMembers.length);
+        console.log('管理者詳細:', adminMembers.map(m => ({ id: m.id, role: m.role, name: m.name })));
+        
+        for (const adminMember of adminMembers) {
+          console.log(`管理者 ${adminMember.name} (${adminMember.id}) の通知トークンを取得中...`);
+          const adminTokens = await getUserNotificationTokens(adminMember.id, 'joinRequest');
+          console.log(`管理者 ${adminMember.name} の通知トークン数:`, adminTokens.length);
+          leaderAndAdminTokens.push(...adminTokens);
+        }
+      } else {
+        console.log('メンバーが0人のため、管理者の通知トークンは取得しません');
+      }
+      
+      // 重複を除去
+      const uniqueTokens = [...new Set(leaderAndAdminTokens)];
+      console.log('総通知トークン数:', uniqueTokens.length);
+      
+      if (uniqueTokens.length > 0) {
+        const notificationTitle = '新しい入会申請';
+        const notificationBody = `${circleData.name}に${applicantName}さんから入会申請が届きました`;
+        const notificationData = {
+          type: 'joinRequest',
+          circleId: circleId,
+          circleName: circleData.name,
+          applicantName: applicantName,
+        };
+        
+        await sendPushNotification(uniqueTokens, notificationTitle, notificationBody, notificationData);
+        console.log('入会申請通知を送信しました');
+      } else {
+        console.log('通知トークンが0件のため、通知を送信しません');
+      }
+    } catch (error) {
+      console.error('入会申請通知の送信に失敗:', error);
     }
   };
 
@@ -1129,6 +1213,7 @@ const styles = StyleSheet.create({
   joinButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center', // 中央揃えを追加
     backgroundColor: '#007bff',
     paddingVertical: 16, // 以前は10
     paddingHorizontal: 20,
@@ -1140,7 +1225,7 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
-    marginLeft: 8,
+    textAlign: 'center', // テキスト中央揃えを追加
   },
   leaderSection: {
     alignItems: 'flex-start',

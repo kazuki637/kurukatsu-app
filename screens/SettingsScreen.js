@@ -49,6 +49,7 @@ export default function SettingsScreen({ navigation }) {
   };
 
   const settingsOptions = [
+    { label: '通知設定', icon: 'notifications-outline', screen: 'NotificationSettings' },
     { label: 'ブロックリスト', icon: 'lock-closed-outline', screen: 'BlockManagement' },
     { label: 'お問い合わせ', icon: 'help-circle-outline', screen: 'HelpScreen' },
     { label: '利用規約', icon: 'document-text-outline', screen: 'TermsOfServiceScreen' },

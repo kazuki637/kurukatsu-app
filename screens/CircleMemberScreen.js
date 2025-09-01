@@ -2,12 +2,13 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, Alert, ScrollView, FlatList, ActivityIndicator, TextInput, Modal, Dimensions } from 'react-native';
 import CommonHeader from '../components/CommonHeader';
 import { db } from '../firebaseConfig';
-import { doc, getDoc, getDocs, collection, setDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth } from '../firebaseConfig';
 import { collection as firestoreCollection, query, where, orderBy, getDocs as getDocsFirestore, deleteDoc, updateDoc, arrayRemove } from 'firebase/firestore';
 import { Ionicons } from '@expo/vector-icons';
 import { getRoleDisplayName } from '../utils/permissionUtils';
 import { Modalize } from 'react-native-modalize';
+import { useFocusEffect } from '@react-navigation/native';
 
 // 高度に洗練されたカレンダーコンポーネント
 const Calendar = ({ selectedDate, onDateSelect, events }) => {
@@ -280,9 +281,9 @@ export default function CircleMemberScreen({ route, navigation }) {
   const [circleName, setCircleName] = useState('メンバー');
   const [tabIndex, setTabIndex] = useState(() => {
     // initialTabパラメータに基づいて初期タブを設定
-    if (initialTab === 'contact') {
+    if (initialTab === 'contact' || initialTab === 1) {
       return 1; // 連絡タブ
-    } else if (initialTab === 'members') {
+    } else if (initialTab === 'members' || initialTab === 2) {
       return 2; // メンバータブ
     }
     return 0; // デフォルトはカレンダータブ
@@ -318,6 +319,9 @@ export default function CircleMemberScreen({ route, navigation }) {
   // 現在のユーザーの出席状況を管理
   const [currentUserAttendance, setCurrentUserAttendance] = useState({});
 
+  // 未読メッセージ数の状態
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+
   // 送信者情報を取得する関数
   const getSenderInfo = async (senderUid) => {
     if (senderCache[senderUid]) {
@@ -342,6 +346,63 @@ export default function CircleMemberScreen({ route, navigation }) {
     return { name: '不明', profileImageUrl: null };
   };
 
+  // メッセージを既読にする関数
+  const markMessageAsRead = async (messageId) => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    try {
+      const messageRef = doc(db, 'users', user.uid, 'circleMessages', messageId);
+      await setDoc(messageRef, { readAt: serverTimestamp() }, { merge: true });
+      
+      // ローカルのメッセージ状態も更新
+      setMessages(prevMessages => 
+        prevMessages.map(msg => 
+          msg.id === messageId 
+            ? { ...msg, readAt: new Date() }
+            : msg
+        )
+      );
+    } catch (error) {
+      console.error('Error marking message as read:', error);
+    }
+  };
+
+  // 未読メッセージ数を取得する関数
+  const fetchUnreadMessageCount = async () => {
+    const user = auth.currentUser;
+    if (!user || !circleId) return;
+
+    try {
+      const q = query(
+        collection(db, 'users', user.uid, 'circleMessages'),
+        where('circleId', '==', circleId),
+        where('readAt', '==', null)
+      );
+      const snap = await getDocs(q);
+      setUnreadMessageCount(snap.size);
+    } catch (error) {
+      console.error('Error fetching unread message count:', error);
+      setUnreadMessageCount(0);
+    }
+  };
+
+  // 画面遷移直後に未読数を取得
+  useEffect(() => {
+    fetchUnreadMessageCount();
+  }, []);
+
+  // 画面フォーカス時に未読数を更新
+  useFocusEffect(
+    React.useCallback(() => {
+      if (tabIndex === 1) { // 連絡タブが表示されている場合
+        fetchUnreadMessageCount();
+        // メッセージ一覧も再取得して既読状態を最新化
+        fetchMessages();
+      }
+    }, [tabIndex])
+  );
+
   useEffect(() => {
     const fetchCircle = async () => {
       if (circleId) {
@@ -355,6 +416,53 @@ export default function CircleMemberScreen({ route, navigation }) {
     fetchCircle();
   }, [circleId]);
 
+  // メッセージ取得関数
+  const fetchMessages = async () => {
+    const user = auth.currentUser;
+    if (!user) return;
+    
+    try {
+      const q = query(
+        collection(db, 'users', user.uid, 'circleMessages'),
+        where('circleId', '==', circleId),
+        orderBy('sentAt', 'desc')
+      );
+      const snap = await getDocs(q);
+      const messagesData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // 送信者情報を事前に取得
+      const messagesWithSenderInfo = await Promise.all(
+        messagesData.map(async (message) => {
+          if (message.senderUid) {
+            const senderInfo = await getSenderInfo(message.senderUid);
+            return {
+              ...message,
+              senderInfo
+            };
+          } else {
+            // フォールバック: 保存された情報を使用
+            return {
+              ...message,
+              senderInfo: {
+                name: message.senderName || '不明',
+                profileImageUrl: message.senderProfileImageUrl || null
+              }
+            };
+          }
+        })
+      );
+      
+      setMessages(messagesWithSenderInfo);
+      
+      // 未読数を更新
+      await fetchUnreadMessageCount();
+    } catch (e) {
+      setMessages([]);
+    } finally {
+      setMessagesLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (tabIndex !== 1) return;
     
@@ -364,48 +472,6 @@ export default function CircleMemberScreen({ route, navigation }) {
       return;
     }
     
-    const fetchMessages = async () => {
-      const user = auth.currentUser;
-      if (!user) return;
-      
-      try {
-        const q = query(
-          collection(db, 'users', user.uid, 'circleMessages'),
-          where('circleId', '==', circleId),
-          orderBy('sentAt', 'desc')
-        );
-        const snap = await getDocs(q);
-        const messagesData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        
-        // 送信者情報を事前に取得
-        const messagesWithSenderInfo = await Promise.all(
-          messagesData.map(async (message) => {
-            if (message.senderUid) {
-              const senderInfo = await getSenderInfo(message.senderUid);
-              return {
-                ...message,
-                senderInfo
-              };
-            } else {
-              // フォールバック: 保存された情報を使用
-              return {
-                ...message,
-                senderInfo: {
-                  name: message.senderName || '不明',
-                  profileImageUrl: message.senderProfileImageUrl || null
-                }
-              };
-            }
-          })
-        );
-        
-        setMessages(messagesWithSenderInfo);
-      } catch (e) {
-        setMessages([]);
-      } finally {
-        setMessagesLoading(false);
-      }
-    };
     fetchMessages();
   }, [tabIndex, circleId]);
 
@@ -960,33 +1026,38 @@ export default function CircleMemberScreen({ route, navigation }) {
                           )}
                         </View>
                         
-                        {/* 右側の連絡種別と送信日時 */}
-                        <View style={styles.messageRightContainer}>
-                          {/* 連絡種別バッジ */}
-                          <View style={[styles.messageTypeBadge, isAttendance ? styles.attendanceBadge : styles.normalBadge]}>
-                            <Ionicons 
-                              name={isAttendance ? "calendar-outline" : "chatbubble-outline"} 
-                              size={14} 
-                              color={isAttendance ? "#fff" : "#007bff"} 
-                            />
-                            <Text style={[styles.messageTypeText, isAttendance ? styles.attendanceBadgeText : styles.normalBadgeText]}>
-                              {isAttendance ? '出欠確認' : '通常連絡'}
-                            </Text>
-                          </View>
-                          
-                          <View style={styles.messageMeta}>
-                            <Text style={styles.messageDate}>
-                              {item.sentAt && item.sentAt.toDate ? 
-                                item.sentAt.toDate().toLocaleDateString('ja-JP') : ''
-                              }
-                            </Text>
-                            <Text style={styles.messageTime}>
-                              {item.sentAt && item.sentAt.toDate ? 
-                                item.sentAt.toDate().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : ''
-                              }
-                            </Text>
-                          </View>
-                        </View>
+                                                 {/* 右側の連絡種別と送信日時 */}
+                         <View style={styles.messageRightContainer}>
+                           {/* 連絡種別バッジ */}
+                           <View style={[styles.messageTypeBadge, isAttendance ? styles.attendanceBadge : styles.normalBadge]}>
+                             <Ionicons 
+                               name={isAttendance ? "calendar-outline" : "chatbubble-outline"} 
+                               size={14} 
+                               color={isAttendance ? "#fff" : "#007bff"} 
+                             />
+                             <Text style={[styles.messageTypeText, isAttendance ? styles.attendanceBadgeText : styles.normalBadgeText]}>
+                               {isAttendance ? '出欠確認' : '通常連絡'}
+                             </Text>
+                           </View>
+                           
+                           <View style={styles.messageMeta}>
+                             <Text style={styles.messageDate}>
+                               {item.sentAt && item.sentAt.toDate ? 
+                                 item.sentAt.toDate().toLocaleDateString('ja-JP') : ''
+                               }
+                             </Text>
+                             <Text style={styles.messageTime}>
+                               {item.sentAt && item.sentAt.toDate ? 
+                                 item.sentAt.toDate().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : ''
+                               }
+                             </Text>
+                           </View>
+                           
+                           {/* 未読の場合は赤●を表示 */}
+                           {!item.readAt && (
+                             <View style={styles.unreadDot} />
+                           )}
+                         </View>
                       </View>
 
                       {/* 出欠確認の期限表示 */}
@@ -1095,7 +1166,15 @@ export default function CircleMemberScreen({ route, navigation }) {
               style={[styles.tabItem, tabIndex === i && styles.tabItemActive]}
               onPress={() => setTabIndex(i)}
             >
-              <Text style={[styles.tabText, tabIndex === i && styles.tabTextActive]}>{tab.title}</Text>
+              <View style={styles.tabTitleContainer}>
+                <Text style={[styles.tabText, tabIndex === i && styles.tabTextActive]}>{tab.title}</Text>
+                {/* 連絡タブに未読数の赤丸を表示 */}
+                {tab.key === 'news' && unreadMessageCount > 0 && (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadBadgeText}>{unreadMessageCount}</Text>
+                  </View>
+                )}
+              </View>
             </TouchableOpacity>
           ))}
         </View>
@@ -1857,5 +1936,38 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: 'bold',
+  },
+  // タブタイトルコンテナ
+  tabTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  // 未読数の赤丸バッジ
+  unreadBadge: {
+    backgroundColor: '#ff4757',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 6,
+    paddingHorizontal: 4,
+  },
+  unreadBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  // 未読メッセージの赤●
+  unreadDot: {
+    position: 'absolute',
+    top: '50%',
+    right: 70, // 時刻の左に配置
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#ff4757',
+    marginTop: -4, // 中央揃えのための調整
   },
 }); 
