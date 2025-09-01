@@ -28,5 +28,4 @@ yarn-error.*
 *.tsbuildinfo
 
 # Firebase config (contains sensitive API keys)
-firebaseConfig.js
 serviceAccountKey.json
