@@ -352,7 +352,9 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
             <View style={styles.tabContent}>
               <Text style={[styles.tabText, selectedTab === 'requests' && styles.activeTabText]}>入会申請</Text>
               {joinRequests.length > 0 && (
-                <View style={styles.notificationBadge} />
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>{joinRequests.length}</Text>
+                </View>
               )}
             </View>
           </TouchableOpacity>
@@ -545,7 +547,21 @@ const styles = StyleSheet.create({
   tabText: { fontSize: 16, color: '#666' },
   activeTabText: { color: '#007bff', fontWeight: 'bold' },
   tabContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  notificationBadge: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#ff3b30', marginLeft: 6 },
+  notificationBadge: { 
+    backgroundColor: '#ff4757',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 6,
+    paddingHorizontal: 4,
+  },
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   searchBarContainer: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 8, margin: 15, paddingHorizontal: 10, borderWidth: 1, borderColor: '#ddd' },
   searchIcon: { marginRight: 10 },
   searchInput: { flex: 1, paddingVertical: 12, fontSize: 16 },

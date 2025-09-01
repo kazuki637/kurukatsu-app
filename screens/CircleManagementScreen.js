@@ -14,6 +14,7 @@ export default function CircleManagementScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [adminCircles, setAdminCircles] = useState([]);
   const [isModalVisible, setModalVisible] = useState(false);
+  const [totalJoinRequestsCount, setTotalJoinRequestsCount] = useState(0);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -31,6 +32,8 @@ export default function CircleManagementScreen({ navigation }) {
   useEffect(() => {
     if (!user) {
       setLoading(false);
+      // ユーザーがログアウトした場合はグローバル変数をリセット
+      global.totalJoinRequestsCount = 0;
       return;
     }
 
@@ -45,17 +48,39 @@ export default function CircleManagementScreen({ navigation }) {
         }
 
         const adminCircleList = [];
+        let totalRequests = 0;
+        
         for (const circleDoc of snapshot.docs) {
           const circleId = circleDoc.id;
           const memberDoc = await getDoc(doc(db, 'circles', circleId, 'members', user.uid));
           if (memberDoc.exists()) {
             const role = memberDoc.data().role || 'member';
             if (role === 'leader' || role === 'admin') {
-              adminCircleList.push({ id: circleId, ...circleDoc.data(), role });
+              // 入会申請数を取得
+              let joinRequestsCount = 0;
+              try {
+                const requestsSnapshot = await getDocs(collection(db, 'circles', circleId, 'joinRequests'));
+                joinRequestsCount = requestsSnapshot.size;
+                totalRequests += joinRequestsCount;
+              } catch (error) {
+                console.error(`Error fetching join requests for circle ${circleId}:`, error);
+              }
+              
+              adminCircleList.push({ 
+                id: circleId, 
+                ...circleDoc.data(), 
+                role,
+                joinRequestsCount 
+              });
             }
           }
         }
+        
         setAdminCircles(adminCircleList);
+        setTotalJoinRequestsCount(totalRequests);
+        
+        // グローバル変数に設定（タブバーの赤丸表示用）
+        global.totalJoinRequestsCount = totalRequests;
       } catch (error) {
         console.error('Error fetching admin circles:', error);
       } finally {
@@ -249,10 +274,17 @@ export default function CircleManagementScreen({ navigation }) {
             <Ionicons name="people-outline" size={40} color="#aaa" />
           </View>
         )}
-        <View style={{ marginLeft: 16 }}>
+        <View style={{ marginLeft: 16, flex: 1 }}>
           <Text style={styles.circleName}>{item.name}</Text>
           <Text style={styles.circleRole}>{item.role === 'leader' ? '代表者' : '管理者'}</Text>
         </View>
+        
+        {/* 入会申請がある場合に数字付き赤丸を表示 */}
+        {item.joinRequestsCount > 0 && (
+          <View style={styles.notificationBadge}>
+            <Text style={styles.notificationBadgeText}>{item.joinRequestsCount}</Text>
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -507,5 +539,21 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     textAlign: 'center',
+  },
+  // 入会申請通知バッジ（数字付き）
+  notificationBadge: {
+    backgroundColor: '#ff4757',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+    paddingHorizontal: 4,
+  },
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 });
