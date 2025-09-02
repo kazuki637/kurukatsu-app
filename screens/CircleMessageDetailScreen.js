@@ -376,6 +376,20 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
         const userMessageRef = doc(db, 'users', user.uid, 'circleMessages', message.id);
         await setDoc(userMessageRef, { readAt: serverTimestamp() }, { merge: true });
         
+        // 既読操作時にリアルタイムで未読数を減算
+        if (global.updateHomeUnreadCounts) {
+          global.updateHomeUnreadCounts(message.circleId, -1);
+        }
+        if (global.updateMyPageUnreadCounts) {
+          global.updateMyPageUnreadCounts(message.circleId, -1);
+        }
+        if (global.updateCircleMemberUnreadCounts) {
+          global.updateCircleMemberUnreadCounts(message.circleId, -1);
+        }
+        if (global.updateMessageReadStatus) {
+          global.updateMessageReadStatus(message.id, true);
+        }
+        
         // 2. サークルメンバー一覧取得
         const membersRef = collection(db, 'circles', message.circleId, 'members');
         const membersSnap = await getDocs(membersRef);

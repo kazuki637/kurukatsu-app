@@ -5,7 +5,7 @@ export const useNotificationNavigation = () => {
   const navigation = useNavigation();
 
   useEffect(() => {
-    // 通知からの遷移をチェック
+    // 通知からの遷移をチェック（フォールバック用）
     const checkPendingNotification = () => {
       if (global.pendingNotification) {
         const { data, timestamp } = global.pendingNotification;
@@ -16,7 +16,7 @@ export const useNotificationNavigation = () => {
           return;
         }
 
-        console.log('通知からの画面遷移を実行:', data);
+        console.log('フォールバック通知遷移を実行:', data);
         
         if (data.type === 'joinRequest') {
           // 入会申請通知の場合

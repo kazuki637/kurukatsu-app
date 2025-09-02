@@ -8,7 +8,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from './firebaseConfig.js';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 
@@ -69,6 +69,38 @@ const CircleManagementStack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 const RootStack = createStackNavigator(); // For modals
 
+// 直接遷移処理関数
+const handleDirectNavigation = (data) => {
+  if (!navigationRef) {
+    console.log('ナビゲーション参照が設定されていません');
+    return;
+  }
+
+  console.log('直接遷移を実行:', data);
+  
+  try {
+    if (data.type === 'joinRequest') {
+      // 入会申請通知の場合：直接CircleMemberManagement画面に遷移
+      navigationRef.navigate('サークル管理', {
+        screen: 'CircleMemberManagement',
+        params: {
+          circleId: data.circleId,
+          initialTab: 'requests'
+        }
+      });
+    } else if (data.type === 'contact') {
+      // サークル連絡通知の場合：直接CircleMember画面に遷移
+      navigationRef.navigate('CircleMember', {
+        circleId: data.circleId,
+        initialTab: 1 // 連絡タブのインデックス
+      });
+    }
+  } catch (error) {
+    console.error('直接遷移エラー:', error);
+    // エラー時は遷移しない（シンプルに）
+  }
+};
+
 // 通知の初期設定
 const initializeNotifications = () => {
   // Android用の通知チャンネル設定
@@ -86,16 +118,44 @@ const initializeNotifications = () => {
     handleNotification: async (notification) => {
       console.log('通知ハンドラーが呼ばれました:', notification);
       
-      // 通知データに基づいて画面遷移の準備
+      // 通知データをグローバル変数に保存（通知タップ時に使用）
       if (notification.request.content.data) {
         const data = notification.request.content.data;
         console.log('通知データ:', data);
         
-        // グローバル変数に通知データを保存（画面遷移時に使用）
         global.pendingNotification = {
           data: data,
           timestamp: Date.now()
         };
+        
+        // 通知受信時に未読数をリアルタイム更新
+        if (data.type === 'contact') {
+          // 重複処理防止: 同じmessageIdの通知は1回のみ処理
+          const notificationKey = `${data.circleId}_${data.messageId}`;
+          if (processedNotificationIds.has(notificationKey)) {
+            console.log('重複通知をスキップ:', notificationKey);
+            return {
+              shouldShowAlert: true,
+              shouldPlaySound: true,
+              shouldSetBadge: false,
+            };
+          }
+          
+          processedNotificationIds.add(notificationKey);
+          console.log('通知受信: 未読数更新開始', data.circleId);
+          updateUnreadCountsRealtime(data.circleId, 1);
+          // 新しいメッセージの未読状態も設定
+          if (data.messageId && global.updateMessageReadStatus) {
+            global.updateMessageReadStatus(data.messageId, false);
+          }
+          
+          // 古い通知IDをクリーンアップ（メモリリーク防止）
+          setTimeout(() => {
+            processedNotificationIds.delete(notificationKey);
+          }, 60000); // 1分後にクリーンアップ
+        }
+        
+        console.log('通知データを保存しました（タップ待ち）');
       }
       
       return {
@@ -105,10 +165,182 @@ const initializeNotifications = () => {
       };
     },
   });
+
+  // 通知タップ時のイベントリスナーを設定
+  const notificationListener = Notifications.addNotificationResponseReceivedListener(response => {
+    console.log('通知がタップされました:', response);
+    
+    if (response.notification.request.content.data) {
+      const data = response.notification.request.content.data;
+      console.log('タップされた通知データ:', data);
+      
+      // 直接遷移を実行
+      handleDirectNavigation(data);
+    }
+  });
 };
 
 // グローバルナビゲーション参照
 let navigationRef = null;
+
+// 通知の重複処理防止用
+let processedNotificationIds = new Set();
+
+// グローバル入会申請数管理（タブバー表示用）
+global.totalJoinRequestsCount = 0;
+
+// アプリ起動時に入会申請数を取得する関数
+const fetchInitialJoinRequestsCount = async (userId) => {
+  if (!userId) {
+    global.totalJoinRequestsCount = 0;
+    return;
+  }
+
+  try {
+    // ユーザーが管理者・代表者であるサークルを取得
+    const circlesRef = collection(db, 'circles');
+    const circlesSnapshot = await getDocs(circlesRef);
+    
+    let totalRequests = 0;
+    
+    for (const circleDoc of circlesSnapshot.docs) {
+      const circleId = circleDoc.id;
+      
+      // ユーザーがメンバーかチェック
+      const memberDoc = await getDoc(doc(db, 'circles', circleId, 'members', userId));
+      if (memberDoc.exists()) {
+        const memberData = memberDoc.data();
+        const role = memberData.role || 'member';
+        
+        if (role === 'leader' || role === 'admin') {
+          // 入会申請数を取得
+          try {
+            const requestsSnapshot = await getDocs(collection(db, 'circles', circleId, 'joinRequests'));
+            const joinRequestsCount = requestsSnapshot.size;
+            totalRequests += joinRequestsCount;
+          } catch (error) {
+            console.error(`Error fetching join requests for circle ${circleId}:`, error);
+          }
+        }
+      }
+    }
+    
+    global.totalJoinRequestsCount = totalRequests;
+    console.log('初期入会申請数取得完了:', totalRequests);
+  } catch (error) {
+    console.error('Error fetching initial join requests count:', error);
+    global.totalJoinRequestsCount = 0;
+  }
+};
+
+// リアルタイム未読数更新関数
+const updateUnreadCountsRealtime = (circleId, delta) => {
+  // ホーム画面とマイページ画面、CircleMemberScreenの未読数を更新
+  if (global.updateHomeUnreadCounts) {
+    global.updateHomeUnreadCounts(circleId, delta);
+  }
+  if (global.updateMyPageUnreadCounts) {
+    global.updateMyPageUnreadCounts(circleId, delta);
+  }
+  if (global.updateCircleMemberUnreadCounts) {
+    global.updateCircleMemberUnreadCounts(circleId, delta);
+  }
+};
+
+// グローバルブロック状態管理
+let globalBlockedCircleIds = [];
+
+// ブロック状態更新関数（グローバルにエクスポート）
+global.updateBlockStatus = (circleId, isBlocked) => {
+  if (isBlocked) {
+    // ブロック追加
+    if (!globalBlockedCircleIds.includes(circleId)) {
+      globalBlockedCircleIds.push(circleId);
+    }
+  } else {
+    // ブロック解除
+    globalBlockedCircleIds = globalBlockedCircleIds.filter(id => id !== circleId);
+  }
+  
+  // 各画面のブロック状態を更新
+  if (global.updateHomeBlockStatus) {
+    global.updateHomeBlockStatus(globalBlockedCircleIds);
+  }
+  if (global.updateSearchResultsBlockStatus) {
+    global.updateSearchResultsBlockStatus(globalBlockedCircleIds);
+  }
+  if (global.updateCircleProfileBlockStatus) {
+    global.updateCircleProfileBlockStatus(globalBlockedCircleIds);
+  }
+  if (global.updateBlockManagementStatus) {
+    global.updateBlockManagementStatus(globalBlockedCircleIds);
+  }
+};
+
+// グローバル入会申請数管理
+let globalJoinRequestsCount = {};
+
+// 入会申請数更新関数（グローバルにエクスポート）
+global.updateJoinRequestsCount = (circleId, count) => {
+  globalJoinRequestsCount[circleId] = count;
+  
+  // 各画面の入会申請数を更新
+  if (global.updateCircleManagementDetailJoinRequests) {
+    global.updateCircleManagementDetailJoinRequests(circleId, count);
+  }
+  if (global.updateCircleMemberManagementJoinRequests) {
+    global.updateCircleMemberManagementJoinRequests(circleId, count);
+  }
+};
+
+// グローバルメンバー数管理
+let globalMemberCount = {};
+
+// メンバー数更新関数（グローバルにエクスポート）
+global.updateMemberCount = (circleId, count) => {
+  globalMemberCount[circleId] = count;
+  
+  // 各画面のメンバー数を更新
+  if (global.updateCircleProfileMemberCount) {
+    global.updateCircleProfileMemberCount(circleId, count);
+  }
+  if (global.updateCircleProfileEditMemberCount) {
+    global.updateCircleProfileEditMemberCount(circleId, count);
+  }
+  if (global.updateCircleMemberScreenMemberCount) {
+    global.updateCircleMemberScreenMemberCount(circleId, count);
+  }
+  if (global.updateCircleMemberManagementMemberCount) {
+    global.updateCircleMemberManagementMemberCount(circleId, count);
+  }
+  if (global.updateCircleContactMemberCount) {
+    global.updateCircleContactMemberCount(circleId, count);
+  }
+};
+
+// グローバルお気に入り状態管理
+let globalFavoriteCircleIds = [];
+
+// お気に入り状態更新関数（グローバルにエクスポート）
+global.updateFavoriteStatus = (circleId, isFavorite) => {
+  if (isFavorite) {
+    // お気に入り追加
+    if (!globalFavoriteCircleIds.includes(circleId)) {
+      globalFavoriteCircleIds.push(circleId);
+    }
+  } else {
+    // お気に入り削除
+    globalFavoriteCircleIds = globalFavoriteCircleIds.filter(id => id !== circleId);
+  }
+  
+  // 各画面のお気に入り状態を更新
+  if (global.updateMyPageFavoriteStatus) {
+    global.updateMyPageFavoriteStatus(globalFavoriteCircleIds);
+  }
+  if (global.updateSearchResultsFavoriteStatus) {
+    global.updateSearchResultsFavoriteStatus(globalFavoriteCircleIds);
+  }
+};
 
 // Authentication Stack
 function AuthStackScreen() {
@@ -206,6 +438,25 @@ function CircleManagementStackScreen() {
 
 // Main Tab Navigator
 function MainTabNavigator() {
+  const [totalJoinRequestsCount, setTotalJoinRequestsCount] = React.useState(0);
+
+  // グローバル入会申請数の変更を監視
+  React.useEffect(() => {
+    const updateBadge = () => {
+      setTotalJoinRequestsCount(global.totalJoinRequestsCount || 0);
+    };
+
+    // 初期値設定
+    updateBadge();
+
+    // 定期的にグローバル値をチェック（リアルタイム更新のため）
+    const interval = setInterval(updateBadge, 1000);
+
+    return () => {
+      clearInterval(interval);
+    };
+  }, []);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -231,7 +482,7 @@ function MainTabNavigator() {
               <View style={{ alignItems: 'center' }}>
                 <Ionicons name={iconName} size={size} color={color} />
                 {/* 入会申請がある場合に赤丸を表示 */}
-                {global.totalJoinRequestsCount > 0 && (
+                {totalJoinRequestsCount > 0 && (
                   <View style={{
                     position: 'absolute',
                     top: 0,
@@ -311,9 +562,15 @@ function AppNavigator() {
         try {
           const { registerForPushNotifications } = await import('./utils/notificationUtils');
           await registerForPushNotifications(currentUser.uid);
+          
+          // 初期入会申請数を取得（タブバー表示用）
+          await fetchInitialJoinRequestsCount(currentUser.uid);
         } catch (error) {
           console.error('通知トークンの取得に失敗:', error);
         }
+      } else {
+        // ログアウト時は入会申請数をリセット
+        global.totalJoinRequestsCount = 0;
       }
     });
     

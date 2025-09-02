@@ -321,6 +321,31 @@ export default function CircleMemberScreen({ route, navigation }) {
 
   // 未読メッセージ数の状態
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  
+  // 各メッセージの未読状態を管理
+  const [messageReadStatus, setMessageReadStatus] = useState({});
+  
+  // リアルタイム未読数更新関数をグローバルに登録
+  React.useEffect(() => {
+    global.updateCircleMemberUnreadCounts = (targetCircleId, delta) => {
+      if (targetCircleId === circleId) { // 現在のサークルの場合のみ更新
+        setUnreadMessageCount(prev => Math.max(0, prev + delta));
+      }
+    };
+    
+    // 個別メッセージの未読状態更新関数
+    global.updateMessageReadStatus = (messageId, isRead) => {
+      setMessageReadStatus(prev => ({
+        ...prev,
+        [messageId]: isRead
+      }));
+    };
+    
+    return () => {
+      delete global.updateCircleMemberUnreadCounts;
+      delete global.updateMessageReadStatus;
+    };
+  }, [circleId]);
 
   // 送信者情報を取得する関数
   const getSenderInfo = async (senderUid) => {
@@ -392,16 +417,8 @@ export default function CircleMemberScreen({ route, navigation }) {
     fetchUnreadMessageCount();
   }, []);
 
-  // 画面フォーカス時に未読数を更新
-  useFocusEffect(
-    React.useCallback(() => {
-      if (tabIndex === 1) { // 連絡タブが表示されている場合
-        fetchUnreadMessageCount();
-        // メッセージ一覧も再取得して既読状態を最新化
-        fetchMessages();
-      }
-    }, [tabIndex])
-  );
+  // イベントベース更新のため、フォーカス時の未読数取得は削除
+  // 通知受信・既読時にリアルタイム更新される
 
   useEffect(() => {
     const fetchCircle = async () => {
@@ -454,8 +471,14 @@ export default function CircleMemberScreen({ route, navigation }) {
       
       setMessages(messagesWithSenderInfo);
       
-      // 未読数を更新
-      await fetchUnreadMessageCount();
+      // 各メッセージの未読状態をローカル状態に保存
+      const readStatusMap = {};
+      messagesWithSenderInfo.forEach(message => {
+        readStatusMap[message.id] = !!message.readAt;
+      });
+      setMessageReadStatus(readStatusMap);
+      
+      // イベントベース更新のため、未読数更新は削除
     } catch (e) {
       setMessages([]);
     } finally {
@@ -496,7 +519,22 @@ export default function CircleMemberScreen({ route, navigation }) {
     fetchEvents();
   }, [circleId]);
 
-  // メンバー取得
+  // メンバー数更新関数をグローバルに登録
+  React.useEffect(() => {
+    global.updateCircleMemberScreenMemberCount = (targetCircleId, count) => {
+      if (targetCircleId === circleId) {
+        // メンバー数が変更された場合、現在のメンバーリストの長さと比較
+        // 実際のリストは別途更新されるため、ここでは通知のみ
+        console.log(`メンバー数が更新されました: ${count}`);
+      }
+    };
+    
+    return () => {
+      delete global.updateCircleMemberScreenMemberCount;
+    };
+  }, [circleId]);
+
+  // メンバー取得（初回ロード時のみ）
   useEffect(() => {
     if (tabIndex !== 2) return;
     
@@ -535,6 +573,9 @@ export default function CircleMemberScreen({ route, navigation }) {
           }
         }
         setMembers(membersList);
+        
+        // グローバルメンバー数を更新
+        global.updateMemberCount(circleId, membersList.length);
       } catch (e) {
         console.error('Error fetching members:', e);
         setMembers([]);
@@ -1053,10 +1094,10 @@ export default function CircleMemberScreen({ route, navigation }) {
                              </Text>
                            </View>
                            
-                           {/* 未読の場合は赤●を表示 */}
-                           {!item.readAt && (
-                             <View style={styles.unreadDot} />
-                           )}
+                                                     {/* 未読の場合は赤●を表示 */}
+                          {!messageReadStatus[item.id] && (
+                            <View style={styles.unreadDot} />
+                          )}
                          </View>
                       </View>
 

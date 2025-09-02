@@ -121,6 +121,9 @@ export default function CircleManagementScreen({ navigation }) {
             
             setTotalJoinRequestsCount(totalRequests);
             global.totalJoinRequestsCount = totalRequests;
+            
+            // グローバル入会申請数を更新
+            global.updateJoinRequestsCount(circle.id, joinRequestsCount);
           } catch (error) {
             console.error(`Error listening to join requests for circle ${circle.id}:`, error);
           }

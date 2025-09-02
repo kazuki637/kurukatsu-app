@@ -20,6 +20,27 @@ export default function BlockManagementScreen({ navigation }) {
   const [blockedCircles, setBlockedCircles] = useState([]);
   const [loading, setLoading] = useState(true);
   const user = auth.currentUser;
+  
+  // ブロック状態更新関数をグローバルに登録
+  React.useEffect(() => {
+    global.updateBlockManagementStatus = (blockedIds) => {
+      // ブロック管理画面では、ブロックされたサークルの詳細情報が必要
+      // ここでは簡易的にIDのみで管理
+      setBlockedCircles(prev => {
+        const currentIds = prev.map(circle => circle.id);
+        const newIds = blockedIds.filter(id => !currentIds.includes(id));
+        const removedIds = currentIds.filter(id => !blockedIds.includes(id));
+        
+        // 新しくブロックされたサークルは詳細情報を取得する必要がある
+        // 解除されたサークルは削除
+        return prev.filter(circle => !removedIds.includes(circle.id));
+      });
+    };
+    
+    return () => {
+      delete global.updateBlockManagementStatus;
+    };
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -93,6 +114,11 @@ export default function BlockManagementScreen({ navigation }) {
           onPress: async () => {
             try {
               await deleteDoc(doc(db, 'users', user.uid, 'blocks', circleId));
+              
+              // ブロック解除時にリアルタイム更新
+              if (global.updateBlockStatus) {
+                global.updateBlockStatus(circleId, false);
+              }
               
               // ローカル状態を更新
               setBlockedCircles(prev => prev.filter(circle => circle.id !== circleId));

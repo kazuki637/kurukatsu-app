@@ -20,6 +20,52 @@ const SearchResultsScreen = ({ route, navigation }) => {
   // ブロック機能の状態管理
   const [userBlockedCircleIds, setUserBlockedCircleIds] = useState([]);
   
+  // ブロック状態更新関数をグローバルに登録
+  React.useEffect(() => {
+    global.updateSearchResultsBlockStatus = (blockedIds) => {
+      setUserBlockedCircleIds(blockedIds);
+    };
+    
+    return () => {
+      delete global.updateSearchResultsBlockStatus;
+    };
+  }, []);
+
+  // お気に入り状態更新関数をグローバルに登録
+  React.useEffect(() => {
+    global.updateSearchResultsFavoriteStatus = (favoriteCircleIds) => {
+      // お気に入り状態が変更された場合、現在のuserProfileを更新
+      if (userProfile) {
+        setUserProfile(prev => ({
+          ...prev,
+          favoriteCircleIds: favoriteCircleIds
+        }));
+      }
+    };
+    
+    return () => {
+      delete global.updateSearchResultsFavoriteStatus;
+    };
+  }, [userProfile]);
+  
+  // 初回ロード時にブロック状態を取得
+  useEffect(() => {
+    const fetchUserBlocks = async () => {
+      if (user) {
+        try {
+          const blocksRef = collection(db, 'users', user.uid, 'blocks');
+          const blocksSnapshot = await getDocs(blocksRef);
+          const blockedIds = blocksSnapshot.docs.map(doc => doc.id);
+          setUserBlockedCircleIds(blockedIds);
+        } catch (error) {
+          console.error('Error fetching user blocks:', error);
+          setUserBlockedCircleIds([]);
+        }
+      }
+    };
+    fetchUserBlocks();
+  }, [user]);
+  
   // ユーザープロフィールの状態管理
   const [userProfile, setUserProfile] = useState(null);
 
@@ -50,23 +96,8 @@ const SearchResultsScreen = ({ route, navigation }) => {
   }, [user]);
   
   // 画面がフォーカスされたときにブロック状態を再取得
-  useFocusEffect(
-    useCallback(() => {
-      if (user) {
-        const fetchUserBlocks = async () => {
-          try {
-            const blocksRef = collection(db, 'users', user.uid, 'blocks');
-            const blocksSnapshot = await getDocs(blocksRef);
-            const blockedIds = blocksSnapshot.docs.map(doc => doc.id);
-            setUserBlockedCircleIds(blockedIds);
-          } catch (error) {
-            console.error('Error fetching user blocks on focus:', error);
-          }
-        };
-        fetchUserBlocks();
-      }
-    }, [user])
-  );
+  // イベントベース更新のため、フォーカス時のブロック状態取得は削除
+  // ブロック操作時にリアルタイム更新される
 
   // ユーザープロフィールの取得
   useEffect(() => {
@@ -148,12 +179,20 @@ const SearchResultsScreen = ({ route, navigation }) => {
       
       await setDoc(doc(db, 'users', user.uid, 'blocks', selectedCircle.id), blockData);
       
+      // ブロック操作時にリアルタイム更新
+      if (global.updateBlockStatus) {
+        global.updateBlockStatus(selectedCircle.id, true);
+      }
+      
       // いいね！している場合は削除
       if (userProfile && userProfile.favoriteCircleIds && userProfile.favoriteCircleIds.includes(selectedCircle.id)) {
         const userDocRef = doc(db, 'users', user.uid);
         const circleDocRef = doc(db, 'circles', selectedCircle.id);
         await updateDoc(userDocRef, { favoriteCircleIds: arrayRemove(selectedCircle.id) });
         await updateDoc(circleDocRef, { likes: increment(-1) });
+        
+        // グローバルお気に入り状態を更新
+        global.updateFavoriteStatus(selectedCircle.id, false);
       }
       
       // ローカル状態を更新

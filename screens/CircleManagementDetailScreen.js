@@ -79,17 +79,18 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
     return () => unsubscribe();
   }, [user?.uid, circleId]);
 
-  // 画面がフォーカスされたときにデータを更新
-  useFocusEffect(
-    useCallback(() => {
-      if (user && circleId) {
-        // 入会申請の数を再取得
-        getDocs(collection(db, 'circles', circleId, 'joinRequests')).then((requestsSnapshot) => {
-          setJoinRequestsCount(requestsSnapshot.size);
-        });
+  // 入会申請数更新関数をグローバルに登録
+  React.useEffect(() => {
+    global.updateCircleManagementDetailJoinRequests = (targetCircleId, count) => {
+      if (targetCircleId === circleId) {
+        setJoinRequestsCount(count);
       }
-    }, [user, circleId])
-  );
+    };
+    
+    return () => {
+      delete global.updateCircleManagementDetailJoinRequests;
+    };
+  }, [circleId]);
 
   if (loading) {
     return (
