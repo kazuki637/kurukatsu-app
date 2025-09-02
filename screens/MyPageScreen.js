@@ -45,16 +45,56 @@ export default function MyPageScreen({ navigation, route }) {
   const [imageError, setImageError] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState({}); // 未読通知数を管理
   
+  // リアルタイム未読数更新関数をグローバルに登録
+  React.useEffect(() => {
+    global.updateMyPageUnreadCounts = (circleId, delta) => {
+      setUnreadCounts(prev => ({
+        ...prev,
+        [circleId]: Math.max(0, (prev[circleId] || 0) + delta)
+      }));
+    };
+
+    // お気に入り状態更新関数をグローバルに登録
+    global.updateMyPageFavoriteStatus = (favoriteCircleIds) => {
+      // お気に入りサークル一覧を更新
+      if (favoriteCircleIds.length > 0) {
+        const fetchFavoriteCircles = async () => {
+          try {
+            const circlesRef = collection(db, 'circles');
+            const q = query(circlesRef, where('__name__', 'in', favoriteCircleIds));
+            const savedSnapshot = await getDocs(q);
+            const saved = savedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setSavedCircles(saved);
+          } catch (error) {
+            console.error('Error fetching favorite circles:', error);
+          }
+        };
+        fetchFavoriteCircles();
+      } else {
+        setSavedCircles([]);
+      }
+    };
+    
+    return () => {
+      delete global.updateMyPageUnreadCounts;
+      delete global.updateMyPageFavoriteStatus;
+    };
+  }, []);
+  
   // 画面がフォーカスされたときにデータをリロード
   useFocusEffect(
     React.useCallback(() => {
       setImageError(false); // 画像エラー状態をリセット
+      
+      // イベントベース更新のため、フォーカス時のクエリは削除
+      // 通知受信・既読時にリアルタイム更新される
+      
       // プロフィール編集画面から戻ってきた場合のみデータをリロード
       // 初回ロード時はリロードしない
       if (!isInitialLoad && userProfile) {
         reload();
       }
-    }, [reload, isInitialLoad, userProfile])
+    }, [reload, isInitialLoad, userProfile, userId])
   );
 
 
@@ -123,6 +163,12 @@ export default function MyPageScreen({ navigation, route }) {
         // savedCircles処理
         const saved = savedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setSavedCircles(saved);
+        
+        // グローバルお気に入り状態を更新
+        global.updateFavoriteStatus = global.updateFavoriteStatus || (() => {});
+        if (userProfile.favoriteCircleIds) {
+          globalFavoriteCircleIds = [...userProfile.favoriteCircleIds];
+        }
 
       } catch (e) {
         console.error('Error fetching circles and unread counts:', e);

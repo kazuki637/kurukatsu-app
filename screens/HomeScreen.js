@@ -6,7 +6,7 @@ import { auth, db, storage } from '../firebaseConfig';
 import { collection, query, where, getDocs, getDoc, doc, orderBy, limit } from 'firebase/firestore';
 import { ref, getDownloadURL } from 'firebase/storage';
 import { useFocusEffect } from '@react-navigation/native';
-import { useNotificationNavigation } from '../hooks/useNotificationNavigation';
+// import { useNotificationNavigation } from '../hooks/useNotificationNavigation';
 
 const HomeScreen = ({ navigation }) => {
   const [userCircles, setUserCircles] = useState([]);
@@ -25,8 +25,8 @@ const HomeScreen = ({ navigation }) => {
   // 未読通知数を管理
   const [unreadCounts, setUnreadCounts] = useState({});
 
-  // 通知ナビゲーションフックを使用
-  useNotificationNavigation();
+  // 通知ナビゲーションフックを使用（削除：直接遷移に変更）
+  // useNotificationNavigation();
 
   // 未読通知数を取得する関数
   const fetchUnreadCounts = async (circleIds) => {
@@ -52,6 +52,28 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
+  // イベントベース更新のため、ポーリング管理は不要
+  
+  // リアルタイム未読数更新関数をグローバルに登録
+  React.useEffect(() => {
+    global.updateHomeUnreadCounts = (circleId, delta) => {
+      setUnreadCounts(prev => ({
+        ...prev,
+        [circleId]: Math.max(0, (prev[circleId] || 0) + delta)
+      }));
+    };
+    
+    // ブロック状態更新関数をグローバルに登録
+    global.updateHomeBlockStatus = (blockedIds) => {
+      setUserBlockedCircleIds(blockedIds);
+    };
+    
+    return () => {
+      delete global.updateHomeUnreadCounts;
+      delete global.updateHomeBlockStatus;
+    };
+  }, []);
+
   useFocusEffect(
     React.useCallback(() => {
       const fetchUserData = async () => {
@@ -69,7 +91,7 @@ const HomeScreen = ({ navigation }) => {
             setUserUniversity(userData.university || '');
           }
 
-          // ブロック状態の取得
+          // 初回ロード時のみブロック状態を取得
           let blockedIds = [];
           try {
             const blocksRef = collection(db, 'users', auth.currentUser.uid, 'blocks');
@@ -103,11 +125,8 @@ const HomeScreen = ({ navigation }) => {
           
           setUserCircles(userCirclesList);
           
-          // 所属しているサークルの未読通知数を取得
-          if (userCirclesList.length > 0) {
-            const circleIds = userCirclesList.map(circle => circle.id);
-            await fetchUnreadCounts(circleIds);
-          }
+          // イベントベース更新のため、フォーカス時の未読数取得は削除
+          // 通知受信・既読時にリアルタイム更新される
           
           // 大学別の人気サークルを取得
           if (userData && userData.university) {
@@ -136,6 +155,18 @@ const HomeScreen = ({ navigation }) => {
       fetchUserData();
     }, [])
   );
+
+  // 初回ロード時のみ未読通知数を取得
+  React.useEffect(() => {
+    const fetchInitialUnreadCounts = async () => {
+      if (userCircles.length > 0) {
+        const circleIds = userCircles.map(circle => circle.id);
+        await fetchUnreadCounts(circleIds);
+      }
+    };
+    
+    fetchInitialUnreadCounts();
+  }, [userCircles.length]); // userCirclesが設定された時のみ実行
 
   // 記事データを取得する共通関数
   const fetchArticlesData = async () => {
@@ -202,41 +233,8 @@ const HomeScreen = ({ navigation }) => {
     }
   }, [articlesInitialized]);
 
-  // 画面がフォーカスされたときにブロック状態を再取得
-  useFocusEffect(
-    React.useCallback(() => {
-      if (auth.currentUser) {
-        const fetchBlockedCircles = async () => {
-          try {
-            const blocksRef = collection(db, 'users', auth.currentUser.uid, 'blocks');
-            const blocksSnapshot = await getDocs(blocksRef);
-            const blockedIds = blocksSnapshot.docs.map(doc => doc.id);
-            setUserBlockedCircleIds(blockedIds);
-            
-            // ブロック状態が変更された場合、人気サークルと新着サークルを再フィルタリング
-            if (userUniversity && popularCircles.length > 0) {
-              const universityPopularCircles = await fetchPopularCirclesByUniversity(userUniversity);
-              const filteredPopularCircles = universityPopularCircles.filter(circle => 
-                !blockedIds.includes(circle.id)
-              );
-              setPopularCircles(filteredPopularCircles);
-            }
-            
-            if (newCircles.length > 0) {
-              const newCirclesList = await fetchNewCircles();
-              const filteredNewCircles = newCirclesList.filter(circle => 
-                !blockedIds.includes(circle.id)
-              );
-              setNewCircles(filteredNewCircles);
-            }
-          } catch (error) {
-            console.error('Error fetching blocked circles on focus:', error);
-          }
-        };
-        fetchBlockedCircles();
-      }
-    }, [auth.currentUser, userUniversity, popularCircles.length, newCircles.length])
-  );
+  // イベントベース更新のため、フォーカス時のブロック状態取得は削除
+  // ブロック操作時にリアルタイム更新される
 
   // 大学別の人気サークルを取得する関数
   const fetchPopularCirclesByUniversity = async (university) => {

@@ -38,6 +38,35 @@ export default function CircleProfileScreen({ route, navigation }) {
   // アクションメニュー用の状態
   const [actionMenuVisible, setActionMenuVisible] = useState(false);
   const [userBlockedCircleIds, setUserBlockedCircleIds] = useState([]);
+  
+  // ブロック状態更新関数をグローバルに登録
+  React.useEffect(() => {
+    global.updateCircleProfileBlockStatus = (blockedIds) => {
+      setUserBlockedCircleIds(blockedIds);
+    };
+    
+    return () => {
+      delete global.updateCircleProfileBlockStatus;
+    };
+  }, []);
+  
+  // 初回ロード時にブロック状態を取得
+  useEffect(() => {
+    const fetchUserBlocks = async () => {
+      if (user) {
+        try {
+          const blocksRef = collection(db, 'users', user.uid, 'blocks');
+          const blocksSnapshot = await getDocs(blocksRef);
+          const blockedIds = blocksSnapshot.docs.map(doc => doc.id);
+          setUserBlockedCircleIds(blockedIds);
+        } catch (error) {
+          console.error('Error fetching user blocks:', error);
+          setUserBlockedCircleIds([]);
+        }
+      }
+    };
+    fetchUserBlocks();
+  }, [user]);
   const [selectedCircle, setSelectedCircle] = useState(null);
 
   useEffect(() => {
@@ -88,7 +117,22 @@ export default function CircleProfileScreen({ route, navigation }) {
     fetchLeaderProfileImage();
   }, [circleData]);
 
-  // メンバーデータを取得
+  // メンバー数更新関数をグローバルに登録
+  React.useEffect(() => {
+    global.updateCircleProfileMemberCount = (targetCircleId, count) => {
+      if (targetCircleId === circleId) {
+        // メンバー数が変更された場合、現在のメンバーリストの長さと比較
+        // 実際のリストは別途更新されるため、ここでは通知のみ
+        console.log(`メンバー数が更新されました: ${count}`);
+      }
+    };
+    
+    return () => {
+      delete global.updateCircleProfileMemberCount;
+    };
+  }, [circleId]);
+
+  // 初回ロード時にメンバーデータを取得
   useEffect(() => {
     if (!circleId) return;
 
@@ -124,6 +168,9 @@ export default function CircleProfileScreen({ route, navigation }) {
         console.log('取得したメンバーデータ:', membersData);
         setMembers(membersData);
         
+        // グローバルメンバー数を更新
+        global.updateMemberCount(circleId, membersData.length);
+        
         // テスト用のダミーデータ（メンバーが0人の場合）
         if (membersData.length === 0) {
           console.log('メンバーが0人のため、ダミーデータを設定');
@@ -135,6 +182,8 @@ export default function CircleProfileScreen({ route, navigation }) {
             { id: '5', gender: '女性', university: '慶應義塾大学' },
           ];
           setMembers(dummyMembers);
+          // ダミーデータの場合もグローバル更新
+          global.updateMemberCount(circleId, dummyMembers.length);
         }
       } catch (error) {
         console.error('Error fetching members:', error);
@@ -248,6 +297,10 @@ export default function CircleProfileScreen({ route, navigation }) {
       });
       setHasRequested(true);
       Alert.alert('申請完了', '入会申請を送信しました。');
+
+      // グローバル入会申請数を更新（+1）
+      const currentCount = global.globalJoinRequestsCount?.[circleId] || 0;
+      global.updateJoinRequestsCount(circleId, currentCount + 1);
 
       // サークル代表者・管理者へプッシュ通知を送信
       await sendJoinRequestNotification(userData.name || '不明');
@@ -364,12 +417,20 @@ export default function CircleProfileScreen({ route, navigation }) {
 
       await setDoc(doc(db, 'users', user.uid, 'blocks', circleId), blockData);
       
+      // ブロック操作時にリアルタイム更新
+      if (global.updateBlockStatus) {
+        global.updateBlockStatus(circleId, true);
+      }
+      
       // いいね！している場合は削除
       if (isFavorite) {
         const userDocRef = doc(db, 'users', user.uid);
         const circleDocRef = doc(db, 'circles', circleId);
         await updateDoc(userDocRef, { favoriteCircleIds: arrayRemove(circleId) });
         await updateDoc(circleDocRef, { likes: increment(-1) });
+        
+        // グローバルお気に入り状態を更新
+        global.updateFavoriteStatus(circleId, false);
       }
       
       // ローカル状態を更新
@@ -405,9 +466,15 @@ export default function CircleProfileScreen({ route, navigation }) {
       if (isFavorite) {
         await updateDoc(userDocRef, { favoriteCircleIds: arrayRemove(circleId) });
         await updateDoc(circleDocRef, { likes: increment(-1) });
+        
+        // グローバルお気に入り状態を更新
+        global.updateFavoriteStatus(circleId, false);
       } else {
         await updateDoc(userDocRef, { favoriteCircleIds: arrayUnion(circleId) });
         await updateDoc(circleDocRef, { likes: increment(1) });
+        
+        // グローバルお気に入り状態を更新
+        global.updateFavoriteStatus(circleId, true);
       }
     } catch (error) {
       console.error("Error toggling favorite: ", error);

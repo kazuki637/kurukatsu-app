@@ -33,7 +33,22 @@ export default function CircleContactScreen({ route, navigation }) {
     return selectedUids.length === 1 && selectedUids.includes(currentUser.uid);
   };
 
-  // メンバー一覧取得
+  // メンバー数更新関数をグローバルに登録
+  React.useEffect(() => {
+    global.updateCircleContactMemberCount = (targetCircleId, count) => {
+      if (targetCircleId === circleId) {
+        // メンバー数が変更された場合、現在のメンバーリストの長さと比較
+        // 実際のリストは別途更新されるため、ここでは通知のみ
+        console.log(`メンバー数が更新されました: ${count}`);
+      }
+    };
+    
+    return () => {
+      delete global.updateCircleContactMemberCount;
+    };
+  }, [circleId]);
+
+  // 初回ロード時にメンバー一覧取得
   useEffect(() => {
     const fetchMembers = async () => {
       setLoading(true);
@@ -65,6 +80,9 @@ export default function CircleContactScreen({ route, navigation }) {
           }
         }
         setMembers(memberProfiles);
+        
+        // グローバルメンバー数を更新
+        global.updateMemberCount(circleId, memberProfiles.length);
         
         // 自分自身を強制選択
         setSelectedUids([currentUser.uid]);
