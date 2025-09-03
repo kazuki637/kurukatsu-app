@@ -677,9 +677,10 @@ export default function ProfileEditScreen(props) {
               )}
             </View>
             
-            {/* 学生証認証 */}
+            {/* 学生証認証 - 一時的に非表示 */}
+            {/* 
             <View style={styles.formGroup}>
-                             <Text style={styles.label}>学生証認証<Text style={styles.optional}>(スキップ可)</Text></Text>
+              <Text style={styles.label}>学生証認証<Text style={styles.optional}>(スキップ可)</Text></Text>
               <View style={styles.studentIdContainer}>
                 {studentIdUrl ? (
                   <View style={styles.verifiedContainer}>
@@ -742,6 +743,7 @@ export default function ProfileEditScreen(props) {
                 )}
               </View>
             </View>
+            */}
                       <TouchableOpacity 
                         style={styles.saveButton} 
                         onPress={handleSave} 
