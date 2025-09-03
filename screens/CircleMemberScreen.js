@@ -548,30 +548,20 @@ export default function CircleMemberScreen({ route, navigation }) {
       try {
         const membersRef = collection(db, 'circles', circleId, 'members');
         const membersSnap = await getDocs(membersRef);
-        const memberIds = membersSnap.docs.map(doc => doc.id);
-        const membersList = [];
-        for (const memberId of memberIds) {
-          try {
-            const userDoc = await getDoc(doc(db, 'users', memberId));
-            const memberDoc = await getDoc(doc(db, 'circles', circleId, 'members', memberId));
-            if (userDoc.exists()) {
-              const userData = userDoc.data();
-              const memberData = memberDoc.data();
-              membersList.push({
-                id: memberId,
-                name: userData.name || '氏名未設定',
-                university: userData.university || '',
-                grade: userData.grade || '',
-                email: userData.email || '',
-                profileImageUrl: userData.profileImageUrl || null,
-                role: memberData.role || 'member',
-                joinedAt: memberData.joinedAt
-              });
-            }
-          } catch (error) {
-            console.error('Error fetching user data:', error);
-          }
-        }
+        
+        const membersList = membersSnap.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: data.name || '氏名未設定',
+            university: data.university || '',
+            grade: data.grade || '',
+            email: data.email || '',
+            profileImageUrl: data.profileImageUrl || null,
+            role: data.role || 'member',
+            joinedAt: data.joinedAt
+          };
+        });
         setMembers(membersList);
         
         // グローバルメンバー数を更新

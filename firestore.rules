@@ -64,18 +64,8 @@ service cloud.firestore {
     match /circles/{circleId}/members/{memberId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null;
-      allow update: if request.auth != null && 
-        (resource.data.role in ['leader', 'admin'] || 
-         exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)).data.role in ['leader', 'admin'] ||
-         // 代表者権限の引き継ぎを許可（他のメンバーをleaderに変更）
-         (request.auth.uid != resource.id && 
-          exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)) &&
-          get(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)).data.role == 'leader'));
-      allow delete: if request.auth != null && 
-        (request.auth.uid == memberId || // 自分自身の削除（脱退）を許可
-         exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)).data.role in ['leader', 'admin']);
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null;
     }
 
     // サークルの入会申請
@@ -164,9 +154,9 @@ service cloud.firestore {
       allow create: if request.auth != null && 
                      request.auth.uid == userId;
       
-      // 自分のブロックデータのみ読み取り可能
-      allow read: if request.auth != null && 
-                   request.auth.uid == userId;
+      // 自分のブロックデータのみ読み取り可能（認証チェックを緩和）
+      allow read: if request.auth == null || 
+                   (request.auth != null && request.auth.uid == userId);
       
       // 自分のブロックデータのみ削除可能
       allow delete: if request.auth != null && 

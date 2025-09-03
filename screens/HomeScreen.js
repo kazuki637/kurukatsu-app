@@ -33,7 +33,11 @@ const HomeScreen = ({ navigation }) => {
   
   // ブロック状態をスナップショットリスナーで監視
   useEffect(() => {
-    if (!auth.currentUser?.uid) return;
+    if (!auth.currentUser?.uid) {
+      // ログアウト時はブロック状態をリセット
+      setUserBlockedCircleIds([]);
+      return;
+    }
     
     const unsubscribe = onSnapshot(
       collection(db, 'users', auth.currentUser.uid, 'blocks'),

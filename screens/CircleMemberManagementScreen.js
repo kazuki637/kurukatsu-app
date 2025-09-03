@@ -262,8 +262,11 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
         role: 'member',
         assignedAt: new Date(),
         assignedBy: user.uid,
-        gender: userData.gender || null,
-        university: userData.university || null
+        gender: userData.gender || '',
+        university: userData.university || '',
+        name: userData.name || '氏名未設定',
+        grade: userData.grade || '',
+        profileImageUrl: userData.profileImageUrl || null
       });
       
       // ユーザーのjoinedCircleIdsにサークルIDを追加
