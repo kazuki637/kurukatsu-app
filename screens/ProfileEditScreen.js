@@ -445,6 +445,10 @@ export default function ProfileEditScreen(props) {
         }, 100);
       } else {
         // 通常の編集の場合は即座に戻る
+        // プロフィール更新完了をイベントで通知
+        if (global.onProfileUpdated) {
+          global.onProfileUpdated();
+        }
         navigation.goBack();
       }
     } catch (error) {

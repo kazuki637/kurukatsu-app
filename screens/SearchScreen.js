@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { db } from '../firebaseConfig';
@@ -17,35 +17,67 @@ const SearchScreen = ({ navigation }) => {
   const [selectedCircleType, setSelectedCircleType] = useState(''); // サークル種別を追加
   
   const [allCircles, setAllCircles] = useState([]);
-  const [filteredCircles, setFilteredCircles] = useState([]);
   const [initialLoading, setInitialLoading] = useState(true);
 
-  // 1. Fetch all circles when screen comes into focus
-  useFocusEffect(
-    React.useCallback(() => {
-      const fetchAllCircles = async () => {
-        try {
-          const circlesCollectionRef = collection(db, 'circles');
-          const querySnapshot = await getDocs(circlesCollectionRef);
-          const circles = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          setAllCircles(circles);
-          setFilteredCircles(circles); // Initially, all circles are shown
-        } catch (error) {
-          console.error("Error fetching all circles: ", error);
-          alert('サークル情報の取得に失敗しました。');
-        } finally {
-          setInitialLoading(false);
-        }
-      };
-      fetchAllCircles();
-    }, [])
-  );
-
-  // 2. Re-filter circles whenever a filter changes
+  // グローバルキャッシュの初期化とキャッシュ無効化関数の登録
   useEffect(() => {
-    if (initialLoading) return; // Don't filter until initial data is loaded
+    if (!global.circlesCache) {
+      global.circlesCache = {
+        data: null,
+        timestamp: null,
+        maxAge: 5 * 60 * 1000 // 5分
+      };
+    }
 
-    const filtered = allCircles.filter(circle => {
+    // キャッシュ無効化関数をグローバルに登録
+    global.invalidateCirclesCache = () => {
+      global.circlesCache.data = null;
+      global.circlesCache.timestamp = null;
+    };
+
+    return () => {
+      delete global.invalidateCirclesCache;
+    };
+  }, []);
+
+  // 初回ロード時のみデータ取得（キャッシュ機能付き）
+  useEffect(() => {
+    const fetchAllCircles = async () => {
+      try {
+        // キャッシュチェック
+        const now = Date.now();
+        if (global.circlesCache.data && 
+            global.circlesCache.timestamp && 
+            (now - global.circlesCache.timestamp) < global.circlesCache.maxAge) {
+          setAllCircles(global.circlesCache.data);
+          setInitialLoading(false);
+          return;
+        }
+        const circlesCollectionRef = collection(db, 'circles');
+        const querySnapshot = await getDocs(circlesCollectionRef);
+        const circles = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // キャッシュに保存
+        global.circlesCache.data = circles;
+        global.circlesCache.timestamp = now;
+        
+        setAllCircles(circles);
+      } catch (error) {
+        console.error("Error fetching all circles: ", error);
+        alert('サークル情報の取得に失敗しました。');
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+    
+    fetchAllCircles();
+  }, []);
+
+  // フィルタリングをuseMemoで最適化
+  const filteredCircles = useMemo(() => {
+    if (initialLoading || allCircles.length === 0) return [];
+
+    return allCircles.filter(circle => {
       const searchTextLower = searchText.toLowerCase();
       const matchesSearchText = searchText 
         ? (circle.name?.toLowerCase().includes(searchTextLower) || 
@@ -88,10 +120,33 @@ const SearchScreen = ({ navigation }) => {
 
       return matchesSearchText && matchesUniversity && matchesGenre && matchesFeatures && matchesFrequency && matchesMembers && matchesGenderRatio && matchesActivityDays && matchesCircleType;
     });
-
-    setFilteredCircles(filtered);
-
   }, [searchText, selectedUniversities, selectedGenres, selectedFeatures, selectedFrequency, selectedMembers, selectedGenderRatio, selectedActivityDays, selectedCircleType, allCircles, initialLoading]);
+
+  // フォーカス時にキャッシュをチェックして必要に応じて更新
+  useFocusEffect(
+    useCallback(() => {
+      // キャッシュが無効化されている場合は最新データを取得
+      if (!global.circlesCache.data) {
+        const fetchAllCircles = async () => {
+          try {
+            const circlesCollectionRef = collection(db, 'circles');
+            const querySnapshot = await getDocs(circlesCollectionRef);
+            const circles = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            
+            // キャッシュを更新
+            global.circlesCache.data = circles;
+            global.circlesCache.timestamp = Date.now();
+            
+            setAllCircles(circles);
+          } catch (error) {
+            console.error("Error fetching circles on focus: ", error);
+          }
+        };
+        
+        fetchAllCircles();
+      }
+    }, [])
+  );
 
 
   const updateFilter = (filterType, value) => {
@@ -122,59 +177,26 @@ const SearchScreen = ({ navigation }) => {
 
   const handleSearch = async () => {
     try {
-      // 検索時に最新のサークルデータを取得
-      const circlesCollectionRef = collection(db, 'circles');
-      const querySnapshot = await getDocs(circlesCollectionRef);
-      const latestCircles = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // キャッシュが有効な場合はそれを使用、そうでなければ最新データを取得
+      const now = Date.now();
+      let circlesToUse = allCircles;
       
-      // 最新データでフィルタリングを再実行
-      const latestFiltered = latestCircles.filter(circle => {
-        const searchTextLower = searchText.toLowerCase();
-        const matchesSearchText = searchText 
-          ? (circle.name?.toLowerCase().includes(searchTextLower) || 
-             circle.description?.toLowerCase().includes(searchTextLower) ||
-             circle.activityLocation?.toLowerCase().includes(searchTextLower) ||
-             circle.universityName?.toLowerCase().includes(searchTextLower)) 
-          : true;
-
-        const matchesUniversity = selectedUniversities.length > 0 
-          ? selectedUniversities.includes(circle.universityName) 
-          : true;
-
-        const matchesGenre = selectedGenres.length > 0 
-          ? selectedGenres.includes(circle.genre) 
-          : true;
-
-        const matchesFeatures = selectedFeatures.length > 0 
-          ? selectedFeatures.some(feature => circle.features?.includes(feature)) 
-          : true;
-          
-        const matchesFrequency = selectedFrequency.length > 0 
-          ? selectedFrequency.includes(circle.frequency) 
-          : true;
-
-        const matchesMembers = selectedMembers.length > 0 
-          ? selectedMembers.includes(circle.members) 
-          : true;
-
-        const matchesGenderRatio = selectedGenderRatio.length > 0 
-          ? selectedGenderRatio.includes(circle.genderratio) 
-          : true;
-
-        const matchesActivityDays = selectedActivityDays.length > 0 
-          ? selectedActivityDays.some(day => circle.activityDays?.includes(day)) 
-          : true;
-
-        const matchesCircleType = selectedCircleType 
-          ? circle.circleType === selectedCircleType 
-          : true;
-
-        return matchesSearchText && matchesUniversity && matchesGenre && matchesFeatures && matchesFrequency && matchesMembers && matchesGenderRatio && matchesActivityDays && matchesCircleType;
-      });
+      if (!global.circlesCache.data || 
+          !global.circlesCache.timestamp || 
+          (now - global.circlesCache.timestamp) >= global.circlesCache.maxAge) {
+        const circlesCollectionRef = collection(db, 'circles');
+        const querySnapshot = await getDocs(circlesCollectionRef);
+        circlesToUse = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // キャッシュを更新
+        global.circlesCache.data = circlesToUse;
+        global.circlesCache.timestamp = now;
+      }
       
-      navigation.navigate('SearchResults', { circles: latestFiltered });
+      // 現在のフィルタリング結果を使用（既に最適化済み）
+      navigation.navigate('SearchResults', { circles: filteredCircles });
     } catch (error) {
-      console.error("Error fetching latest circles: ", error);
+      console.error("Error in handleSearch: ", error);
       // エラーが発生した場合は、現在のフィルタリング結果を使用
       navigation.navigate('SearchResults', { circles: filteredCircles });
     }

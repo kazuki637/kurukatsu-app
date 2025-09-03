@@ -3,13 +3,13 @@ import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Ima
 import CommonHeader from '../components/CommonHeader';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db, storage } from '../firebaseConfig';
-import { collection, query, where, getDocs, getDoc, doc, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, getDoc, doc, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { ref, getDownloadURL } from 'firebase/storage';
-import { useFocusEffect } from '@react-navigation/native';
+
 // import { useNotificationNavigation } from '../hooks/useNotificationNavigation';
 
 const HomeScreen = ({ navigation }) => {
-  const [userCircles, setUserCircles] = useState([]);
+
   const [loading, setLoading] = useState(true);
   const [userUniversity, setUserUniversity] = useState('');
   const [popularCircles, setPopularCircles] = useState([]);
@@ -22,151 +22,96 @@ const HomeScreen = ({ navigation }) => {
   
   // ブロック機能の状態管理
   const [userBlockedCircleIds, setUserBlockedCircleIds] = useState([]);
-  // 未読通知数を管理
-  const [unreadCounts, setUnreadCounts] = useState({});
+
 
   // 通知ナビゲーションフックを使用（削除：直接遷移に変更）
   // useNotificationNavigation();
 
-  // 未読通知数を取得する関数
-  const fetchUnreadCounts = async (circleIds) => {
-    if (!circleIds || circleIds.length === 0) return;
-    
-    try {
-      const unreadCountsData = {};
-      const q = query(
-        collection(db, 'users', auth.currentUser.uid, 'circleMessages'),
-        where('circleId', 'in', circleIds),
-        where('readAt', '==', null)
-      );
-      const snapshot = await getDocs(q);
-      
-      // サークルIDごとに未読数を集計
-      snapshot.docs.forEach(doc => {
-        const circleId = doc.data().circleId;
-        unreadCountsData[circleId] = (unreadCountsData[circleId] || 0) + 1;
-      });
-      setUnreadCounts(unreadCountsData);
-    } catch (error) {
-      console.error('Error fetching unread counts:', error);
-    }
-  };
 
-  // イベントベース更新のため、ポーリング管理は不要
+
+
   
-  // リアルタイム未読数更新関数をグローバルに登録
-  React.useEffect(() => {
-    global.updateHomeUnreadCounts = (circleId, delta) => {
-      setUnreadCounts(prev => ({
-        ...prev,
-        [circleId]: Math.max(0, (prev[circleId] || 0) + delta)
-      }));
-    };
+  // ブロック状態をスナップショットリスナーで監視
+  useEffect(() => {
+    if (!auth.currentUser?.uid) return;
     
-    // ブロック状態更新関数をグローバルに登録
-    global.updateHomeBlockStatus = (blockedIds) => {
-      setUserBlockedCircleIds(blockedIds);
-    };
+    const unsubscribe = onSnapshot(
+      collection(db, 'users', auth.currentUser.uid, 'blocks'),
+      (snapshot) => {
+        const blockedIds = snapshot.docs.map(doc => doc.id);
+        setUserBlockedCircleIds(blockedIds);
+      },
+      (error) => {
+        console.error('Error listening to blocks:', error);
+        setUserBlockedCircleIds([]);
+      }
+    );
     
-    return () => {
-      delete global.updateHomeUnreadCounts;
-      delete global.updateHomeBlockStatus;
-    };
-  }, []);
+    return unsubscribe;
+  }, [auth.currentUser?.uid]);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      const fetchUserData = async () => {
-        if (!auth.currentUser) {
-          setLoading(false);
-          return;
+  // 初回ロード時のみデータ取得
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!auth.currentUser) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        // ユーザーの大学情報を取得
+        const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        let userData = null;
+        if (userDoc.exists()) {
+          userData = userDoc.data();
+          setUserUniversity(userData.university || '');
         }
 
+        // 初回ロード時のみブロック状態を取得
+        let blockedIds = [];
         try {
-          // ユーザーの大学情報を取得
-          const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
-          let userData = null;
-          if (userDoc.exists()) {
-            userData = userDoc.data();
-            setUserUniversity(userData.university || '');
-          }
+          const blocksRef = collection(db, 'users', auth.currentUser.uid, 'blocks');
+          const blocksSnapshot = await getDocs(blocksRef);
+          blockedIds = blocksSnapshot.docs.map(doc => doc.id);
+          setUserBlockedCircleIds(blockedIds);
+        } catch (error) {
+          console.error('Error fetching user blocks:', error);
+          setUserBlockedCircleIds([]);
+        }
 
-          // 初回ロード時のみブロック状態を取得
-          let blockedIds = [];
-          try {
-            const blocksRef = collection(db, 'users', auth.currentUser.uid, 'blocks');
-            const blocksSnapshot = await getDocs(blocksRef);
-            blockedIds = blocksSnapshot.docs.map(doc => doc.id);
-            setUserBlockedCircleIds(blockedIds);
-          } catch (error) {
-            console.error('Error fetching user blocks:', error);
-            setUserBlockedCircleIds([]);
-          }
-
-          // すべてのサークルを取得
-          const circlesCollectionRef = collection(db, 'circles');
-          const querySnapshot = await getDocs(circlesCollectionRef);
-          const circles = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          
-          // ユーザーが所属しているサークルをフィルタリング
-          const userCirclesList = [];
-          for (const circle of circles) {
-            try {
-              // 各サークルのmembersサブコレクションをチェック
-              const membersRef = collection(db, 'circles', circle.id, 'members');
-              const memberDoc = await getDoc(doc(db, 'circles', circle.id, 'members', auth.currentUser.uid));
-              if (memberDoc.exists()) {
-                userCirclesList.push(circle);
-              }
-            } catch (error) {
-              console.error(`Error checking membership for circle ${circle.id}:`, error);
-            }
-          }
-          
-          setUserCircles(userCirclesList);
-          
-          // イベントベース更新のため、フォーカス時の未読数取得は削除
-          // 通知受信・既読時にリアルタイム更新される
-          
-          // 大学別の人気サークルを取得
-          if (userData && userData.university) {
-            const universityPopularCircles = await fetchPopularCirclesByUniversity(userData.university);
-            // ブロックしたサークルを除外（ローカル変数を使用）
-            const filteredPopularCircles = universityPopularCircles.filter(circle => 
-              !blockedIds.includes(circle.id)
-            );
-            setPopularCircles(filteredPopularCircles);
-          }
-
-          // 新着のサークルを取得
-          const newCirclesList = await fetchNewCircles();
+        // すべてのサークルを取得
+        const circlesCollectionRef = collection(db, 'circles');
+        const querySnapshot = await getDocs(circlesCollectionRef);
+        const circles = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        // 大学別の人気サークルを取得
+        if (userData && userData.university) {
+          const universityPopularCircles = await fetchPopularCirclesByUniversity(userData.university);
           // ブロックしたサークルを除外（ローカル変数を使用）
-          const filteredNewCircles = newCirclesList.filter(circle => 
+          const filteredPopularCircles = universityPopularCircles.filter(circle => 
             !blockedIds.includes(circle.id)
           );
-          setNewCircles(filteredNewCircles);
-        } catch (error) {
-          console.error("Error fetching user data: ", error);
-        } finally {
-          setLoading(false);
+          setPopularCircles(filteredPopularCircles);
         }
-      };
 
-      fetchUserData();
-    }, [])
-  );
-
-  // 初回ロード時のみ未読通知数を取得
-  React.useEffect(() => {
-    const fetchInitialUnreadCounts = async () => {
-      if (userCircles.length > 0) {
-        const circleIds = userCircles.map(circle => circle.id);
-        await fetchUnreadCounts(circleIds);
+        // 新着のサークルを取得
+        const newCirclesList = await fetchNewCircles();
+        // ブロックしたサークルを除外（ローカル変数を使用）
+        const filteredNewCircles = newCirclesList.filter(circle => 
+          !blockedIds.includes(circle.id)
+        );
+        setNewCircles(filteredNewCircles);
+      } catch (error) {
+        console.error("Error fetching user data: ", error);
+      } finally {
+        setLoading(false);
       }
     };
-    
-    fetchInitialUnreadCounts();
-  }, [userCircles.length]); // userCirclesが設定された時のみ実行
+
+    fetchUserData();
+  }, []); // 初回マウント時のみ実行
+
+
 
   // 記事データを取得する共通関数
   const fetchArticlesData = async () => {
@@ -213,28 +158,16 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  // 記事データを取得（最適化版）
-  useFocusEffect(
-    React.useCallback(() => {
-      // 既に記事が読み込まれている場合は再読み込みしない
-      if (articlesInitialized && articles.length > 0) {
-        setArticlesLoading(false);
-        return;
-      }
-
-      fetchArticlesData();
-    }, [articlesInitialized, articles.length])
-  );
-
-  // 記事データの初期化（初回のみ）
+  // 記事データを初回ロード時のみ取得
   useEffect(() => {
-    if (!articlesInitialized) {
-      fetchArticlesData();
+    // 既に記事が読み込まれている場合は再読み込みしない
+    if (articlesInitialized && articles.length > 0) {
+      setArticlesLoading(false);
+      return;
     }
-  }, [articlesInitialized]);
 
-  // イベントベース更新のため、フォーカス時のブロック状態取得は削除
-  // ブロック操作時にリアルタイム更新される
+    fetchArticlesData();
+  }, []); // 初回マウント時のみ実行
 
   // 大学別の人気サークルを取得する関数
   const fetchPopularCirclesByUniversity = async (university) => {
@@ -378,56 +311,7 @@ const HomeScreen = ({ navigation }) => {
             )}
           </View>
 
-          {/* 所属しているサークル */}
-          <View style={styles.sectionContainer}>
-            <Text style={styles.sectionTitle}>所属しているサークル</Text>
-            <View style={styles.favoriteCirclesContainer}>
-              {loading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color="#999" />
-                </View>
-              ) : userCircles.length > 0 ? (
-                userCircles.map((circle, index) => (
-                  <TouchableOpacity 
-                    key={circle.id} 
-                    style={styles.circleCardContainer}
-                    onPress={() => navigation.navigate('CircleMember', { circleId: circle.id })}
-                  >
-                    <View style={styles.circleCard}>
-                      {circle.imageUrl ? (
-                        <Image source={{ uri: circle.imageUrl }} style={styles.circleImage} />
-                      ) : (
-                        <View style={[styles.circleImage, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
-                          <Ionicons name="people-outline" size={40} color="#aaa" />
-                        </View>
-                      )}
-                      <View style={styles.circleInfo}>
-                        <Text style={styles.circleCategory}>サークル | {circle.genre || 'その他'}</Text>
-                        <Text style={styles.circleName}>{circle.name}</Text>
-                        <Text style={styles.circleEvent}>{circle.universityName || '大学名未設定'}</Text>
-                      </View>
-                      
-                      {/* 未読通知バッジ */}
-                      {unreadCounts[circle.id] > 0 && (
-                        <View style={styles.unreadBadge}>
-                          <Text style={styles.unreadBadgeText}>{unreadCounts[circle.id]}</Text>
-                        </View>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                ))
-              ) : (
-                <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>所属しているサークルはありません</Text>
-                  <Text style={styles.emptySubText}>サークルに参加して活動を始めましょう</Text>
-                  <Image 
-                    source={require('../assets/pictures/1.png')} 
-                    style={styles.emptyImage}
-                  />
-                </View>
-              )}
-            </View>
-          </View>
+
 
           {/* 人気のサークル */}
           {popularCircles.length > 0 && (
@@ -442,7 +326,7 @@ const HomeScreen = ({ navigation }) => {
                 style={styles.popularCirclesScrollView}
               >
                 {popularCircles
-                  .filter(circle => circle.headerImageUrl) // ヘッダー画像があるサークルのみ表示
+                  .filter(circle => circle.headerImageUrl && !userBlockedCircleIds.includes(circle.id)) // ヘッダー画像があるサークルかつブロックしていないサークルのみ表示
                   .map((circle, index) => (
                   <TouchableOpacity 
                     key={circle.id} 
@@ -502,7 +386,7 @@ const HomeScreen = ({ navigation }) => {
                 style={styles.popularCirclesScrollView}
               >
                 {newCircles
-                  .filter(circle => circle.headerImageUrl) // ヘッダー画像があるサークルのみ表示
+                  .filter(circle => circle.headerImageUrl && !userBlockedCircleIds.includes(circle.id)) // ヘッダー画像があるサークルかつブロックしていないサークルのみ表示
                   .map((circle, index) => (
                   <TouchableOpacity 
                     key={circle.id} 

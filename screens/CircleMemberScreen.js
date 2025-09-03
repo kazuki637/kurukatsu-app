@@ -841,10 +841,11 @@ export default function CircleMemberScreen({ route, navigation }) {
       // サークルメンバーから削除
       await deleteDoc(doc(db, 'circles', circleId, 'members', user.uid));
       
-      // ユーザーのjoinedCircleIdsからサークルIDを削除
+      // ユーザーのjoinedCircleIdsとadminCircleIdsからサークルIDを削除
       const userDocRef = doc(db, 'users', user.uid);
       await updateDoc(userDocRef, {
-        joinedCircleIds: arrayRemove(circleId)
+        joinedCircleIds: arrayRemove(circleId),
+        adminCircleIds: arrayRemove(circleId) // 管理者/代表者の場合も削除
       });
       
       setLeaveModalVisible(false);

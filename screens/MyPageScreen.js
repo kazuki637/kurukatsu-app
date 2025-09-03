@@ -38,12 +38,14 @@ export default function MyPageScreen({ navigation, route }) {
   const { data: userProfile, loading, error, reload } = useFirestoreDoc(db, userId ? `users/${userId}` : '', { cacheDuration: 5000 });
   
   // プロフィール編集画面から渡された更新データを処理（削除）
-  const [savedCircles, setSavedCircles] = useState([]);
+
   const [joinedCircles, setJoinedCircles] = useState([]);
-  const [circlesLoading, setCirclesLoading] = useState(true);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [imageError, setImageError] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState({}); // 未読通知数を管理
+  
+  // 統合ローディング状態：初回ロード時は全てのデータが揃うまでローディング表示
+  const [isDataReady, setIsDataReady] = useState(false);
   
   // リアルタイム未読数更新関数をグローバルに登録
   React.useEffect(() => {
@@ -54,48 +56,24 @@ export default function MyPageScreen({ navigation, route }) {
       }));
     };
 
-    // お気に入り状態更新関数をグローバルに登録
-    global.updateMyPageFavoriteStatus = (favoriteCircleIds) => {
-      // お気に入りサークル一覧を更新
-      if (favoriteCircleIds.length > 0) {
-        const fetchFavoriteCircles = async () => {
-          try {
-            const circlesRef = collection(db, 'circles');
-            const q = query(circlesRef, where('__name__', 'in', favoriteCircleIds));
-            const savedSnapshot = await getDocs(q);
-            const saved = savedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setSavedCircles(saved);
-          } catch (error) {
-            console.error('Error fetching favorite circles:', error);
-          }
-        };
-        fetchFavoriteCircles();
-      } else {
-        setSavedCircles([]);
-      }
-    };
+
     
     return () => {
       delete global.updateMyPageUnreadCounts;
-      delete global.updateMyPageFavoriteStatus;
     };
   }, []);
   
-  // 画面がフォーカスされたときにデータをリロード
-  useFocusEffect(
-    React.useCallback(() => {
+  // プロフィール編集完了時のイベントベース更新
+  React.useEffect(() => {
+    global.onProfileUpdated = () => {
       setImageError(false); // 画像エラー状態をリセット
-      
-      // イベントベース更新のため、フォーカス時のクエリは削除
-      // 通知受信・既読時にリアルタイム更新される
-      
-      // プロフィール編集画面から戻ってきた場合のみデータをリロード
-      // 初回ロード時はリロードしない
-      if (!isInitialLoad && userProfile) {
-        reload();
-      }
-    }, [reload, isInitialLoad, userProfile, userId])
-  );
+      reload(); // プロフィール情報をリロード
+    };
+    
+    return () => {
+      delete global.onProfileUpdated;
+    };
+  }, [reload]);
 
 
 
@@ -103,11 +81,6 @@ export default function MyPageScreen({ navigation, route }) {
   React.useEffect(() => {
     const fetchCirclesAndUnreadCounts = async () => {
       if (!userProfile) return;
-      
-      // 初回ロード時のみローディング状態を表示
-      if (isInitialLoad) {
-        setCirclesLoading(true);
-      }
       
       try {
         // 並列でサークル情報と未読通知数を取得
@@ -134,17 +107,10 @@ export default function MyPageScreen({ navigation, route }) {
           promises.push(Promise.resolve({ docs: [] }));
         }
         
-        // savedCircles取得のPromise
-        if (userProfile.favoriteCircleIds && userProfile.favoriteCircleIds.length > 0) {
-          const circlesRef = collection(db, 'circles');
-          const q = query(circlesRef, where('__name__', 'in', userProfile.favoriteCircleIds));
-          promises.push(getDocs(q));
-        } else {
-          promises.push(Promise.resolve({ docs: [] }));
-        }
+
         
         // 並列実行
-        const [circlesSnapshot, unreadSnapshot, savedSnapshot] = await Promise.all(promises);
+        const [circlesSnapshot, unreadSnapshot] = await Promise.all(promises);
         
         // joinedCircles処理
         const joined = circlesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -160,14 +126,11 @@ export default function MyPageScreen({ navigation, route }) {
           setUnreadCounts(unreadCountsData);
         }
         
-        // savedCircles処理
-        const saved = savedSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setSavedCircles(saved);
-        
-        // グローバルお気に入り状態を更新
-        global.updateFavoriteStatus = global.updateFavoriteStatus || (() => {});
-        if (userProfile.favoriteCircleIds) {
-          globalFavoriteCircleIds = [...userProfile.favoriteCircleIds];
+
+
+        // 初回ロード時は全てのデータが揃ったことを示す
+        if (isInitialLoad) {
+          setIsDataReady(true);
         }
 
       } catch (e) {
@@ -175,29 +138,40 @@ export default function MyPageScreen({ navigation, route }) {
         setJoinedCircles([]);
         setSavedCircles([]);
         setUnreadCounts({});
-      } finally {
-        setCirclesLoading(false);
+        
+        // エラー時もデータ準備完了として扱う
+        if (isInitialLoad) {
+          setIsDataReady(true);
+        }
       }
     };
     
     // userProfileが存在し、必要なIDが変更された場合のみ実行
-    if (userProfile && (
-      userProfile.joinedCircleIds !== undefined || 
-      userProfile.favoriteCircleIds !== undefined
-    )) {
+    if (userProfile && userProfile.joinedCircleIds !== undefined) {
       fetchCirclesAndUnreadCounts();
+    } else if (userProfile && isInitialLoad) {
+      // userProfileは存在するが、joinedCircleIdsが未定義の場合
+      // 初回ロード時はデータ準備完了として扱う
+      setIsDataReady(true);
+    } else if (!userProfile && !loading && isInitialLoad) {
+      // userProfileが存在せず、ローディングも完了している場合
+      // 初回ロード時はデータ準備完了として扱う
+      setIsDataReady(true);
     }
-  }, [userProfile?.joinedCircleIds?.length, userProfile?.favoriteCircleIds?.length]);
+  }, [userProfile?.joinedCircleIds?.length, isInitialLoad, loading]);
 
   // 初回ロード完了後はisInitialLoadをfalseに設定
+  // 全てのデータが揃った後にisInitialLoadをfalseに設定
   React.useEffect(() => {
-    if (!loading && isInitialLoad) {
+    if (isDataReady && isInitialLoad) {
       setIsInitialLoad(false);
     }
-  }, [loading, isInitialLoad]);
+  }, [isDataReady, isInitialLoad]);
   
-  // 初回ロード時のみローディング画面を表示
-  if (loading && isInitialLoad) {
+  // 統合ローディング条件：初回ロード時は全てのデータが揃うまでローディング表示
+  const isInitialLoading = (loading && isInitialLoad) || (isInitialLoad && !isDataReady);
+  
+  if (isInitialLoading) {
     return (
       <View style={styles.container}>
         <CommonHeader title="マイページ" />
@@ -228,7 +202,8 @@ export default function MyPageScreen({ navigation, route }) {
   }
   
   // ユーザープロフィールが存在しない場合（新規登録直後など）
-  if (!userProfile) {
+  // 初回ロード完了後でプロフィールが存在しない場合のみ表示
+  if (!userProfile && !isInitialLoad) {
     return (
       <View style={styles.container}>
         <CommonHeader title="マイページ" />
@@ -315,39 +290,7 @@ export default function MyPageScreen({ navigation, route }) {
               </View>
             )}
           </View>
-          <View style={styles.contentArea}>
-            <Text style={styles.sectionTitle}>いいね！したサークル</Text>
-            {savedCircles.length > 0 ? (
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.popularCirclesScrollContainer}
-                style={styles.popularCirclesScrollView}
-              >
-                {savedCircles.map((circle, index) => (
-                  <TouchableOpacity 
-                    key={circle.id} 
-                    style={styles.popularCircleCard}
-                    onPress={() => navigation.navigate('CircleDetail', { circleId: circle.id })}
-                  >
-                    {circle.imageUrl ? (
-                      <Image source={{ uri: circle.imageUrl }} style={styles.popularCircleImage} />
-                    ) : (
-                      <View style={[styles.popularCircleImage, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
-                        <Ionicons name="people-outline" size={40} color="#aaa" />
-                      </View>
-                    )}
-                    <Text style={styles.popularCircleName}>{circle.name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            ) : (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>いいね！したサークルはありません</Text>
-                <Text style={styles.emptySubText}>気になるサークルを保存しましょう</Text>
-              </View>
-            )}
-          </View>
+
         </ScrollView>
       </SafeAreaView>
     </View>

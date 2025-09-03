@@ -115,10 +115,7 @@ export default function BlockManagementScreen({ navigation }) {
             try {
               await deleteDoc(doc(db, 'users', user.uid, 'blocks', circleId));
               
-              // ブロック解除時にリアルタイム更新
-              if (global.updateBlockStatus) {
-                global.updateBlockStatus(circleId, false);
-              }
+              // ブロック解除完了（スナップショットリスナーで自動更新される）
               
               // ローカル状態を更新
               setBlockedCircles(prev => prev.filter(circle => circle.id !== circleId));
