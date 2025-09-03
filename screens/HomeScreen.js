@@ -33,17 +33,30 @@ const HomeScreen = ({ navigation }) => {
   
   // ブロック状態をスナップショットリスナーで監視
   useEffect(() => {
+    console.log('HomeScreen: ブロックリスナー設定開始, uid:', auth.currentUser?.uid);
+    
     if (!auth.currentUser?.uid) {
-      // ログアウト時はブロック状態をリセット
+      console.log('HomeScreen: uidがnullのため、ブロック状態をリセット');
       setUserBlockedCircleIds([]);
       return;
     }
+    
+    console.log('HomeScreen: ブロックリスナーを設定中, uid:', auth.currentUser.uid);
     
     const unsubscribe = onSnapshot(
       collection(db, 'users', auth.currentUser.uid, 'blocks'),
       (snapshot) => {
         const blockedIds = snapshot.docs.map(doc => doc.id);
+        console.log('HomeScreen: ブロック状態更新:', blockedIds);
         setUserBlockedCircleIds(blockedIds);
+        console.log('HomeScreen: userBlockedCircleIds state updated to:', blockedIds);
+        
+        // ブロック状態が変更された時にサークルデータを再取得
+        if (userUniversity) {
+          console.log('HomeScreen: ブロック状態変更によりサークルデータを再取得');
+          fetchPopularCirclesByUniversity(userUniversity).then(setPopularCircles);
+          fetchNewCircles().then(setNewCircles);
+        }
       },
       (error) => {
         console.error('Error listening to blocks:', error);
@@ -51,8 +64,11 @@ const HomeScreen = ({ navigation }) => {
       }
     );
     
-    return unsubscribe;
-  }, [auth.currentUser?.uid]);
+    return () => {
+      console.log('HomeScreen: ブロックリスナーをクリーンアップ');
+      unsubscribe();
+    };
+  }, [auth.currentUser?.uid, userUniversity]);
 
   // 初回ロード時のみデータ取得
   useEffect(() => {
@@ -330,7 +346,13 @@ const HomeScreen = ({ navigation }) => {
                 style={styles.popularCirclesScrollView}
               >
                 {popularCircles
-                  .filter(circle => circle.headerImageUrl && !userBlockedCircleIds.includes(circle.id)) // ヘッダー画像があるサークルかつブロックしていないサークルのみ表示
+                  .filter(circle => {
+                    const hasHeaderImage = circle.headerImageUrl;
+                    const isBlocked = userBlockedCircleIds.includes(circle.id);
+                    const shouldShow = hasHeaderImage && !isBlocked;
+                    console.log(`HomeScreen: 人気サークル ${circle.name} (${circle.id}) - ヘッダー画像: ${hasHeaderImage}, ブロック: ${isBlocked}, 表示: ${shouldShow}`);
+                    return shouldShow;
+                  }) // ヘッダー画像があるサークルかつブロックしていないサークルのみ表示
                   .map((circle, index) => (
                   <TouchableOpacity 
                     key={circle.id} 
@@ -390,7 +412,13 @@ const HomeScreen = ({ navigation }) => {
                 style={styles.popularCirclesScrollView}
               >
                 {newCircles
-                  .filter(circle => circle.headerImageUrl && !userBlockedCircleIds.includes(circle.id)) // ヘッダー画像があるサークルかつブロックしていないサークルのみ表示
+                  .filter(circle => {
+                    const hasHeaderImage = circle.headerImageUrl;
+                    const isBlocked = userBlockedCircleIds.includes(circle.id);
+                    const shouldShow = hasHeaderImage && !isBlocked;
+                    console.log(`HomeScreen: 新着サークル ${circle.name} (${circle.id}) - ヘッダー画像: ${hasHeaderImage}, ブロック: ${isBlocked}, 表示: ${shouldShow}`);
+                    return shouldShow;
+                  }) // ヘッダー画像があるサークルかつブロックしていないサークルのみ表示
                   .map((circle, index) => (
                   <TouchableOpacity 
                     key={circle.id} 

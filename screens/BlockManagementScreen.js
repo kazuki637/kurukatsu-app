@@ -113,7 +113,9 @@ export default function BlockManagementScreen({ navigation }) {
           style: 'destructive',
           onPress: async () => {
             try {
+              console.log('BlockManagementScreen: ブロック解除開始, uid:', user.uid, 'circleId:', circleId);
               await deleteDoc(doc(db, 'users', user.uid, 'blocks', circleId));
+              console.log('BlockManagementScreen: ブロック解除完了, uid:', user.uid, 'circleId:', circleId);
               
               // ブロック解除完了（スナップショットリスナーで自動更新される）
               
