@@ -16,7 +16,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { db, auth } from '../firebaseConfig';
-import { doc, getDoc, getDocs, collection, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import CommonHeader from '../components/CommonHeader';
 
@@ -170,8 +170,20 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
       // 新しい代表者を設定
       await updateDoc(newLeaderRef, { role: 'leader' });
       
+      // 新しい代表者のadminCircleIdsにサークルIDを追加
+      const newLeaderUserRef = doc(db, 'users', selectedMember.id);
+      await updateDoc(newLeaderUserRef, {
+        adminCircleIds: arrayUnion(circleId)
+      });
+      
       // 現在の代表者をメンバーに変更（最後に実行）
       await updateDoc(currentLeaderRef, { role: 'member' });
+      
+      // 現在の代表者のadminCircleIdsからサークルIDを削除
+      const currentLeaderUserRef = doc(db, 'users', user.uid);
+      await updateDoc(currentLeaderUserRef, {
+        adminCircleIds: arrayRemove(circleId)
+      });
 
       setShowCompletionModal(true);
     } catch (error) {

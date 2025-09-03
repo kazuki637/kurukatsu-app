@@ -197,11 +197,17 @@ export default function CircleRegistrationScreen() {
         role: 'leader' // 作成者を代表者として設定
       });
 
-      // ユーザーのjoinedCircleIdsに新しいサークルIDを追加
+      // ユーザーのjoinedCircleIdsとadminCircleIdsに新しいサークルIDを追加
       const userDocRef = doc(db, 'users', user.uid);
       await updateDoc(userDocRef, {
-        joinedCircleIds: arrayUnion(circleDocRef.id)
+        joinedCircleIds: arrayUnion(circleDocRef.id),
+        adminCircleIds: arrayUnion(circleDocRef.id) // 代表者としてadminCircleIdsにも追加
       });
+
+      // サークル登録完了後、検索画面のキャッシュを無効化
+      if (global.invalidateCirclesCache) {
+        global.invalidateCirclesCache();
+      }
 
       Alert.alert('登録完了', 'サークル情報が正常に登録されました。', [
         { text: 'OK', onPress: () => {

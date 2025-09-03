@@ -165,10 +165,11 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
               // サークルのメンバーコレクションから削除
               await deleteDoc(doc(db, 'circles', circleId, 'members', memberId));
               
-              // ユーザーのjoinedCircleIdsからサークルIDを削除
+              // ユーザーのjoinedCircleIdsとadminCircleIdsからサークルIDを削除
               const userDocRef = doc(db, 'users', memberId);
               await updateDoc(userDocRef, {
-                joinedCircleIds: arrayRemove(circleId)
+                joinedCircleIds: arrayRemove(circleId),
+                adminCircleIds: arrayRemove(circleId) // 管理者/代表者の場合も削除
               });
               
               // 強制退会の通知を送信（削除されたメンバーに）
@@ -207,6 +208,20 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
         assignedAt: new Date(),
         assignedBy: user.uid
       });
+      
+      // ユーザーのadminCircleIdsを更新
+      const userDocRef = doc(db, 'users', memberId);
+      if (newRole === 'leader' || newRole === 'admin') {
+        // 管理者/代表者に昇格時：adminCircleIdsに追加
+        await updateDoc(userDocRef, {
+          adminCircleIds: arrayUnion(circleId)
+        });
+      } else if (newRole === 'member') {
+        // メンバーに降格時：adminCircleIdsから削除
+        await updateDoc(userDocRef, {
+          adminCircleIds: arrayRemove(circleId)
+        });
+      }
       
       // 役割変更の通知を送信
       console.log('通知送信処理は一時的に無効化されています');

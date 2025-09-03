@@ -417,10 +417,7 @@ export default function CircleProfileScreen({ route, navigation }) {
 
       await setDoc(doc(db, 'users', user.uid, 'blocks', circleId), blockData);
       
-      // ブロック操作時にリアルタイム更新
-      if (global.updateBlockStatus) {
-        global.updateBlockStatus(circleId, true);
-      }
+      // ブロック操作完了（スナップショットリスナーで自動更新される）
       
       // いいね！している場合は削除
       if (isFavorite) {

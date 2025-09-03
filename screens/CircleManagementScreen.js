@@ -37,109 +37,133 @@ export default function CircleManagementScreen({ navigation }) {
       return;
     }
 
-    // リアルタイムリスナーを設定
-    const unsubscribe = onSnapshot(collection(db, 'circles'), async (snapshot) => {
+    // ユーザードキュメントから管理サークルIDを取得
+    const fetchAdminCircles = async () => {
       try {
-        // ユーザーがログアウトしている場合は処理をスキップ
-        if (!user) {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (!userDoc.exists()) {
           setAdminCircles([]);
           setLoading(false);
           return;
         }
 
-        const adminCircleList = [];
-        let totalRequests = 0;
+        const userData = userDoc.data();
+        const adminCircleIds = userData.adminCircleIds || [];
         
-        for (const circleDoc of snapshot.docs) {
-          const circleId = circleDoc.id;
-          const memberDoc = await getDoc(doc(db, 'circles', circleId, 'members', user.uid));
-          if (memberDoc.exists()) {
-            const role = memberDoc.data().role || 'member';
-            if (role === 'leader' || role === 'admin') {
-              // 入会申請数を取得
-              let joinRequestsCount = 0;
-              try {
-                const requestsSnapshot = await getDocs(collection(db, 'circles', circleId, 'joinRequests'));
-                joinRequestsCount = requestsSnapshot.size;
-                totalRequests += joinRequestsCount;
-              } catch (error) {
-                console.error(`Error fetching join requests for circle ${circleId}:`, error);
-              }
-              
-              adminCircleList.push({ 
-                id: circleId, 
-                ...circleDoc.data(), 
-                role,
-                joinRequestsCount 
-              });
-            }
-          }
+        if (adminCircleIds.length === 0) {
+          setAdminCircles([]);
+          setTotalJoinRequestsCount(0);
+          global.totalJoinRequestsCount = 0;
+          setLoading(false);
+          return;
         }
+
+        // 管理サークルの詳細情報を並列取得
+        const circlePromises = adminCircleIds.map(async (circleId) => {
+          try {
+            const circleDoc = await getDoc(doc(db, 'circles', circleId));
+            if (!circleDoc.exists()) return null;
+
+            // ユーザーの役割を取得
+            const memberDoc = await getDoc(doc(db, 'circles', circleId, 'members', user.uid));
+            if (!memberDoc.exists()) return null;
+
+            const role = memberDoc.data().role || 'member';
+            if (role !== 'leader' && role !== 'admin') return null;
+
+            // 入会申請数を取得
+            let joinRequestsCount = 0;
+            try {
+              const requestsSnapshot = await getDocs(collection(db, 'circles', circleId, 'joinRequests'));
+              joinRequestsCount = requestsSnapshot.size;
+            } catch (error) {
+              console.error(`Error fetching join requests for circle ${circleId}:`, error);
+            }
+
+            return {
+              id: circleId,
+              ...circleDoc.data(),
+              role,
+              joinRequestsCount
+            };
+          } catch (error) {
+            console.error(`Error fetching circle ${circleId}:`, error);
+            return null;
+          }
+        });
+
+        const circles = await Promise.all(circlePromises);
+        const validCircles = circles.filter(circle => circle !== null);
         
-        setAdminCircles(adminCircleList);
+        const totalRequests = validCircles.reduce((sum, circle) => sum + circle.joinRequestsCount, 0);
+        
+        setAdminCircles(validCircles);
         setTotalJoinRequestsCount(totalRequests);
-        
-        // グローバル変数に設定（タブバーの赤丸表示用）
         global.totalJoinRequestsCount = totalRequests;
+
       } catch (error) {
         console.error('Error fetching admin circles:', error);
+        setAdminCircles([]);
+        setTotalJoinRequestsCount(0);
+        global.totalJoinRequestsCount = 0;
       } finally {
         setLoading(false);
       }
-    }, (error) => {
-      console.error('Error listening to circles:', error);
-      setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
-  }, [user?.uid]);
+    fetchAdminCircles();
 
-  // 入会申請の変更をリアルタイムで監視
-  useEffect(() => {
-    if (!user || adminCircles.length === 0) return;
-
+    // 管理サークルの変更を監視（個別監視）
     const unsubscribeListeners = [];
     
-    // 各管理サークルの入会申請をリアルタイムで監視
-    adminCircles.forEach(circle => {
-      const unsubscribe = onSnapshot(
-        collection(db, 'circles', circle.id, 'joinRequests'),
-        async (snapshot) => {
-          try {
-            const joinRequestsCount = snapshot.size;
-            
-            // 該当サークルの入会申請数を更新
-            setAdminCircles(prev => prev.map(c => 
-              c.id === circle.id ? { ...c, joinRequestsCount } : c
-            ));
-            
-            // 全体の入会申請数を再計算
-            const updatedCircles = adminCircles.map(c => 
-              c.id === circle.id ? { ...c, joinRequestsCount } : c
-            );
-            const totalRequests = updatedCircles.reduce((sum, c) => sum + c.joinRequestsCount, 0);
-            
-            setTotalJoinRequestsCount(totalRequests);
-            global.totalJoinRequestsCount = totalRequests;
-            
-            // グローバル入会申請数を更新
-            global.updateJoinRequestsCount(circle.id, joinRequestsCount);
-          } catch (error) {
-            console.error(`Error listening to join requests for circle ${circle.id}:`, error);
-          }
-        },
-        (error) => {
-          console.error(`Error listening to join requests for circle ${circle.id}:`, error);
+    // ユーザードキュメントの変更を監視して、管理サークルIDの変更を検知
+    const userDocUnsubscribe = onSnapshot(doc(db, 'users', user.uid), (userDoc) => {
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const adminCircleIds = userData.adminCircleIds || [];
+        
+        // 管理サークルIDが変更された場合は再取得
+        if (JSON.stringify(adminCircleIds) !== JSON.stringify(adminCircles.map(c => c.id))) {
+          fetchAdminCircles();
         }
-      );
-      
-      unsubscribeListeners.push(unsubscribe);
+      }
     });
+
+    unsubscribeListeners.push(userDocUnsubscribe);
 
     return () => {
       unsubscribeListeners.forEach(unsubscribe => unsubscribe());
     };
-  }, [user?.uid, adminCircles]);
+  }, [user?.uid]);
+
+  // 入会申請数のイベントベース更新
+  useEffect(() => {
+    if (!user) return;
+
+    // グローバル入会申請数更新関数を登録
+    global.updateCircleManagementJoinRequests = (circleId, delta) => {
+      setAdminCircles(prev => {
+        const updated = prev.map(c => {
+          if (c.id === circleId) {
+            const newCount = Math.max(0, c.joinRequestsCount + delta);
+            return { ...c, joinRequestsCount: newCount };
+          }
+          return c;
+        });
+        
+        // 全体の入会申請数を再計算
+        const totalRequests = updated.reduce((sum, c) => sum + c.joinRequestsCount, 0);
+        setTotalJoinRequestsCount(totalRequests);
+        global.totalJoinRequestsCount = totalRequests;
+        
+        return updated;
+      });
+    };
+
+    return () => {
+      delete global.updateCircleManagementJoinRequests;
+    };
+  }, [user?.uid]);
 
   const handleRegisterCirclePress = async () => {
     if (!user) {

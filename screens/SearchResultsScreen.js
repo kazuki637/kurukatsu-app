@@ -179,10 +179,7 @@ const SearchResultsScreen = ({ route, navigation }) => {
       
       await setDoc(doc(db, 'users', user.uid, 'blocks', selectedCircle.id), blockData);
       
-      // ブロック操作時にリアルタイム更新
-      if (global.updateBlockStatus) {
-        global.updateBlockStatus(selectedCircle.id, true);
-      }
+      // ブロック操作完了（スナップショットリスナーで自動更新される）
       
       // いいね！している場合は削除
       if (userProfile && userProfile.favoriteCircleIds && userProfile.favoriteCircleIds.includes(selectedCircle.id)) {
