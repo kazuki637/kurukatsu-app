@@ -417,6 +417,30 @@ export default function ProfileEditScreen(props) {
                  String(birthday.getDate()).padStart(2, '0'),
         profileImageUrl: imageUrl,
       }, { merge: true });
+      
+      // ユーザーが所属している全サークルのメンバーデータを更新
+      const userDoc = await getDoc(userDocRef);
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const joinedCircleIds = userData.joinedCircleIds || [];
+        
+        // 各サークルのメンバーデータを更新
+        const updatePromises = joinedCircleIds.map(async (circleId) => {
+          try {
+            await setDoc(doc(db, 'circles', circleId, 'members', user.uid), {
+              name: name,
+              university: university,
+              grade: grade,
+              profileImageUrl: imageUrl
+            }, { merge: true });
+          } catch (error) {
+            console.error(`Error updating member data for circle ${circleId}:`, error);
+          }
+        });
+        
+        await Promise.all(updatePromises);
+      }
+      
       setHasUnsavedChanges(false);
       setIsSaving(false);
       

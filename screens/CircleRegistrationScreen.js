@@ -194,7 +194,14 @@ export default function CircleRegistrationScreen() {
       // 作成者をmembersサブコレクションに追加（代表者として）
       await setDoc(doc(db, 'circles', circleDocRef.id, 'members', user.uid), { 
         joinedAt: new Date(),
-        role: 'leader' // 作成者を代表者として設定
+        role: 'leader', // 作成者を代表者として設定
+        assignedAt: new Date(),
+        assignedBy: user.uid,
+        gender: userProfile.gender || '',
+        university: userProfile.university || '',
+        name: userProfile.name || '氏名未設定',
+        grade: userProfile.grade || '',
+        profileImageUrl: userProfile.profileImageUrl || null
       });
 
       // ユーザーのjoinedCircleIdsとadminCircleIdsに新しいサークルIDを追加
