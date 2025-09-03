@@ -266,7 +266,8 @@ export default function CircleProfileScreen({ route, navigation }) {
       return;
     }
 
-    // 学生証認証状態を確認
+    // 学生証認証状態を確認 - 一時的に無効化
+    /*
     const isStudentIdVerified = await checkStudentIdVerification(user.uid);
     if (!isStudentIdVerified) {
       Alert.alert(
@@ -282,6 +283,7 @@ export default function CircleProfileScreen({ route, navigation }) {
       );
       return;
     }
+    */
 
     try {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
