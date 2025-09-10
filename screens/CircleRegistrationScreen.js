@@ -26,6 +26,7 @@ export default function CircleRegistrationScreen() {
   const [uploading, setUploading] = useState(false);
   const [circleImage, setCircleImage] = useState(null);
   const [circleType, setCircleType] = useState('学内サークル'); // デフォルトは学内サークル
+  const [userProfile, setUserProfile] = useState(null);
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -117,6 +118,7 @@ export default function CircleRegistrationScreen() {
         const docSnap = await getDoc(userDocRef);
         if (docSnap.exists()) {
           const userData = docSnap.data();
+          setUserProfile(userData);
           setUniversityName(userData.university || '');
           setContactInfo(user.email || ''); // Firebase Authenticationのメールアドレスを使用
           setRepresentativeName(userData.name || '');
@@ -167,6 +169,11 @@ export default function CircleRegistrationScreen() {
       const user = auth.currentUser;
       if (!user) {
         Alert.alert('エラー', 'ユーザー情報が取得できませんでした。');
+        return;
+      }
+
+      if (!userProfile) {
+        Alert.alert('エラー', 'ユーザープロフィール情報が取得できませんでした。');
         return;
       }
 

@@ -74,6 +74,50 @@ const ArticleDetailScreen = ({ route, navigation }) => {
   const [user, setUser] = useState(null);
   const [viewCount, setViewCount] = useState(0);
   const [hasViewed, setHasViewed] = useState(false);
+  const [imagesLoaded, setImagesLoaded] = useState({});
+  const [allImagesReady, setAllImagesReady] = useState(false);
+
+  // すべての画像の読み込み完了を待つ関数
+  const waitForAllImagesToLoad = async (blocksData) => {
+    const imageBlocks = blocksData.filter(block => block.type === 'image');
+    
+    if (imageBlocks.length === 0) {
+      setAllImagesReady(true);
+      return;
+    }
+
+    // 各画像の読み込み完了をPromiseで管理
+    const imageLoadPromises = imageBlocks.map((block) => {
+      return new Promise((resolve) => {
+        Image.getSize(
+          block.url,
+          (width, height) => {
+            setImageDimensions(prev => ({
+              ...prev,
+              [block.url]: { width, height },
+            }));
+            setImagesLoaded(prev => ({
+              ...prev,
+              [block.url]: true,
+            }));
+            resolve();
+          },
+          (error) => {
+            console.error('画像の読み込みに失敗:', error);
+            setImagesLoaded(prev => ({
+              ...prev,
+              [block.url]: true,
+            }));
+            resolve(); // エラーでも完了として扱う
+          }
+        );
+      });
+    });
+
+    // すべての画像の読み込み完了を待つ
+    await Promise.all(imageLoadPromises);
+    setAllImagesReady(true);
+  };
 
   // 画像のサイズを動的に計算する関数
   const getImageStyle = (imageUrl) => {
@@ -194,6 +238,9 @@ const ArticleDetailScreen = ({ route, navigation }) => {
         
         setBlocks(blocksData);
 
+        // 画像の読み込み完了を待つ
+        await waitForAllImagesToLoad(blocksData);
+
       } catch (err) {
         console.error('記事の取得に失敗:', err);
         setError('記事の取得に失敗しました');
@@ -205,7 +252,7 @@ const ArticleDetailScreen = ({ route, navigation }) => {
     fetchArticle();
   }, [articleId]);
 
-  if (loading) {
+  if (loading || !allImagesReady) {
     return (
       <View style={styles.container}>
         <CommonHeader 
@@ -307,13 +354,6 @@ const ArticleDetailScreen = ({ route, navigation }) => {
                     source={{ uri: block.url }} 
                     style={getImageStyle(block.url)}
                     resizeMode="contain"
-                    onLoad={(event) => {
-                      const { width, height } = event.nativeEvent.source;
-                      setImageDimensions(prev => ({
-                        ...prev,
-                        [block.url]: { width, height },
-                      }));
-                    }}
                   />
                 ) : null}
               </View>

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, StatusBar, ActivityIndicator, Image, Alert, FlatList, Modal, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, StatusBar, ActivityIndicator, Image, Alert, FlatList, Modal, ScrollView, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { db, auth } from '../firebaseConfig';
@@ -15,6 +15,7 @@ export default function CircleManagementScreen({ navigation }) {
   const [adminCircles, setAdminCircles] = useState([]);
   const [isModalVisible, setModalVisible] = useState(false);
   const [totalJoinRequestsCount, setTotalJoinRequestsCount] = useState(0);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -136,6 +137,21 @@ export default function CircleManagementScreen({ navigation }) {
     };
   }, [user?.uid]);
 
+  // 画面表示時のフェードインアニメーション（サークル登録済・未登録両方）
+  useEffect(() => {
+    if (!loading && user) {
+      // ローディング完了かつユーザー認証済みの場合、フェードインアニメーションを開始
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      // 他の状態の場合は透明度をリセット
+      fadeAnim.setValue(0);
+    }
+  }, [loading, user, fadeAnim]);
+
   // 入会申請数のイベントベース更新
   useEffect(() => {
     if (!user) return;
@@ -252,7 +268,7 @@ export default function CircleManagementScreen({ navigation }) {
           <Text style={styles.headerTitle}>サークル管理</Text>
         </View>
         <SafeAreaView style={styles.contentSafeArea}>
-          <View style={styles.mainContentWrapper}>
+          <Animated.View style={[styles.mainContentWrapper, { opacity: fadeAnim }]}>
             <View style={styles.cardContainer}>
               <View style={styles.card}>
                 <Text style={styles.cardTitle}>サークルの管理ができる！</Text>
@@ -278,7 +294,7 @@ export default function CircleManagementScreen({ navigation }) {
                 <Text style={styles.createButtonText}>新しいサークルを登録する</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </Animated.View>
         </SafeAreaView>
 
         <Modal
@@ -373,21 +389,23 @@ export default function CircleManagementScreen({ navigation }) {
         <Text style={styles.headerTitle}>サークル管理</Text>
       </View>
       <SafeAreaView style={styles.contentSafeArea}>
-        <FlatList
-          data={adminCircles}
-          keyExtractor={item => item.id}
-          renderItem={renderCircleItem}
-          contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
-        />
-        <View style={styles.createButtonContainer}>
-          <TouchableOpacity
-            style={styles.createButton}
-            onPress={handleRegisterCirclePress}
-          >
-            <Ionicons name="add-circle-outline" size={32} color="#fff" />
-            <Text style={styles.createButtonText}>新しいサークルを登録する</Text>
-          </TouchableOpacity>
-        </View>
+        <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+          <FlatList
+            data={adminCircles}
+            keyExtractor={item => item.id}
+            renderItem={renderCircleItem}
+            contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+          />
+          <View style={styles.createButtonContainer}>
+            <TouchableOpacity
+              style={styles.createButton}
+              onPress={handleRegisterCirclePress}
+            >
+              <Ionicons name="add-circle-outline" size={32} color="#fff" />
+              <Text style={styles.createButtonText}>新しいサークルを登録する</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
       </SafeAreaView>
 
       <Modal

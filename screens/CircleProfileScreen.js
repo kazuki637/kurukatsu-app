@@ -26,7 +26,7 @@ const { width } = Dimensions.get('window');
 export default function CircleProfileScreen({ route, navigation }) {
   const { circleId } = route.params;
   // サークルデータ取得（キャッシュ30秒）
-  const { data: circleData, loading, error, reload } = useFirestoreDoc(db, circleId ? `circles/${circleId}` : '', { cacheDuration: 30000 });
+  const { data: circleData, loading, error } = useFirestoreDoc('circles', circleId);
   const [user, setUser] = useState(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [hasRequested, setHasRequested] = useState(false);
@@ -140,30 +140,16 @@ export default function CircleProfileScreen({ route, navigation }) {
       try {
         const membersRef = collection(db, 'circles', circleId, 'members');
         const membersSnapshot = await getDocs(membersRef);
-        const membersData = [];
         
-        for (const memberDoc of membersSnapshot.docs) {
-          const memberId = memberDoc.id;
+        const membersData = membersSnapshot.docs.map(memberDoc => {
           const memberData = memberDoc.data();
+          console.log(`メンバー ${memberDoc.id} のデータ:`, memberData);
           
-          console.log(`メンバー ${memberId} のデータ:`, memberData);
-          
-          // メンバードキュメントから直接性別と大学情報を取得
-          // ユーザー情報も取得（名前など他の情報のため）
-          const userDoc = await getDoc(doc(db, 'users', memberId));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            const memberInfo = {
-              id: memberId,
-              gender: memberData.gender || userData.gender || null,
-              university: memberData.university || userData.university || null,
-              ...memberData,
-              ...userData
-            };
-            console.log(`メンバー ${memberId} の統合データ:`, memberInfo);
-            membersData.push(memberInfo);
-          }
-        }
+          return {
+            id: memberDoc.id,
+            ...memberData
+          };
+        });
         
         console.log('取得したメンバーデータ:', membersData);
         setMembers(membersData);
@@ -632,24 +618,6 @@ export default function CircleProfileScreen({ route, navigation }) {
 
 
 
-      {/* LINEグループ */}
-      {circleData.lineGroupLink && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>LINEグループ</Text>
-          <TouchableOpacity style={styles.lineButton} onPress={() => Linking.openURL(circleData.lineGroupLink)}>
-            <Ionicons name="logo-whatsapp" size={24} color="#06C755" />
-            <Text style={styles.lineButtonText}>LINEグループを開く</Text>
-            <Ionicons name="chevron-forward" size={20} color="#666" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.copyButton} onPress={() => {
-            // Clipboard.setString(circleData.lineGroupLink);
-            Alert.alert('コピーしました', 'LINEグループリンクをコピーしました');
-          }}>
-            <Ionicons name="copy-outline" size={18} color="#333" />
-            <Text style={styles.copyButtonText}>リンクをコピー</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
       {/* 新歓スケジュール */}
       {circleData.welcome && circleData.welcome.schedule && (
@@ -709,7 +677,7 @@ export default function CircleProfileScreen({ route, navigation }) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>新歓LINEグループ</Text>
           <TouchableOpacity style={styles.lineButton} onPress={() => Linking.openURL(circleData.shinkanLineGroupLink)}>
-            <Ionicons name="logo-whatsapp" size={24} color="#06C755" />
+            <RNImage source={require('../assets/SNS-icons/LINE_Brand_icon.png')} style={styles.snsLogoImage} />
             <Text style={styles.lineButtonText}>LINEグループを開く</Text>
           </TouchableOpacity>
         </View>
@@ -770,7 +738,6 @@ export default function CircleProfileScreen({ route, navigation }) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <Text>サークルデータの取得に失敗しました</Text>
-        <TouchableOpacity onPress={reload}><Text>再読み込み</Text></TouchableOpacity>
       </View>
     );
   }

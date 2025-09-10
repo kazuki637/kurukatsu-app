@@ -67,7 +67,6 @@ const LoginScreen = ({ navigation }) => {
           source={require('../assets/icon.png')} 
           style={styles.appIcon}
         />
-        <Text style={styles.title}>クルカツへようこそ！</Text>
         <TextInput
           style={styles.input}
           placeholder="メールアドレス"
@@ -142,7 +141,8 @@ const styles = StyleSheet.create({
   appIcon: {
     width: 100,
     height: 100,
-    marginBottom: 20,
+    marginBottom: 40,
+    marginTop: 20,
     borderRadius: 20,
   },
   title: {

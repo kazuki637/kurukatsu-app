@@ -268,9 +268,14 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
       await deleteDoc(doc(db, 'circles', circleId, 'joinRequests', request.id));
       setJoinRequests(prev => prev.filter(r => r.id !== request.id));
       
-      // グローバル入会申請数を更新
-      const newCount = joinRequests.length - 1;
-      global.updateJoinRequestsCount(circleId, newCount);
+      // グローバル入会申請数を更新（-1）
+      if (global.updateCircleManagementJoinRequests) {
+        global.updateCircleManagementJoinRequests(circleId, -1);
+      }
+      // CircleManagementDetailScreen用の更新も実行
+      if (global.updateCircleManagementDetailJoinRequests) {
+        global.updateCircleManagementDetailJoinRequests(circleId, joinRequests.length - 1);
+      }
       
       // メンバーリストを再取得
       const fetchMembers = async () => {
@@ -329,9 +334,14 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
       await deleteDoc(doc(db, 'circles', circleId, 'joinRequests', requestId));
       setJoinRequests(prev => prev.filter(r => r.id !== requestId));
       
-      // グローバル入会申請数を更新
-      const newCount = joinRequests.length - 1;
-      global.updateJoinRequestsCount(circleId, newCount);
+      // グローバル入会申請数を更新（-1）
+      if (global.updateCircleManagementJoinRequests) {
+        global.updateCircleManagementJoinRequests(circleId, -1);
+      }
+      // CircleManagementDetailScreen用の更新も実行
+      if (global.updateCircleManagementDetailJoinRequests) {
+        global.updateCircleManagementDetailJoinRequests(circleId, joinRequests.length - 1);
+      }
       
       Alert.alert('却下完了', '入会申請を却下しました');
     } catch (e) {

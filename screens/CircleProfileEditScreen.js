@@ -42,9 +42,8 @@ const deleteImageFromStorage = async (url) => {
 export default function CircleProfileEditScreen({ route, navigation }) {
   const { circleId } = route.params;
   // サークルデータ取得（キャッシュ30秒）
-  const { data: circleData, loading, error, reload } = useFirestoreDoc(db, circleId ? `circles/${circleId}` : '', { cacheDuration: 30000 });
+  const { data: circleData, loading, error } = useFirestoreDoc('circles', circleId);
   const [user, setUser] = useState(null);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [hasRequested, setHasRequested] = useState(false);
   const [isMember, setIsMember] = useState(false);
   // const [tabIndex, setTabIndex] = useState(0); // 削除
@@ -148,18 +147,14 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       const unsubscribeSnapshot = onSnapshot(userDocRef, (docSnap) => {
         if (docSnap.exists()) {
           const userData = docSnap.data();
-          const favorites = userData.favoriteCircleIds || [];
           const joinedCircles = userData.joinedCircleIds || [];
-          setIsFavorite(favorites.includes(circleId));
           setIsMember(joinedCircles.includes(circleId));
         } else {
-          setIsFavorite(false);
           setIsMember(false);
         }
       });
       return unsubscribeSnapshot;
     } else {
-      setIsFavorite(false);
       setIsMember(false);
     }
   }, [user, circleId]);
@@ -444,7 +439,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             
             // Firestoreに保存
             await updateDoc(doc(db, 'circles', circleId), { headerImageUrl: downloadUrl });
-            reload && reload(); // 追加: 変更を即時反映
+
             
             console.log('ヘッダー画像アップロード完了');
           } catch (e) {
@@ -1228,7 +1223,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>新歓LINEグループ</Text>
         <View style={{flexDirection: 'row', alignItems: 'center'}}>
-          <Ionicons name="logo-whatsapp" size={24} color="#06C755" />
+          <RNImage source={require('../assets/SNS-icons/LINE_Brand_icon.png')} style={styles.snsLargeLogo} />
           <TextInput
             value={shinkanLineGroupLink}
             onChangeText={(text) => {
@@ -1305,7 +1300,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
         <Text>サークルデータの取得に失敗しました</Text>
-        <TouchableOpacity onPress={reload}><Text>再読み込み</Text></TouchableOpacity>
       </View>
     );
   }

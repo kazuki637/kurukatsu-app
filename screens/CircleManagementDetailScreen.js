@@ -232,7 +232,9 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
                         <Ionicons name={btn.icon} size={28} color="#007bff" />
                         <Text style={styles.managementGridItemText}>{btn.label}</Text>
                         {btn.label === 'メンバー管理' && joinRequestsCount > 0 && (
-                          <View style={styles.notificationBadge} />
+                          <View style={styles.notificationBadge}>
+                            <Text style={styles.notificationBadgeText}>{joinRequestsCount}</Text>
+                          </View>
                         )}
                       </View>
                     </TouchableOpacity>
@@ -357,12 +359,19 @@ const styles = StyleSheet.create({
   },
   notificationBadge: {
     position: 'absolute',
-    top: -5,
-    right: 0,
-    width: 10,
-    height: 10,
-    borderRadius: 6,
-    backgroundColor: '#ff3b30',
+    top: -8,
+    right: -8,
+    backgroundColor: '#ff4757',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 
 }); 

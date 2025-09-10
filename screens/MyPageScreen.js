@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -34,18 +34,33 @@ const gridItemSize = (width - 20 * 3) / 2;
 export default function MyPageScreen({ navigation, route }) {
   const user = auth.currentUser;
   const userId = user ? user.uid : null;
-  // ユーザープロフィール取得（キャッシュ5秒に短縮）
-  const { data: userProfile, loading, error, reload } = useFirestoreDoc(db, userId ? `users/${userId}` : '', { cacheDuration: 5000 });
+  // ユーザープロフィール取得
+  const { data: userProfile, loading, error } = useFirestoreDoc('users', userId);
   
   // プロフィール編集画面から渡された更新データを処理（削除）
 
   const [joinedCircles, setJoinedCircles] = useState([]);
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
   const [unreadCounts, setUnreadCounts] = useState({}); // 未読通知数を管理
   
   // 統合ローディング状態：初回ロード時は全てのデータが揃うまでローディング表示
   const [isDataReady, setIsDataReady] = useState(false);
+
+  // 画像のプリロード
+  useEffect(() => {
+    if (userProfile?.profileImageUrl && userProfile.profileImageUrl.trim() !== '') {
+      // 画像エラー状態をリセット
+      setImageError(false);
+      setImageLoading(true);
+      
+      // 画像をプリロードしてキャッシュに保存
+      Image.prefetch(userProfile.profileImageUrl).catch(() => {
+        // プリロードに失敗した場合は無視（通常の読み込みにフォールバック）
+      });
+    }
+  }, [userProfile?.profileImageUrl]);
   
   // リアルタイム未読数更新関数をグローバルに登録
   React.useEffect(() => {
@@ -67,13 +82,13 @@ export default function MyPageScreen({ navigation, route }) {
   React.useEffect(() => {
     global.onProfileUpdated = () => {
       setImageError(false); // 画像エラー状態をリセット
-      reload(); // プロフィール情報をリロード
+      // リロード機能は useFirestoreDoc のリアルタイム更新で自動的に行われる
     };
     
     return () => {
       delete global.onProfileUpdated;
     };
-  }, [reload]);
+  }, []);
 
 
 
@@ -87,7 +102,7 @@ export default function MyPageScreen({ navigation, route }) {
         const promises = [];
         
         // joinedCircles取得のPromise
-        if (userProfile.joinedCircleIds && userProfile.joinedCircleIds.length > 0) {
+        if (userProfile.joinedCircleIds && Array.isArray(userProfile.joinedCircleIds) && userProfile.joinedCircleIds.length > 0) {
           const circlesRef = collection(db, 'circles');
           const q = query(circlesRef, where('__name__', 'in', userProfile.joinedCircleIds));
           promises.push(getDocs(q));
@@ -96,7 +111,7 @@ export default function MyPageScreen({ navigation, route }) {
         }
         
         // 未読通知数取得のPromise
-        if (userProfile.joinedCircleIds && userProfile.joinedCircleIds.length > 0) {
+        if (userProfile.joinedCircleIds && Array.isArray(userProfile.joinedCircleIds) && userProfile.joinedCircleIds.length > 0) {
           const q = query(
             collection(db, 'users', userId, 'circleMessages'),
             where('circleId', 'in', userProfile.joinedCircleIds),
@@ -136,7 +151,6 @@ export default function MyPageScreen({ navigation, route }) {
       } catch (e) {
         console.error('Error fetching circles and unread counts:', e);
         setJoinedCircles([]);
-        setSavedCircles([]);
         setUnreadCounts({});
         
         // エラー時もデータ準備完了として扱う
@@ -147,7 +161,7 @@ export default function MyPageScreen({ navigation, route }) {
     };
     
     // userProfileが存在し、必要なIDが変更された場合のみ実行
-    if (userProfile && userProfile.joinedCircleIds !== undefined) {
+    if (userProfile && userProfile.joinedCircleIds !== undefined && Array.isArray(userProfile.joinedCircleIds)) {
       fetchCirclesAndUnreadCounts();
     } else if (userProfile && isInitialLoad) {
       // userProfileは存在するが、joinedCircleIdsが未定義の場合
@@ -158,7 +172,7 @@ export default function MyPageScreen({ navigation, route }) {
       // 初回ロード時はデータ準備完了として扱う
       setIsDataReady(true);
     }
-  }, [userProfile?.joinedCircleIds?.length, isInitialLoad, loading]);
+  }, [userProfile, isInitialLoad, loading]);
 
   // 初回ロード完了後はisInitialLoadをfalseに設定
   // 全てのデータが揃った後にisInitialLoadをfalseに設定
@@ -192,7 +206,12 @@ export default function MyPageScreen({ navigation, route }) {
         <SafeAreaView style={{ flex: 1 }}>
           <View style={styles.loadingContainer}>
             <Text>ユーザーデータの取得に失敗しました</Text>
-            <TouchableOpacity onPress={reload} style={{ marginTop: 10 }}>
+            <TouchableOpacity onPress={() => {
+              // 画面を再マウントして再読み込みを実現
+              setImageError(false);
+              setIsInitialLoad(true);
+              setIsDataReady(false);
+            }} style={{ marginTop: 10 }}>
               <Text style={{ color: '#007bff' }}>再読み込み</Text>
             </TouchableOpacity>
           </View>
@@ -225,14 +244,27 @@ export default function MyPageScreen({ navigation, route }) {
           <View style={styles.profileSection}>
             <View style={styles.profileImageContainerSimple}>
               {userProfile?.profileImageUrl && userProfile.profileImageUrl.trim() !== '' && !imageError ? (
-                <Image
-                  source={{ 
-                    uri: userProfile.profileImageUrl,
-                    cache: 'default' // デフォルトのキャッシュ設定を使用
-                  }}
-                  style={styles.profileImage}
-                  onError={() => setImageError(true)}
-                />
+                <View style={styles.profileImageWrapper}>
+                  <Image
+                    source={{ 
+                      uri: userProfile.profileImageUrl,
+                      cache: 'force-cache' // 強制キャッシュを使用
+                    }}
+                    style={styles.profileImage}
+                    onLoadStart={() => setImageLoading(true)}
+                    onLoadEnd={() => setImageLoading(false)}
+                    onError={() => {
+                      setImageError(true);
+                      setImageLoading(false);
+                    }}
+                    resizeMode="cover"
+                  />
+                  {imageLoading && (
+                    <View style={styles.imageLoadingOverlay}>
+                      <ActivityIndicator size="small" color="#007bff" />
+                    </View>
+                  )}
+                </View>
               ) : (
                 <View style={[styles.profileImage, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
                   <Ionicons name="person-outline" size={48} color="#aaa" />
@@ -302,7 +334,19 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   profileSection: { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 20 },
   profileImageContainerSimple: { alignItems: 'center', marginBottom: 12 },
+  profileImageWrapper: { position: 'relative' },
   profileImage: { width: 100, height: 100, borderRadius: 50 },
+  imageLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 50,
+  },
   userName: { fontSize: 22, fontWeight: 'bold', color: '#333', marginTop: 10 },
   userUniversity: { fontSize: 16, color: '#666', marginTop: 4 },
   editProfileButton: { marginTop: 15, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, paddingVertical: 8, alignItems: 'center', paddingHorizontal: 24 },

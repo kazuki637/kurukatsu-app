@@ -128,7 +128,6 @@ const SignupScreen = ({ navigation }) => {
           source={require('../assets/icon.png')} 
           style={styles.appIcon}
         />
-        <Text style={styles.title}>クルカツへようこそ！</Text>
         <TextInput
           style={styles.input}
           placeholder="メールアドレス"
@@ -230,7 +229,7 @@ const SignupScreen = ({ navigation }) => {
         </View> */}
         <TouchableOpacity
           style={styles.loginLinkButton}
-          onPress={() => navigation.navigate('Login')}
+          onPress={() => navigation.goBack()}
         >
           <Text style={styles.loginLinkButtonText}>ログイン画面へ戻る</Text>
         </TouchableOpacity>
@@ -296,7 +295,8 @@ const styles = StyleSheet.create({
   appIcon: {
     width: 100,
     height: 100,
-    marginBottom: 20,
+    marginBottom: 40,
+    marginTop: 20,
     borderRadius: 20,
   },
   termsText: {

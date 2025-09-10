@@ -186,52 +186,7 @@ let navigationRef = null;
 // 通知の重複処理防止用
 let processedNotificationIds = new Set();
 
-// グローバル入会申請数管理（タブバー表示用）
-global.totalJoinRequestsCount = 0;
 
-// アプリ起動時に入会申請数を取得する関数
-const fetchInitialJoinRequestsCount = async (userId) => {
-  if (!userId) {
-    global.totalJoinRequestsCount = 0;
-    return;
-  }
-
-  try {
-    // ユーザーが管理者・代表者であるサークルを取得
-    const circlesRef = collection(db, 'circles');
-    const circlesSnapshot = await getDocs(circlesRef);
-    
-    let totalRequests = 0;
-    
-    for (const circleDoc of circlesSnapshot.docs) {
-      const circleId = circleDoc.id;
-      
-      // ユーザーがメンバーかチェック
-      const memberDoc = await getDoc(doc(db, 'circles', circleId, 'members', userId));
-      if (memberDoc.exists()) {
-        const memberData = memberDoc.data();
-        const role = memberData.role || 'member';
-        
-        if (role === 'leader' || role === 'admin') {
-          // 入会申請数を取得
-          try {
-            const requestsSnapshot = await getDocs(collection(db, 'circles', circleId, 'joinRequests'));
-            const joinRequestsCount = requestsSnapshot.size;
-            totalRequests += joinRequestsCount;
-          } catch (error) {
-            console.error(`Error fetching join requests for circle ${circleId}:`, error);
-          }
-        }
-      }
-    }
-    
-    global.totalJoinRequestsCount = totalRequests;
-    console.log('初期入会申請数取得完了:', totalRequests);
-  } catch (error) {
-    console.error('Error fetching initial join requests count:', error);
-    global.totalJoinRequestsCount = 0;
-  }
-};
 
 // リアルタイム未読数更新関数
 const updateUnreadCountsRealtime = (circleId, delta) => {
@@ -438,24 +393,6 @@ function CircleManagementStackScreen() {
 
 // Main Tab Navigator
 function MainTabNavigator() {
-  const [totalJoinRequestsCount, setTotalJoinRequestsCount] = React.useState(0);
-
-  // グローバル入会申請数の変更を監視
-  React.useEffect(() => {
-    const updateBadge = () => {
-      setTotalJoinRequestsCount(global.totalJoinRequestsCount || 0);
-    };
-
-    // 初期値設定
-    updateBadge();
-
-    // 定期的にグローバル値をチェック（リアルタイム更新のため）
-    const interval = setInterval(updateBadge, 1000);
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, []);
 
   return (
     <Tab.Navigator
@@ -476,29 +413,6 @@ function MainTabNavigator() {
             iconName = focused ? 'settings' : 'settings-outline';
           }
 
-          // サークル管理タブの場合は、アイコンと赤丸を組み合わせて表示
-          if (route.name === 'サークル管理') {
-            return (
-              <View style={{ alignItems: 'center' }}>
-                <Ionicons name={iconName} size={size} color={color} />
-                {/* 入会申請がある場合に赤丸を表示 */}
-                {totalJoinRequestsCount > 0 && (
-                  <View style={{
-                    position: 'absolute',
-                    top: 0,
-                    right: -5,
-                    backgroundColor: '#ff4757',
-                    borderRadius: 8,
-                    width: 6,
-                    height: 6,
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}>
-                  </View>
-                )}
-              </View>
-            );
-          }
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
@@ -563,14 +477,9 @@ function AppNavigator() {
           const { registerForPushNotifications } = await import('./utils/notificationUtils');
           await registerForPushNotifications(currentUser.uid);
           
-          // 初期入会申請数を取得（タブバー表示用）
-          await fetchInitialJoinRequestsCount(currentUser.uid);
         } catch (error) {
           console.error('通知トークンの取得に失敗:', error);
         }
-      } else {
-        // ログアウト時は入会申請数をリセット
-        global.totalJoinRequestsCount = 0;
       }
     });
     

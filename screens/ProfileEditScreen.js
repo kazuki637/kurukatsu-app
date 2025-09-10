@@ -423,6 +423,7 @@ export default function ProfileEditScreen(props) {
       if (userDoc.exists()) {
         const userData = userDoc.data();
         const joinedCircleIds = userData.joinedCircleIds || [];
+        const adminCircleIds = userData.adminCircleIds || [];
         
         // 各サークルのメンバーデータを更新
         const updatePromises = joinedCircleIds.map(async (circleId) => {
@@ -438,7 +439,26 @@ export default function ProfileEditScreen(props) {
           }
         });
         
-        await Promise.all(updatePromises);
+        // 代表者（leaderId）が所属するサークルのuniversityNameも更新
+        const leaderUpdatePromises = adminCircleIds.map(async (circleId) => {
+          try {
+            // サークルの詳細を取得してleaderIdを確認
+            const circleDoc = await getDoc(doc(db, 'circles', circleId));
+            if (circleDoc.exists()) {
+              const circleData = circleDoc.data();
+              // 現在のユーザーが代表者（leaderId）の場合のみuniversityNameを更新
+              if (circleData.leaderId === user.uid) {
+                await updateDoc(doc(db, 'circles', circleId), {
+                  universityName: university
+                });
+              }
+            }
+          } catch (error) {
+            console.error(`Error updating universityName for circle ${circleId}:`, error);
+          }
+        });
+        
+        await Promise.all([...updatePromises, ...leaderUpdatePromises]);
       }
       
       setHasUnsavedChanges(false);
