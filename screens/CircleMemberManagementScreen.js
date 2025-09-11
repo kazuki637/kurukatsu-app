@@ -388,7 +388,11 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <CommonHeader title="メンバー管理" />
+      <CommonHeader 
+        title="メンバー管理" 
+        showBackButton={true}
+        onBack={() => navigation.goBack()}
+      />
       <SafeAreaView style={styles.content}>
         {/* タブ切り替え */}
         <View style={styles.tabContainer}>

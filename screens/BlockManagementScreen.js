@@ -179,7 +179,11 @@ export default function BlockManagementScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <CommonHeader title="ブロックリスト" navigation={navigation} />
+      <CommonHeader 
+        title="ブロックリスト" 
+        showBackButton={true}
+        onBack={() => navigation.goBack()}
+      />
       
       {/* 固定ヘッダーセクション（常に表示） */}
       <View style={styles.fixedHeaderSection}>

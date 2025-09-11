@@ -1188,7 +1188,11 @@ export default function CircleMemberScreen({ route, navigation }) {
 
   return (
     <>
-      <CommonHeader title={circleName} />
+      <CommonHeader 
+        title={circleName} 
+        showBackButton={true}
+        onBack={() => navigation.goBack()}
+      />
       <SafeAreaView style={styles.container}>
         {/* タブバー */}
         <View style={styles.tabBar}>

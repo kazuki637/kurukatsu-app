@@ -477,7 +477,11 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      <CommonHeader title="スケジュール" />
+      <CommonHeader 
+        title="スケジュール" 
+        showBackButton={true}
+        onBack={() => navigation.goBack()}
+      />
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView>
           {/* カレンダー */}

@@ -93,7 +93,11 @@ export default function NotificationSettingsScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <CommonHeader title="通知設定" showBackButton />
+      <CommonHeader 
+        title="通知設定" 
+        showBackButton={true}
+        onBack={() => navigation.goBack()}
+      />
       <SafeAreaView style={styles.contentSafeArea}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.section}>

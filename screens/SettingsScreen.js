@@ -58,7 +58,11 @@ export default function SettingsScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <CommonHeader title="設定" showBackButton={false} />
+      <CommonHeader 
+        title="設定" 
+        showBackButton={true}
+        onBack={() => navigation.goBack()}
+      />
       <SafeAreaView style={styles.contentSafeArea}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.section}>

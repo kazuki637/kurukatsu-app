@@ -65,7 +65,6 @@ const AuthStack = createStackNavigator();
 const HomeStack = createStackNavigator();
 const SearchStack = createStackNavigator();
 const MyPageStack = createStackNavigator();
-const SettingsStack = createStackNavigator();
 const CircleManagementStack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 const RootStack = createStackNavigator(); // For modals
@@ -322,6 +321,11 @@ function HomeStackScreen() {
       <HomeStack.Screen name="SearchResults" component={SearchResultsScreen} />
       <HomeStack.Screen name="ArticleDetail" component={ArticleDetailScreen} />
       <HomeStack.Screen name="Settings" component={SettingsScreen} />
+      <HomeStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+      <HomeStack.Screen name="BlockManagement" component={BlockManagementScreen} />
+      <HomeStack.Screen name="HelpScreen" component={HelpScreen} />
+      <HomeStack.Screen name="TermsOfServiceScreen" component={TermsOfServiceScreen} />
+      <HomeStack.Screen name="PrivacyPolicyScreen" component={PrivacyPolicyScreen} />
     </HomeStack.Navigator>
   );
 }
@@ -359,19 +363,6 @@ function MyPageStackScreen() {
   );
 }
 
-// Settings Tab Stack
-function SettingsStackScreen() {
-  return (
-    <SettingsStack.Navigator screenOptions={{ headerShown: false }}>
-      <SettingsStack.Screen name="Settings" component={SettingsScreen} />
-      
-      <SettingsStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
-      <SettingsStack.Screen name="HelpScreen" component={HelpScreen} />
-      <SettingsStack.Screen name="PrivacyPolicyScreen" component={PrivacyPolicyScreen} />
-      <SettingsStack.Screen name="TermsOfServiceScreen" component={TermsOfServiceScreen} />
-    </SettingsStack.Navigator>
-  );
-}
 
 // Circle Management Tab Stack
 function CircleManagementStackScreen() {

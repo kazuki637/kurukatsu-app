@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import CommonHeader from '../components/CommonHeader';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db, storage } from '../firebaseConfig';
@@ -14,7 +14,6 @@ const HomeScreen = ({ navigation }) => {
   const [userUniversity, setUserUniversity] = useState('');
   const [popularCircles, setPopularCircles] = useState([]);
   const [newCircles, setNewCircles] = useState([]);
-  const [searchText, setSearchText] = useState('');
   const [articles, setArticles] = useState([]);
   const [articlesLoading, setArticlesLoading] = useState(true);
   const [articlesInitialized, setArticlesInitialized] = useState(false);
@@ -231,38 +230,17 @@ const HomeScreen = ({ navigation }) => {
     }
   };
 
-  // 検索機能を実装
-  const handleSearch = async () => {
-    if (!searchText.trim()) {
-      return; // 空の検索は無視
-    }
-
-    try {
-      // すべてのサークルを取得
-      const circlesCollectionRef = collection(db, 'circles');
-      const querySnapshot = await getDocs(circlesCollectionRef);
-      const allCircles = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
-      // 検索テキストでフィルタリング
-      const searchTextLower = searchText.toLowerCase();
-      const filteredCircles = allCircles.filter(circle => 
-        circle.name?.toLowerCase().includes(searchTextLower) ||
-        circle.description?.toLowerCase().includes(searchTextLower) ||
-        circle.activityLocation?.toLowerCase().includes(searchTextLower) ||
-        circle.universityName?.toLowerCase().includes(searchTextLower)
-      );
-      
-      // 検索結果画面に遷移
-      navigation.navigate('SearchResults', { circles: filteredCircles });
-    } catch (error) {
-      console.error("Error searching circles: ", error);
-    }
-  };
 
   return (
     <View style={styles.fullScreenContainer}>
       <CommonHeader 
-        title="ホーム" 
+        customTitle={
+          <Image 
+            source={require('../assets/HOME-Header-Title.png')} 
+            style={styles.headerTitleImage}
+            resizeMode="contain"
+          />
+        }
         rightButton={
           <TouchableOpacity 
             onPress={() => navigation.navigate('Settings')}
@@ -274,19 +252,6 @@ const HomeScreen = ({ navigation }) => {
       />
       <SafeAreaView style={styles.contentSafeArea}>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {/* 検索バー */}
-          <View style={styles.searchBarContainer}>
-            <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="サークル名、活動内容、キーワード"
-              value={searchText}
-              onChangeText={setSearchText}
-              onSubmitEditing={handleSearch}
-              returnKeyType="search"
-            />
-          </View>
-
           {/* 記事カード（横スクロール） */}
           <View style={styles.infoCardsContainer}>
             {articlesLoading && articles.length === 0 ? (
@@ -494,27 +459,9 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  // 検索バー
-  searchBarContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    margin: 15,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  searchIcon: {
-    marginRight: 10,
-  },
-  searchInput: {
-    flex: 1,
-    height: 40,
-    fontSize: 16,
-  },
   // 情報カード（横スクロール）
   infoCardsContainer: {
+    marginTop: 20,
     marginBottom: 20,
   },
   infoCardsScrollContainer: {
@@ -796,6 +743,11 @@ const styles = StyleSheet.create({
     padding: 2,
     borderRadius: 20,
     backgroundColor: 'transparent',
+  },
+  // ヘッダータイトル画像
+  headerTitleImage: {
+    height: 35,
+    width: 125,
   },
 });
 

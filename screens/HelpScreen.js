@@ -4,7 +4,7 @@ import CommonHeader from '../components/CommonHeader';
 import { db, auth } from '../firebaseConfig';
 import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 
-export default function HelpScreen() {
+export default function HelpScreen({ navigation }) {
   const [subject, setSubject] = useState('');
   const [inquiry, setInquiry] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -80,7 +80,11 @@ export default function HelpScreen() {
 
   return (
     <View style={styles.container}>
-      <CommonHeader title="お問い合わせ" />
+      <CommonHeader 
+        title="お問い合わせ" 
+        showBackButton={true}
+        onBack={() => navigation.goBack()}
+      />
       <SafeAreaView style={styles.contentSafeArea}>
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
           {/* 件名セクション */}

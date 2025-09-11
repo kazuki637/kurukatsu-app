@@ -249,7 +249,11 @@ export default function CircleContactScreen({ route, navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      <CommonHeader title="サークル連絡" />
+      <CommonHeader 
+        title="サークル連絡" 
+        showBackButton={true}
+        onBack={() => navigation.goBack()}
+      />
       <SafeAreaView style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: 20 }}>
           {/* 連絡種別 */}

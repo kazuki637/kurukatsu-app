@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, StatusBar, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function CommonHeader({ title, showBackButton = false, onBack, rightButtonLabel, onRightButtonPress, rightButton, rightButtonDisabled = false, showActionButton = false, onActionButtonPress }) {
+export default function CommonHeader({ title, customTitle, showBackButton = false, onBack, rightButtonLabel, onRightButtonPress, rightButton, rightButtonDisabled = false, showActionButton = false, onActionButtonPress }) {
   return (
     <View style={styles.header}>
       {showBackButton && (
@@ -10,7 +10,13 @@ export default function CommonHeader({ title, showBackButton = false, onBack, ri
           <Ionicons name="chevron-back" size={24} color="#333" />
         </TouchableOpacity>
       )}
-      <Text style={styles.headerTitle}>{title}</Text>
+      {customTitle ? (
+        <View style={[styles.headerTitleContainer, showBackButton && styles.headerTitleContainerWithBackButton]}>
+          {customTitle}
+        </View>
+      ) : (
+        <Text style={styles.headerTitle}>{title}</Text>
+      )}
       {rightButton ? (
         <View style={styles.headerRightButton}>
           {rightButton}
@@ -62,12 +68,22 @@ const styles = StyleSheet.create({
     right: 0,
     textAlign: 'center',
   },
-  headerLeftButton: {
+  headerTitleContainer: {
     position: 'absolute',
     bottom: 10,
     left: 15,
-    width: 30,
-    height: 30,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  headerTitleContainerWithBackButton: {
+    left: 50, // 戻るボタンの右側に配置
+  },
+  headerLeftButton: {
+    position: 'absolute',
+    bottom: 5,
+    left: 15,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'flex-start',
   },
