@@ -261,7 +261,17 @@ const HomeScreen = ({ navigation }) => {
 
   return (
     <View style={styles.fullScreenContainer}>
-      <CommonHeader title="ホーム" />
+      <CommonHeader 
+        title="ホーム" 
+        rightButton={
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('Settings')}
+            style={styles.settingsButton}
+          >
+            <Ionicons name="settings-outline" size={26} color="#333" />
+          </TouchableOpacity>
+        }
+      />
       <SafeAreaView style={styles.contentSafeArea}>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           {/* 検索バー */}
@@ -780,6 +790,12 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
+  },
+  // 設定ボタン
+  settingsButton: {
+    padding: 2,
+    borderRadius: 20,
+    backgroundColor: 'transparent',
   },
 });
 

@@ -321,6 +321,7 @@ function HomeStackScreen() {
       <HomeStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} />
       <HomeStack.Screen name="SearchResults" component={SearchResultsScreen} />
       <HomeStack.Screen name="ArticleDetail" component={ArticleDetailScreen} />
+      <HomeStack.Screen name="Settings" component={SettingsScreen} />
     </HomeStack.Navigator>
   );
 }
@@ -411,10 +412,7 @@ function MainTabNavigator() {
             iconName = focused ? 'person' : 'person-outline';
           } else if (route.name === 'サークル管理') {
             iconName = focused ? 'people' : 'people-outline';
-          } else if (route.name === '設定') {
-            iconName = focused ? 'settings' : 'settings-outline';
           }
-
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
@@ -433,7 +431,6 @@ function MainTabNavigator() {
       <Tab.Screen name="検索" component={SearchStackScreen} />
       <Tab.Screen name="マイページ" component={MyPageStackScreen} />
       <Tab.Screen name="サークル管理" component={CircleManagementStackScreen} />
-      <Tab.Screen name="設定" component={SettingsStackScreen} />
     </Tab.Navigator>
   );
 }

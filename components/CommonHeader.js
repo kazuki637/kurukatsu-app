@@ -43,7 +43,7 @@ export default function CommonHeader({ title, showBackButton = false, onBack, ri
 const styles = StyleSheet.create({
   header: {
     width: '100%',
-    height: 115,
+    height: 100,
     paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
   },
   headerRightButton: {
     position: 'absolute',
-    bottom: 10,
+    bottom: 5,
     right: 15,
     justifyContent: 'center',
     alignItems: 'flex-end',

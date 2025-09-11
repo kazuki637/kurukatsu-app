@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
   },
   header: {
     width: '100%',
-    height: 115, // ヘッダーの縦幅を調整
+    height: 100, // ヘッダーの縦幅を調整
     paddingTop: StatusBar.currentHeight, // ステータスバーの高さ分を確保
     backgroundColor: '#fff',
     borderBottomWidth: 1,

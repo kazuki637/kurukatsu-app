@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   },
   header: {
     width: '100%',
-    height: 115,
+    height: 100,
     paddingTop: StatusBar.currentHeight,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderBottomWidth: 1,
@@ -330,6 +330,7 @@ const styles = StyleSheet.create({
   managementGridSection: {
     flex: 1,
     paddingHorizontal: 10,
+    marginTop: 10,
   },
   managementRow3col: {
     flexDirection: 'row',
