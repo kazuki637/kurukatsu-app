@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, TouchableWithoutFeedback, Keyboard, ScrollView, Image, Linking } from 'react-native';
 import { auth, db } from '../firebaseConfig';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth';
 import { doc, setDoc } from 'firebase/firestore';
 
 const SignupScreen = ({ navigation }) => {
@@ -69,10 +69,22 @@ const SignupScreen = ({ navigation }) => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       
-      // ユーザープロフィールドキュメントを作成
+      // メール認証を送信
+      console.log('メール認証送信開始:', user.email);
+      try {
+        await sendEmailVerification(user);
+        console.log('メール認証送信成功');
+      } catch (emailError) {
+        console.error('メール認証送信エラー:', emailError);
+        Alert.alert('メール送信エラー', '確認メールの送信に失敗しました。しばらく時間をおいてから再度お試しください。');
+        return;
+      }
+      
+      // ユーザープロフィールドキュメントを作成（認証待ち状態で）
       const userDocRef = doc(db, 'users', user.uid);
       await setDoc(userDocRef, {
         email: user.email,
+        emailVerified: false, // 認証待ち状態
         createdAt: new Date(),
         // 初期値として空の配列を設定
         joinedCircleIds: [],
@@ -88,19 +100,12 @@ const SignupScreen = ({ navigation }) => {
         isGradePublic: true
       });
       
-      Alert.alert(
-        '登録完了', 
-        'アカウントが作成されました。',
-        [
-          {
-            text: '次へ',
-            onPress: () => {
-              // プロフィール編集画面に遷移
-              navigation.navigate('ProfileEdit', { fromSignup: true });
-            }
-          }
-        ]
-      );
+      // メール認証待ち画面に遷移
+      navigation.navigate('EmailVerification', { 
+        email: email,
+        userId: user.uid,
+        fromSignup: true
+      });
     } catch (error) {
       Alert.alert('登録エラー', error.message);
     } finally {
@@ -163,21 +168,6 @@ const SignupScreen = ({ navigation }) => {
           returnKeyType="done"
           onSubmitEditing={Keyboard.dismiss}
         />
-        <TouchableOpacity
-          style={[
-            styles.registerButton,
-            (!email || !password || !confirmPassword || passwordErrors.length > 0 || !agreedToTerms || !agreedToPrivacyPolicy) && styles.registerButtonDisabled
-          ]}
-          onPress={handleSignup}
-          disabled={loading || !email || !password || !confirmPassword || passwordErrors.length > 0 || !agreedToTerms || !agreedToPrivacyPolicy}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.registerButtonText}>登録</Text>
-          )}
-        </TouchableOpacity>
-
         {/* 同意フローの強化: 個別同意チェックボックス */}
         <View style={styles.agreementContainer}>
           <Text style={styles.agreementTitle}>以下の内容に同意してください</Text>
@@ -216,6 +206,21 @@ const SignupScreen = ({ navigation }) => {
             </Text>
           </View>
         </View>
+
+        <TouchableOpacity
+          style={[
+            styles.registerButton,
+            (!email || !password || !confirmPassword || passwordErrors.length > 0 || !agreedToTerms || !agreedToPrivacyPolicy) && styles.registerButtonDisabled
+          ]}
+          onPress={handleSignup}
+          disabled={loading || !email || !password || !confirmPassword || passwordErrors.length > 0 || !agreedToTerms || !agreedToPrivacyPolicy}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.registerButtonText}>登録</Text>
+          )}
+        </TouchableOpacity>
 
         {/* 旧来の曖昧な同意テキストを削除 */}
         {/* <View style={styles.termsContainer}>

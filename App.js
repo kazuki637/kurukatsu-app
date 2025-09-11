@@ -58,6 +58,7 @@ import NotificationSettingsScreen from './screens/NotificationSettingsScreen';
 import ImageCropScreen from './screens/ImageCropScreen';
 import StudentIdCameraScreen from './screens/StudentIdCameraScreen';
 import ArticleDetailScreen from './screens/ArticleDetailScreen';
+import EmailVerificationScreen from './screens/EmailVerificationScreen';
 
 
 const AuthStack = createStackNavigator();
@@ -304,6 +305,7 @@ function AuthStackScreen() {
       <AuthStack.Screen name="Login" component={LoginScreen} />
       <AuthStack.Screen name="Signup" component={SignupScreen} />
       <AuthStack.Screen name="PasswordReset" component={PasswordResetScreen} />
+      <AuthStack.Screen name="EmailVerification" component={EmailVerificationScreen} />
       <AuthStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
     </AuthStack.Navigator>
   );
@@ -505,48 +507,59 @@ function AppNavigator() {
           }} />}
         </RootStack.Screen>
       ) : user ? (
-        <>
+        // メール認証状態をチェック
+        user.emailVerified ? (
+          <>
+            <RootStack.Screen 
+              name="Main" 
+              component={MainTabNavigatorWithProfileCheck} 
+              options={{ headerShown: false }} 
+            />
+            <RootStack.Screen 
+              name="ImageCrop" 
+              component={ImageCropScreen} 
+              options={{ headerShown: false }} 
+            />
+            <RootStack.Screen 
+              name="StudentIdCamera" 
+              component={StudentIdCameraScreen} 
+              options={{ headerShown: false }} 
+            />
+            <RootStack.Screen 
+              name="ProfileEdit" 
+              component={ProfileEditScreen} 
+              options={{ headerShown: false }} 
+            />
+            <RootStack.Screen 
+              name="ArticleDetail" 
+              component={ArticleDetailScreen} 
+              options={{ headerShown: false }} 
+            />
+            <RootStack.Screen 
+              name="CircleMember" 
+              component={CircleMemberScreen} 
+              options={{ headerShown: false }} 
+            />
+            <RootStack.Screen 
+              name="Report" 
+              component={ReportScreen} 
+              options={{ headerShown: false }} 
+            />
+            <RootStack.Screen 
+              name="BlockManagement" 
+              component={BlockManagementScreen} 
+              options={{ headerShown: false }} 
+            />
+          </>
+        ) : (
+          // メール認証待ちの場合は認証画面を表示
           <RootStack.Screen 
-            name="Main" 
-            component={MainTabNavigatorWithProfileCheck} 
+            name="EmailVerification" 
             options={{ headerShown: false }} 
-          />
-          <RootStack.Screen 
-            name="ImageCrop" 
-            component={ImageCropScreen} 
-            options={{ headerShown: false }} 
-          />
-          <RootStack.Screen 
-            name="StudentIdCamera" 
-            component={StudentIdCameraScreen} 
-            options={{ headerShown: false }} 
-          />
-          <RootStack.Screen 
-            name="ProfileEdit" 
-            component={ProfileEditScreen} 
-            options={{ headerShown: false }} 
-          />
-          <RootStack.Screen 
-            name="ArticleDetail" 
-            component={ArticleDetailScreen} 
-            options={{ headerShown: false }} 
-          />
-          <RootStack.Screen 
-            name="CircleMember" 
-            component={CircleMemberScreen} 
-            options={{ headerShown: false }} 
-          />
-          <RootStack.Screen 
-            name="Report" 
-            component={ReportScreen} 
-            options={{ headerShown: false }} 
-          />
-          <RootStack.Screen 
-            name="BlockManagement" 
-            component={BlockManagementScreen} 
-            options={{ headerShown: false }} 
-          />
-        </>
+          >
+            {props => <EmailVerificationScreen {...props} email={user.email} userId={user.uid} fromSignup={false} />}
+          </RootStack.Screen>
+        )
       ) : (
         <RootStack.Screen 
           name="Auth" 

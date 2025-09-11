@@ -12,7 +12,21 @@ const LoginScreen = ({ navigation }) => {
   const handleLogin = async () => {
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // メール認証状態をチェック
+      if (!user.emailVerified) {
+        // メール認証が必要な場合は直接認証画面に遷移
+        navigation.navigate('EmailVerification', { 
+          email: user.email,
+          userId: user.uid,
+          fromSignup: false
+        });
+        return;
+      }
+      
+      // 認証済みの場合、App.jsのonAuthStateChangedが自動的に適切な画面に遷移する
       
     } catch (error) {
       let errorMessage = 'ログインに失敗しました。';
