@@ -1,0 +1,3 @@
+以下のファイルはPC内に保存済
+firebaseConfig.js
+notionService.js
