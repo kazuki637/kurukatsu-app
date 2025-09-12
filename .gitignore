@@ -32,3 +32,6 @@ serviceAccountKey.json
 
 # Notion config (contains sensitive API keys)
 config/notionConfig.js
+
+# Firebase config (contains sensitive API keys)
+firebaseConfig.js
