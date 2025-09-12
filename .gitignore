@@ -35,3 +35,6 @@ config/notionConfig.js
 
 # Firebase config (contains sensitive API keys)
 firebaseConfig.js
+
+# Build outputs
+dist/
