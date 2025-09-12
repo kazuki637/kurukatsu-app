@@ -57,7 +57,7 @@ import NotificationSettingsScreen from './screens/NotificationSettingsScreen';
 
 import ImageCropScreen from './screens/ImageCropScreen';
 import StudentIdCameraScreen from './screens/StudentIdCameraScreen';
-import ArticleDetailScreen from './screens/ArticleDetailScreen';
+import ArticleWebViewScreen from './screens/ArticleWebViewScreen';
 import EmailVerificationScreen from './screens/EmailVerificationScreen';
 
 
@@ -319,7 +319,7 @@ function HomeStackScreen() {
       <HomeStack.Screen name="CircleMember" component={CircleMemberScreen} />
       <HomeStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} />
       <HomeStack.Screen name="SearchResults" component={SearchResultsScreen} />
-      <HomeStack.Screen name="ArticleDetail" component={ArticleDetailScreen} />
+      <HomeStack.Screen name="ArticleWebView" component={ArticleWebViewScreen} />
       <HomeStack.Screen name="Settings" component={SettingsScreen} />
       <HomeStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
       <HomeStack.Screen name="BlockManagement" component={BlockManagementScreen} />
@@ -516,11 +516,6 @@ function AppNavigator() {
             <RootStack.Screen 
               name="ProfileEdit" 
               component={ProfileEditScreen} 
-              options={{ headerShown: false }} 
-            />
-            <RootStack.Screen 
-              name="ArticleDetail" 
-              component={ArticleDetailScreen} 
               options={{ headerShown: false }} 
             />
             <RootStack.Screen 

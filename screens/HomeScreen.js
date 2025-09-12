@@ -2,11 +2,55 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import CommonHeader from '../components/CommonHeader';
 import { Ionicons } from '@expo/vector-icons';
-import { auth, db, storage } from '../firebaseConfig';
+import { auth, db } from '../firebaseConfig';
 import { collection, query, where, getDocs, getDoc, doc, orderBy, limit, onSnapshot } from 'firebase/firestore';
-import { ref, getDownloadURL } from 'firebase/storage';
+import { getArticles } from '../services/notionService';
 
 // import { useNotificationNavigation } from '../hooks/useNotificationNavigation';
+
+// 日付をフォーマットする関数
+const formatDate = (dateValue) => {
+  if (!dateValue) return '';
+  
+  try {
+    let date;
+    
+    // Dateオブジェクトの場合
+    if (dateValue instanceof Date) {
+      date = dateValue;
+    }
+    // 文字列の場合
+    else if (typeof dateValue === 'string') {
+      date = new Date(dateValue);
+    }
+    // 数値（タイムスタンプ）の場合
+    else if (typeof dateValue === 'number') {
+      date = new Date(dateValue);
+    }
+    else {
+      return dateValue; // フォーマットできない場合はそのまま返す
+    }
+    
+    // 日付が有効かチェック
+    if (isNaN(date.getTime())) {
+      return dateValue;
+    }
+    
+    // 日本語の曜日配列
+    const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+    
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const weekday = weekdays[date.getDay()];
+    
+    return `${year}年${month}月${day}日（${weekday}）`;
+    
+  } catch (error) {
+    console.error('日付のフォーマットに失敗:', error);
+    return dateValue; // エラーの場合は元の値を返す
+  }
+};
 
 const HomeScreen = ({ navigation }) => {
 
@@ -17,7 +61,6 @@ const HomeScreen = ({ navigation }) => {
   const [articles, setArticles] = useState([]);
   const [articlesLoading, setArticlesLoading] = useState(true);
   const [articlesInitialized, setArticlesInitialized] = useState(false);
-  const articlesCache = useRef(new Map());
   
   // ブロック機能の状態管理
   const [userBlockedCircleIds, setUserBlockedCircleIds] = useState([]);
@@ -32,27 +75,19 @@ const HomeScreen = ({ navigation }) => {
   
   // ブロック状態をスナップショットリスナーで監視
   useEffect(() => {
-    console.log('HomeScreen: ブロックリスナー設定開始, uid:', auth.currentUser?.uid);
-    
     if (!auth.currentUser?.uid) {
-      console.log('HomeScreen: uidがnullのため、ブロック状態をリセット');
       setUserBlockedCircleIds([]);
       return;
     }
-    
-    console.log('HomeScreen: ブロックリスナーを設定中, uid:', auth.currentUser.uid);
     
     const unsubscribe = onSnapshot(
       collection(db, 'users', auth.currentUser.uid, 'blocks'),
       (snapshot) => {
         const blockedIds = snapshot.docs.map(doc => doc.id);
-        console.log('HomeScreen: ブロック状態更新:', blockedIds);
         setUserBlockedCircleIds(blockedIds);
-        console.log('HomeScreen: userBlockedCircleIds state updated to:', blockedIds);
         
         // ブロック状態が変更された時にサークルデータを再取得
         if (userUniversity) {
-          console.log('HomeScreen: ブロック状態変更によりサークルデータを再取得');
           fetchPopularCirclesByUniversity(userUniversity).then(setPopularCircles);
           fetchNewCircles().then(setNewCircles);
         }
@@ -64,7 +99,6 @@ const HomeScreen = ({ navigation }) => {
     );
     
     return () => {
-      console.log('HomeScreen: ブロックリスナーをクリーンアップ');
       unsubscribe();
     };
   }, [auth.currentUser?.uid, userUniversity]);
@@ -132,45 +166,19 @@ const HomeScreen = ({ navigation }) => {
 
 
 
-  // 記事データを取得する共通関数
+  // 記事データを取得する共通関数（Notion API使用）
   const fetchArticlesData = async () => {
     try {
       setArticlesLoading(true);
       
-      // Firestoreから記事データを取得（最新順）
-      const articlesRef = collection(db, 'articles');
-      const articlesQuery = query(articlesRef, orderBy('createdAt', 'desc'), limit(10));
-      const articlesSnapshot = await getDocs(articlesQuery);
-      
-      const articlesData = [];
-      
-      for (const articleDoc of articlesSnapshot.docs) {
-        const articleData = { id: articleDoc.id, ...articleDoc.data() };
-        
-        // キャッシュからサムネイルURLを取得、なければ新規取得
-        let thumbnailUrl = articlesCache.current.get(articleData.id);
-        if (!thumbnailUrl && articleData.title) {
-          try {
-            const thumbnailRef = ref(storage, `articles/${articleData.title}/header`);
-            thumbnailUrl = await getDownloadURL(thumbnailRef);
-            // キャッシュに保存
-            articlesCache.current.set(articleData.id, thumbnailUrl);
-          } catch (error) {
-            console.log(`記事 ${articleData.title} のサムネイル画像が見つかりません:`, error);
-            // エラー時はサムネイルなし
-          }
-        }
-        
-        articlesData.push({
-          ...articleData,
-          thumbnailUrl: thumbnailUrl || null
-        });
-      }
+      // Notion APIから記事データを取得
+      const articlesData = await getArticles();
       
       setArticles(articlesData);
       setArticlesInitialized(true);
     } catch (error) {
-      console.error("Error fetching articles: ", error);
+      console.error("Error fetching articles from Notion: ", error);
+      // エラー時は空配列を設定
       setArticles([]);
     } finally {
       setArticlesLoading(false);
@@ -273,7 +281,10 @@ const HomeScreen = ({ navigation }) => {
                   <TouchableOpacity 
                     key={article.id}
                     style={styles.infoCard}
-                    onPress={() => navigation.navigate('ArticleDetail', { articleId: article.id })}
+                    onPress={() => navigation.navigate('ArticleWebView', { 
+                      url: article.url, 
+                      title: article.title 
+                    })}
                   >
                     {article.thumbnailUrl ? (
                       <Image 
@@ -289,11 +300,11 @@ const HomeScreen = ({ navigation }) => {
                     )}
                     <View style={styles.infoCardContent}>
                       <Text style={styles.infoCardTitle} numberOfLines={2}>{article.title}</Text>
-                      {article.subtitle && (
-                        <Text style={styles.infoCardSubtitle} numberOfLines={1}>{article.subtitle}</Text>
+                      {article.author && (
+                        <Text style={styles.infoCardSubtitle} numberOfLines={1}>{article.author}</Text>
                       )}
-                      {article.date && (
-                        <Text style={styles.infoCardDate}>{article.date}</Text>
+                      {article.createdAt && (
+                        <Text style={styles.infoCardDate}>{formatDate(article.createdAt)}</Text>
                       )}
                     </View>
                   </TouchableOpacity>
@@ -325,7 +336,6 @@ const HomeScreen = ({ navigation }) => {
                     const hasHeaderImage = circle.headerImageUrl;
                     const isBlocked = userBlockedCircleIds.includes(circle.id);
                     const shouldShow = hasHeaderImage && !isBlocked;
-                    console.log(`HomeScreen: 人気サークル ${circle.name} (${circle.id}) - ヘッダー画像: ${hasHeaderImage}, ブロック: ${isBlocked}, 表示: ${shouldShow}`);
                     return shouldShow;
                   }) // ヘッダー画像があるサークルかつブロックしていないサークルのみ表示
                   .map((circle, index) => (
@@ -391,7 +401,6 @@ const HomeScreen = ({ navigation }) => {
                     const hasHeaderImage = circle.headerImageUrl;
                     const isBlocked = userBlockedCircleIds.includes(circle.id);
                     const shouldShow = hasHeaderImage && !isBlocked;
-                    console.log(`HomeScreen: 新着サークル ${circle.name} (${circle.id}) - ヘッダー画像: ${hasHeaderImage}, ブロック: ${isBlocked}, 表示: ${shouldShow}`);
                     return shouldShow;
                   }) // ヘッダー画像があるサークルかつブロックしていないサークルのみ表示
                   .map((circle, index) => (
