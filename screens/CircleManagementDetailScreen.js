@@ -24,6 +24,7 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
   const [circleData, setCircleData] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [joinRequestsCount, setJoinRequestsCount] = useState(0);
+  const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -44,7 +45,8 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
     const unsubscribe = onSnapshot(doc(db, 'circles', circleId), (circleDoc) => {
       try {
         if (circleDoc.exists()) {
-          setCircleData(circleDoc.data());
+          const newCircleData = circleDoc.data();
+          setCircleData(newCircleData);
         }
 
         // ユーザーがログアウトしている場合は処理をスキップ
@@ -200,13 +202,20 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
           {/* サークル情報：アイコン＋サークル名・ジャンル（横並び） */}
           <View style={styles.circleInfoRow}>
             <View style={styles.circleImageLargeContainer}>
-              {circleData.imageUrl ? (
-                <Image source={{ uri: circleData.imageUrl }} style={styles.circleImageLarge} />
-              ) : (
-                <View style={[styles.circleImageLarge, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
-                  <Ionicons name="people-outline" size={64} color="#aaa" />
-                </View>
-              )}
+              <View style={styles.circleImageWrapper}>
+                {circleData.imageUrl && !imageError ? (
+                  <Image 
+                    source={{ uri: circleData.imageUrl }} 
+                    style={styles.circleImageLarge}
+                    onError={() => setImageError(true)}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={[styles.circleImageLarge, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
+                    <Ionicons name="people-outline" size={64} color="#aaa" />
+                  </View>
+                )}
+              </View>
             </View>
             <View style={styles.circleInfoTextCol}>
               <Text style={styles.circleInfoName}>{circleData.name}</Text>
@@ -305,6 +314,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
+  },
+  circleImageWrapper: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    overflow: 'hidden',
   },
   circleImageLarge: {
     width: 64,

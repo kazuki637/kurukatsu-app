@@ -6,7 +6,7 @@ import { NavigationContainer, useNavigation } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { auth, db } from './firebaseConfig.js';
+import { auth, db } from './firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -58,6 +58,7 @@ import NotificationSettingsScreen from './screens/NotificationSettingsScreen';
 import ImageCropScreen from './screens/ImageCropScreen';
 import StudentIdCameraScreen from './screens/StudentIdCameraScreen';
 import ArticleWebViewScreen from './screens/ArticleWebViewScreen';
+import ArticleListScreen from './screens/ArticleListScreen';
 import EmailVerificationScreen from './screens/EmailVerificationScreen';
 
 
@@ -320,6 +321,7 @@ function HomeStackScreen() {
       <HomeStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} />
       <HomeStack.Screen name="SearchResults" component={SearchResultsScreen} />
       <HomeStack.Screen name="ArticleWebView" component={ArticleWebViewScreen} />
+      <HomeStack.Screen name="ArticleList" component={ArticleListScreen} />
       <HomeStack.Screen name="Settings" component={SettingsScreen} />
       <HomeStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
       <HomeStack.Screen name="BlockManagement" component={BlockManagementScreen} />

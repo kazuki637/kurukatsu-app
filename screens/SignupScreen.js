@@ -84,7 +84,6 @@ const SignupScreen = ({ navigation }) => {
       const userDocRef = doc(db, 'users', user.uid);
       await setDoc(userDocRef, {
         email: user.email,
-        emailVerified: false, // 認証待ち状態
         createdAt: new Date(),
         // 初期値として空の配列を設定
         joinedCircleIds: [],

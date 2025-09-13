@@ -5,7 +5,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { db, auth } from '../firebaseConfig';
 import { collection, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import CommonHeader from '../components/CommonHeader';
 import { getUserRole, checkStudentIdVerification } from '../utils/permissionUtils';
 
@@ -20,19 +20,19 @@ export default function CircleManagementScreen({ navigation }) {
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      if (!currentUser) {
-        setLoading(false);
-      } else {
-        // ユーザーが認証されている場合は、権限情報取得が完了するまでローディング状態を維持
-        setLoading(true);
-      }
+      // 認証状態が確定したら、ユーザーがいるかどうかに関わらずローディングを継続
+      // 実際のデータ取得完了時にsetLoading(false)が呼ばれる
     });
     return unsubscribeAuth;
   }, []);
 
   useEffect(() => {
+    if (user === null) {
+      // 認証状態がまだ確定していない場合は何もしない
+      return;
+    }
+    
     if (!user) {
-      setLoading(false);
       // ユーザーがログアウトした場合はグローバル変数をリセット
       global.totalJoinRequestsCount = 0;
       return;
@@ -137,6 +137,88 @@ export default function CircleManagementScreen({ navigation }) {
     };
   }, [user?.uid]);
 
+  // 画面がフォーカスされた際にデータを再取得
+  useFocusEffect(
+    React.useCallback(() => {
+      if (user) {
+        // 画面がフォーカスされた際に管理サークルデータを再取得
+        // これにより代表者引き継ぎ後の最新状態が反映される
+        const fetchAdminCircles = async () => {
+          try {
+            const userDoc = await getDoc(doc(db, 'users', user.uid));
+            if (!userDoc.exists()) {
+              setAdminCircles([]);
+              setTotalJoinRequestsCount(0);
+              global.totalJoinRequestsCount = 0;
+              return;
+            }
+
+            const userData = userDoc.data();
+            const adminCircleIds = userData.adminCircleIds || [];
+            
+            if (adminCircleIds.length === 0) {
+              setAdminCircles([]);
+              setTotalJoinRequestsCount(0);
+              global.totalJoinRequestsCount = 0;
+              return;
+            }
+
+            // 管理サークルの詳細情報を並列取得
+            const circlePromises = adminCircleIds.map(async (circleId) => {
+              try {
+                const circleDoc = await getDoc(doc(db, 'circles', circleId));
+                if (!circleDoc.exists()) return null;
+
+                // ユーザーの役割を取得
+                const memberDoc = await getDoc(doc(db, 'circles', circleId, 'members', user.uid));
+                if (!memberDoc.exists()) return null;
+
+                const role = memberDoc.data().role || 'member';
+                if (role !== 'leader' && role !== 'admin') return null;
+
+                // 入会申請数を取得
+                let joinRequestsCount = 0;
+                try {
+                  const requestsSnapshot = await getDocs(collection(db, 'circles', circleId, 'joinRequests'));
+                  joinRequestsCount = requestsSnapshot.size;
+                } catch (error) {
+                  console.error(`Error fetching join requests for circle ${circleId}:`, error);
+                }
+
+                return {
+                  id: circleId,
+                  ...circleDoc.data(),
+                  role,
+                  joinRequestsCount
+                };
+              } catch (error) {
+                console.error(`Error fetching circle ${circleId}:`, error);
+                return null;
+              }
+            });
+
+            const circles = await Promise.all(circlePromises);
+            const validCircles = circles.filter(circle => circle !== null);
+            
+            const totalRequests = validCircles.reduce((sum, circle) => sum + circle.joinRequestsCount, 0);
+            
+            setAdminCircles(validCircles);
+            setTotalJoinRequestsCount(totalRequests);
+            global.totalJoinRequestsCount = totalRequests;
+
+          } catch (error) {
+            console.error('Error fetching admin circles on focus:', error);
+            setAdminCircles([]);
+            setTotalJoinRequestsCount(0);
+            global.totalJoinRequestsCount = 0;
+          }
+        };
+
+        fetchAdminCircles();
+      }
+    }, [user?.uid])
+  );
+
   // 画面表示時のフェードインアニメーション（サークル登録済・未登録両方）
   useEffect(() => {
     if (!loading && user) {
@@ -238,7 +320,8 @@ export default function CircleManagementScreen({ navigation }) {
     );
   }
 
-  if (!user) {
+  if (user === null) {
+    // 認証状態がまだ確定していない場合はローディング画面を表示
     return (
       <LinearGradient
         colors={['#1e3a8a', '#3b82f6', '#60a5fa']}
@@ -250,7 +333,9 @@ export default function CircleManagementScreen({ navigation }) {
           <Text style={styles.headerTitle}>サークル管理</Text>
         </View>
         <SafeAreaView style={styles.contentSafeArea}>
-          <Text style={{ textAlign: 'center', marginTop: 40, color: '#fff' }}>ログインしてください</Text>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#007bff" />
+          </View>
         </SafeAreaView>
       </LinearGradient>
     );
@@ -530,7 +615,7 @@ const styles = StyleSheet.create({
   },
   circleManagementImage: {
     width: '100%',
-    height: 350,
+    height: 320,
     borderRadius: 10,
   },
   mainContentWrapper: {

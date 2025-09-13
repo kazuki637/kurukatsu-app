@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Linking, ActivityIndicator, Alert, SafeAreaView, StatusBar, Dimensions, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Linking, ActivityIndicator, Alert, SafeAreaView, StatusBar, Dimensions, TextInput, KeyboardAvoidingView, Platform, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as RNImage } from 'react-native';
 import { db, auth } from '../firebaseConfig';
@@ -81,6 +81,23 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   const [activityLocation, setActivityLocation] = useState(''); // 活動場所
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // 未保存の変更があるかどうか
   const [members, setMembers] = useState([]); // メンバーデータ
+  
+  // フェードイン用のアニメーション値
+  const headerImageOpacity = useRef(new Animated.Value(0)).current;
+  const circleLogoOpacity = useRef(new Animated.Value(0)).current;
+  const activityImageOpacity = useRef(new Animated.Value(0)).current;
+  const instagramLogoOpacity = useRef(new Animated.Value(0)).current;
+  const xLogoOpacity = useRef(new Animated.Value(0)).current;
+  const lineLogoOpacity = useRef(new Animated.Value(0)).current;
+  
+  // フェードインアニメーション関数
+  const fadeInImage = (opacityValue) => {
+    Animated.timing(opacityValue, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
 
   // 初期値セット
   useEffect(() => {
@@ -885,7 +902,11 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         {activityImages && activityImages.length > 0 ? (
           <View style={{position: 'relative', width: '100%', aspectRatio: 16/9, alignSelf: 'center'}}>
             <TouchableOpacity onPress={() => handleReplaceActivityImage(0)} activeOpacity={0.7} style={{width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center'}}>
-              <Image source={{ uri: activityImages[0] }} style={{width: '100%', aspectRatio: 16/9, borderRadius: 0, backgroundColor: '#eee', marginBottom: 20}} />
+              <Animated.Image 
+                source={{ uri: activityImages[0] }} 
+                style={[{width: '100%', aspectRatio: 16/9, borderRadius: 0, backgroundColor: '#eee', marginBottom: 20}, { opacity: activityImageOpacity }]}
+                onLoad={() => fadeInImage(activityImageOpacity)}
+              />
             </TouchableOpacity>
             {/* ゴミ箱ボタン */}
             <TouchableOpacity
@@ -1031,7 +1052,11 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>SNS</Text>
         <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 8}}>
-          <RNImage source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} style={styles.snsLargeLogo} />
+          <Animated.Image 
+            source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} 
+            style={[styles.snsLargeLogo, { opacity: instagramLogoOpacity }]}
+            onLoad={() => fadeInImage(instagramLogoOpacity)}
+          />
           <TextInput
             value={snsLink}
             onChangeText={(text) => {
@@ -1045,7 +1070,11 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           />
         </View>
         <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 8}}>
-          <RNImage source={require('../assets/SNS-icons/X_logo-black.png')} style={styles.snsLargeLogo} />
+          <Animated.Image 
+            source={require('../assets/SNS-icons/X_logo-black.png')} 
+            style={[styles.snsLargeLogo, { opacity: xLogoOpacity }]}
+            onLoad={() => fadeInImage(xLogoOpacity)}
+          />
           <TextInput
             value={xLink}
             onChangeText={(text) => {
@@ -1223,7 +1252,11 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>新歓LINEグループ</Text>
         <View style={{flexDirection: 'row', alignItems: 'center'}}>
-          <RNImage source={require('../assets/SNS-icons/LINE_Brand_icon.png')} style={styles.snsLargeLogo} />
+          <Animated.Image 
+            source={require('../assets/SNS-icons/LINE_Brand_icon.png')} 
+            style={[styles.snsLargeLogo, { opacity: lineLogoOpacity }]}
+            onLoad={() => fadeInImage(lineLogoOpacity)}
+          />
           <TextInput
             value={shinkanLineGroupLink}
             onChangeText={(text) => {
@@ -1334,7 +1367,11 @@ export default function CircleProfileEditScreen({ route, navigation }) {
               </View>
             ) : circleData.headerImageUrl ? (
               <>
-                <Image source={{ uri: circleData.headerImageUrl }} style={styles.headerImage} />
+                <Animated.Image 
+                  source={{ uri: circleData.headerImageUrl }} 
+                  style={[styles.headerImage, { opacity: headerImageOpacity }]}
+                  onLoad={() => fadeInImage(headerImageOpacity)}
+                />
                 {/* ゴミ箱ボタン */}
                 <TouchableOpacity
                   style={{position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 16, padding: 4, zIndex: 2}}
@@ -1355,7 +1392,11 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             <View style={styles.circleInfo}>
               <View style={styles.logoContainer}>
                 {circleData.imageUrl ? (
-                  <Image source={{ uri: circleData.imageUrl }} style={styles.circleLogo} />
+                  <Animated.Image 
+                    source={{ uri: circleData.imageUrl }} 
+                    style={[styles.circleLogo, { opacity: circleLogoOpacity }]}
+                    onLoad={() => fadeInImage(circleLogoOpacity)}
+                  />
                 ) : (
                   <View style={styles.logoPlaceholder}>
                     <Ionicons name="people-outline" size={32} color="#ccc" />
@@ -1376,12 +1417,20 @@ export default function CircleProfileEditScreen({ route, navigation }) {
                     <View style={styles.snsIconRow}>
                       {circleData.snsLink && (
                         <TouchableOpacity onPress={() => Linking.openURL(circleData.snsLink)} style={styles.snsIconButton}>
-                          <RNImage source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} style={styles.snsLogoImage} />
+                          <Animated.Image 
+                            source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} 
+                            style={[styles.snsLogoImage, { opacity: instagramLogoOpacity }]}
+                            onLoad={() => fadeInImage(instagramLogoOpacity)}
+                          />
                         </TouchableOpacity>
                       )}
                       {circleData.xLink && (
                         <TouchableOpacity onPress={() => Linking.openURL(circleData.xLink)} style={styles.snsIconButton}>
-                          <RNImage source={require('../assets/SNS-icons/X_logo-black.png')} style={styles.snsLogoImage} />
+                          <Animated.Image 
+                            source={require('../assets/SNS-icons/X_logo-black.png')} 
+                            style={[styles.snsLogoImage, { opacity: xLogoOpacity }]}
+                            onLoad={() => fadeInImage(xLogoOpacity)}
+                          />
                         </TouchableOpacity>
                       )}
                     </View>

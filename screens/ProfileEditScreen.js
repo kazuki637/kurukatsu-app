@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Alert, Switch, Platform, ScrollView, StatusBar } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Alert, Switch, Platform, ScrollView, StatusBar, Animated } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +32,7 @@ export default function ProfileEditScreen(props) {
   const [profileImageUrl, setProfileImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
   
   // 学生証関連の状態
   const [studentIdImage, setStudentIdImage] = useState(null);
@@ -46,6 +47,32 @@ export default function ProfileEditScreen(props) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [originalData, setOriginalData] = useState(null);
+  
+  // アニメーション用のstate
+  const profileImageOpacity = useRef(new Animated.Value(0)).current;
+
+  // フェードインアニメーション
+  useEffect(() => {
+    const hasImage = (profileImage && profileImage.trim() !== '') || (profileImageUrl && profileImageUrl.trim() !== '');
+    
+    if (hasImage) {
+      // 画像がある場合：画像の読み込み完了時にフェードイン
+      if (!imageLoading && !imageError) {
+        Animated.timing(profileImageOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      }
+    } else {
+      // 画像がない場合：デフォルトアイコンを即座にフェードイン
+      Animated.timing(profileImageOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [imageLoading, profileImage, profileImageUrl, imageError]);
 
   // 大学名の候補をフィルタリングする関数
   const filterUniversities = (input) => {
@@ -101,6 +128,15 @@ export default function ProfileEditScreen(props) {
           setGender(d.gender || '');
           setBirthday(d.birthday ? new Date(d.birthday) : new Date(2000, 0, 1));
           setProfileImageUrl(d.profileImageUrl || '');
+          // 画像の読み込み状態をリセット
+          if (d.profileImageUrl && d.profileImageUrl.trim() !== '') {
+            setImageLoading(true);
+          } else {
+            // 画像がない場合は即座に読み込み完了状態に設定
+            setImageLoading(false);
+          }
+          setImageError(false);
+          profileImageOpacity.setValue(0);
 
           // 学生証URLの有効性チェック
           if (d.studentIdUrl) {
@@ -263,7 +299,10 @@ export default function ProfileEditScreen(props) {
           onCropComplete: (croppedUri) => {
             setProfileImage(croppedUri);
             setHasUnsavedChanges(true);
-
+            // 画像の読み込み状態をリセット
+            setImageLoading(true);
+            setImageError(false);
+            profileImageOpacity.setValue(0);
           }
         });
       }
@@ -522,17 +561,24 @@ export default function ProfileEditScreen(props) {
               <Text style={styles.label}>プロフィール画像<Text style={styles.optional}>(任意)</Text></Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start' }}>
                 <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
-                  {(profileImage && profileImage.trim() !== '' && !imageError) || (profileImageUrl && profileImageUrl.trim() !== '' && !imageError) ? (
-                    <Image
-                      source={{ uri: (profileImage && profileImage.trim() !== '') ? profileImage : profileImageUrl }}
-                      style={styles.profileImage}
-                      onError={() => setImageError(true)}
-                    />
-                  ) : (
-                    <View style={[styles.profileImage, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
-                      <Ionicons name="person-outline" size={60} color="#aaa" />
-                    </View>
-                  )}
+                  <Animated.View style={{ opacity: profileImageOpacity }}>
+                    {(profileImage && profileImage.trim() !== '' && !imageError) || (profileImageUrl && profileImageUrl.trim() !== '' && !imageError) ? (
+                      <Image
+                        source={{ uri: (profileImage && profileImage.trim() !== '') ? profileImage : profileImageUrl }}
+                        style={styles.profileImage}
+                        onLoad={() => setImageLoading(false)}
+                        onError={() => {
+                          setImageLoading(false);
+                          setImageError(true);
+                        }}
+                        fadeDuration={300}
+                      />
+                    ) : (
+                      <View style={[styles.profileImage, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
+                        <Ionicons name="person-outline" size={60} color="#aaa" />
+                      </View>
+                    )}
+                  </Animated.View>
                 </TouchableOpacity>
                 {((profileImage && profileImage.trim() !== '') || (profileImageUrl && profileImageUrl.trim() !== '')) && !imageError && profileImage !== '' && (
                   <TouchableOpacity
@@ -540,6 +586,9 @@ export default function ProfileEditScreen(props) {
                       setProfileImage('');
                       setProfileImageUrl('');
                       setImageError(false);
+                      // 画像の読み込み状態をリセット
+                      setImageLoading(true);
+                      profileImageOpacity.setValue(0);
                       // 状態変更を即座に検知
                       if (!originalData) return;
                       

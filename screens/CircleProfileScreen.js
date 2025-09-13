@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Linking, ActivityIndicator, Alert, SafeAreaView, StatusBar, Dimensions, Modal } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Linking, ActivityIndicator, Alert, SafeAreaView, StatusBar, Dimensions, Modal, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as RNImage } from 'react-native';
 import { db, auth } from '../firebaseConfig';
@@ -38,6 +38,23 @@ export default function CircleProfileScreen({ route, navigation }) {
   // アクションメニュー用の状態
   const [actionMenuVisible, setActionMenuVisible] = useState(false);
   const [userBlockedCircleIds, setUserBlockedCircleIds] = useState([]);
+  
+  // フェードイン用のアニメーション値
+  const headerImageOpacity = useRef(new Animated.Value(0)).current;
+  const circleLogoOpacity = useRef(new Animated.Value(0)).current;
+  const activityImageOpacity = useRef(new Animated.Value(0)).current;
+  const instagramLogoOpacity = useRef(new Animated.Value(0)).current;
+  const xLogoOpacity = useRef(new Animated.Value(0)).current;
+  const lineLogoOpacity = useRef(new Animated.Value(0)).current;
+  
+  // フェードインアニメーション関数
+  const fadeInImage = (opacityValue) => {
+    Animated.timing(opacityValue, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
   
   // ブロック状態更新関数をグローバルに登録
   React.useEffect(() => {
@@ -506,10 +523,11 @@ export default function CircleProfileScreen({ route, navigation }) {
     <View style={styles.tabContent}>
       {/* サークル活動画像（1枚のみ、スクロール不可） */}
       {circleData.activityImages && circleData.activityImages.length > 0 && (
-        <Image
+        <Animated.Image
           source={{ uri: circleData.activityImages[0] }}
-          style={styles.activityImage}
+          style={[styles.activityImage, { opacity: activityImageOpacity }]}
           contentFit="cover"
+          onLoad={() => fadeInImage(activityImageOpacity)}
         />
       )}
 
@@ -677,7 +695,11 @@ export default function CircleProfileScreen({ route, navigation }) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>新歓LINEグループ</Text>
           <TouchableOpacity style={styles.lineButton} onPress={() => Linking.openURL(circleData.shinkanLineGroupLink)}>
-            <RNImage source={require('../assets/SNS-icons/LINE_Brand_icon.png')} style={styles.snsLogoImage} />
+            <Animated.Image 
+              source={require('../assets/SNS-icons/LINE_Brand_icon.png')} 
+              style={[styles.snsLogoImage, { opacity: lineLogoOpacity }]}
+              onLoad={() => fadeInImage(lineLogoOpacity)}
+            />
             <Text style={styles.lineButtonText}>LINEグループを開く</Text>
           </TouchableOpacity>
         </View>
@@ -774,22 +796,30 @@ export default function CircleProfileScreen({ route, navigation }) {
         {/* ヘッダー画像エリア */}
         {circleData.headerImageUrl && (
           <View style={styles.headerImageContainer}>
-            <Image source={{ uri: circleData.headerImageUrl }} style={styles.headerImage} />
+            <Animated.Image 
+              source={{ uri: circleData.headerImageUrl }} 
+              style={[styles.headerImage, { opacity: headerImageOpacity }]}
+              onLoad={() => fadeInImage(headerImageOpacity)}
+            />
           </View>
         )}
 
         {/* サークル基本情報 */}
         <View style={styles.circleInfoSection}>
           <View style={styles.circleInfo}>
-            <View style={styles.logoContainer}>
-              {circleData.imageUrl ? (
-                <Image source={{ uri: circleData.imageUrl }} style={styles.circleLogo} />
-              ) : (
-                <View style={styles.logoPlaceholder}>
-                  <Ionicons name="people-outline" size={32} color="#ccc" />
-                </View>
-              )}
-            </View>
+              <View style={styles.logoContainer}>
+                {circleData.imageUrl ? (
+                  <Animated.Image 
+                    source={{ uri: circleData.imageUrl }} 
+                    style={[styles.circleLogo, { opacity: circleLogoOpacity }]}
+                    onLoad={() => fadeInImage(circleLogoOpacity)}
+                  />
+                ) : (
+                  <View style={styles.logoPlaceholder}>
+                    <Ionicons name="people-outline" size={32} color="#ccc" />
+                  </View>
+                )}
+              </View>
             <View style={styles.circleTextInfo}>
               <View style={styles.circleNameRow}>
                 <Text style={styles.circleName}>{circleData.name}</Text>
@@ -799,21 +829,29 @@ export default function CircleProfileScreen({ route, navigation }) {
                     <Text style={styles.officialText}>公式</Text>
                   </View>
                 )}
-                {/* SNSボタン（X, Instagram） */}
-                {(circleData.xLink || circleData.snsLink) && (
-                  <View style={styles.snsIconRow}>
-                    {circleData.snsLink && (
-                      <TouchableOpacity onPress={() => Linking.openURL(circleData.snsLink)} style={styles.snsIconButton}>
-                        <RNImage source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} style={styles.snsLogoImage} />
-                      </TouchableOpacity>
-                    )}
-                    {circleData.xLink && (
-                      <TouchableOpacity onPress={() => Linking.openURL(circleData.xLink)} style={styles.snsIconButton}>
-                        <RNImage source={require('../assets/SNS-icons/X_logo-black.png')} style={styles.snsLogoImage} />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                )}
+                  {/* SNSボタン（X, Instagram） */}
+                  {(circleData.xLink || circleData.snsLink) && (
+                    <View style={styles.snsIconRow}>
+                      {circleData.snsLink && (
+                        <TouchableOpacity onPress={() => Linking.openURL(circleData.snsLink)} style={styles.snsIconButton}>
+                          <Animated.Image 
+                            source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} 
+                            style={[styles.snsLogoImage, { opacity: instagramLogoOpacity }]}
+                            onLoad={() => fadeInImage(instagramLogoOpacity)}
+                          />
+                        </TouchableOpacity>
+                      )}
+                      {circleData.xLink && (
+                        <TouchableOpacity onPress={() => Linking.openURL(circleData.xLink)} style={styles.snsIconButton}>
+                          <Animated.Image 
+                            source={require('../assets/SNS-icons/X_logo-black.png')} 
+                            style={[styles.snsLogoImage, { opacity: xLogoOpacity }]}
+                            onLoad={() => fadeInImage(xLogoOpacity)}
+                          />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
               </View>
               <Text style={styles.universityName}>{circleData.universityName}</Text>
               <Text style={styles.genre}>{circleData.genre}</Text>

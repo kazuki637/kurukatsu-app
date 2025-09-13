@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert, ActivityIndicator, Image, Platform, KeyboardAvoidingView } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert, ActivityIndicator, Image, Platform, KeyboardAvoidingView, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { db, storage } from '../firebaseConfig';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
@@ -42,6 +42,23 @@ export default function CircleSettingsScreen({ route, navigation }) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [circleType, setCircleType] = useState('学内サークル'); // サークル種別を追加
+  const [imageLoading, setImageLoading] = useState(true);
+  const [imageError, setImageError] = useState(false);
+  
+  // アニメーション用のstate
+  const circleImageOpacity = useRef(new Animated.Value(0)).current;
+
+  // 画像のフェードインアニメーション
+  useEffect(() => {
+    if (!imageLoading && (circleImage || circleImageUrl || !imageError)) {
+      // 画像が読み込まれた時、またはデフォルトアイコンの時にフェードイン
+      Animated.timing(circleImageOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [imageLoading, circleImage, circleImageUrl, imageError]);
 
   useEffect(() => {
     const fetchCircle = async () => {
@@ -65,8 +82,17 @@ export default function CircleSettingsScreen({ route, navigation }) {
           setXLink(d.xLink || '');
           setShinkanLineGroupLink(d.shinkanLineGroupLink || '');
           setIsRecruiting(d.welcome?.isRecruiting || false);
-          setCircleImageUrl(d.imageUrl || '');
+          const newImageUrl = d.imageUrl || '';
+          const isImageUrlChanged = circleImageUrl !== newImageUrl;
+          setCircleImageUrl(newImageUrl);
           setCircleType(d.circleType || '学内サークル'); // サークル種別を設定
+          
+          // 画像URLが変更された場合のみ読み込み状態をリセット
+          if (isImageUrlChanged) {
+            setImageLoading(true);
+            setImageError(false);
+            circleImageOpacity.setValue(0);
+          }
         }
       } catch (e) {
         Alert.alert('エラー', 'サークル情報の取得に失敗しました');
@@ -175,6 +201,10 @@ export default function CircleSettingsScreen({ route, navigation }) {
         onCropComplete: (croppedUri) => {
           setCircleImage(croppedUri);
           setHasUnsavedChanges(true);
+          // 画像の読み込み状態をリセット
+          setImageLoading(true);
+          setImageError(false);
+          circleImageOpacity.setValue(0);
           console.log('サークル設定画面: 画像切り抜き完了');
         }
       });
@@ -259,11 +289,24 @@ export default function CircleSettingsScreen({ route, navigation }) {
             <Text style={styles.label}>サークルアイコン画像</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: 8, marginBottom: 16 }}>
               <TouchableOpacity style={[styles.circleImagePicker, {marginTop: 0, marginBottom: 0}]} onPress={pickCircleImage}>
-                {circleImage || circleImageUrl ? (
-                  <Image source={{ uri: circleImage || circleImageUrl }} style={styles.circleImage} />
-                ) : (
-                  <Ionicons name="image-outline" size={100} color="#ccc" />
-                )}
+                <Animated.View style={[styles.circleImageWrapper, { opacity: circleImageOpacity }]}>
+                  {circleImage || circleImageUrl ? (
+                    <Image 
+                      source={{ uri: circleImage || circleImageUrl }} 
+                      style={styles.circleImage}
+                      onLoad={() => setImageLoading(false)}
+                      onError={() => {
+                        setImageLoading(false);
+                        setImageError(true);
+                      }}
+                      fadeDuration={300}
+                    />
+                  ) : (
+                    <View style={styles.defaultImageContainer}>
+                      <Ionicons name="image-outline" size={100} color="#ccc" />
+                    </View>
+                  )}
+                </Animated.View>
               </TouchableOpacity>
               {/* 必要ならここにゴミ箱ボタン等も追加可能 */}
             </View>
@@ -575,7 +618,21 @@ const styles = StyleSheet.create({
   saveButton: { backgroundColor: '#007bff', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 24 },
   saveButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
   circleImagePicker: { alignItems: 'center', marginBottom: 16 },
+  circleImageWrapper: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    overflow: 'hidden',
+  },
   circleImage: { width: 100, height: 100, borderRadius: 50 },
+  defaultImageContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+  },
   // 入会募集状況関連のスタイル
   recruitingContainer: {
     flexDirection: 'row',

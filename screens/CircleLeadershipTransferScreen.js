@@ -188,7 +188,12 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
     // ログアウトチェックを追加
     const currentUser = auth.currentUser;
     if (currentUser) {
-      navigation.navigate('CircleManagementScreen');
+      // スタックをリセットしてCircleManagementScreenに遷移
+      // これにより「戻る」ボタンで代表者引き継ぎ画面に戻れなくなる
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'CircleManagementScreen' }],
+      });
     } else {
       // ログアウトしている場合はホーム画面に遷移
       navigation.navigate('Home');

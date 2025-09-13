@@ -261,60 +261,76 @@ const HomeScreen = ({ navigation }) => {
       <SafeAreaView style={styles.contentSafeArea}>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
           {/* 記事カード（横スクロール） */}
-          <View style={styles.infoCardsContainer}>
-            {articlesLoading && articles.length === 0 ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color="#999" />
-              </View>
-            ) : articles.length > 0 ? (
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.infoCardsScrollContainer}
-                pagingEnabled={true}
-                snapToInterval={295}
-                decelerationRate={0}
-                snapToAlignment="center"
-                scrollEventThrottle={16}
+          <View style={styles.articleSectionContainer}>
+            {/* 記事セクションヘッダー */}
+            <View style={styles.articleSectionHeader}>
+              <Text style={styles.articleSectionTitle}>クルカツ記事</Text>
+              <TouchableOpacity 
+                style={styles.moreButton}
+                onPress={() => navigation.navigate('ArticleList')}
               >
-                {articles.map((article) => (
-                  <TouchableOpacity 
-                    key={article.id}
-                    style={styles.infoCard}
-                    onPress={() => navigation.navigate('ArticleWebView', { 
-                      url: article.url, 
-                      title: article.title 
-                    })}
-                  >
-                    {article.thumbnailUrl ? (
-                      <Image 
-                        source={{ uri: article.thumbnailUrl }} 
-                        style={styles.infoCardImage}
-                        resizeMode="cover"
-                        fadeDuration={300}
-                      />
-                    ) : (
-                      <View style={[styles.infoCardImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
-                        <Ionicons name="document-text-outline" size={40} color="#ccc" />
+                <Text style={styles.moreButtonText}>もっと見る</Text>
+                <Ionicons name="chevron-forward" size={14} color="#007bff" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.infoCardsContainer}>
+              {articlesLoading && articles.length === 0 ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="small" color="#999" />
+                </View>
+              ) : articles.length > 0 ? (
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.infoCardsScrollContainer}
+                  pagingEnabled={true}
+                  snapToInterval={295}
+                  decelerationRate={0}
+                  snapToAlignment="center"
+                  scrollEventThrottle={16}
+                >
+                  {articles.map((article) => (
+                    <TouchableOpacity 
+                      key={article.id}
+                      style={styles.infoCard}
+                      onPress={() => navigation.navigate('ArticleWebView', { 
+                        url: article.url, 
+                        title: article.title 
+                      })}
+                    >
+                      {article.thumbnailUrl ? (
+                        <Image 
+                          source={{ uri: article.thumbnailUrl }} 
+                          style={styles.infoCardImage}
+                          resizeMode="cover"
+                          fadeDuration={300}
+                        />
+                      ) : (
+                        <View style={[styles.infoCardImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
+                          <Ionicons name="document-text-outline" size={40} color="#ccc" />
+                        </View>
+                      )}
+                      <View style={styles.infoCardContent}>
+                        <Text style={styles.infoCardTitle} numberOfLines={2}>{article.title}</Text>
+                        <View style={styles.infoCardFooter}>
+                          {article.author && (
+                            <Text style={styles.infoCardSubtitle} numberOfLines={1}>{article.author}</Text>
+                          )}
+                          {article.createdAt && (
+                            <Text style={styles.infoCardDate}>{formatDate(article.createdAt)}</Text>
+                          )}
+                        </View>
                       </View>
-                    )}
-                    <View style={styles.infoCardContent}>
-                      <Text style={styles.infoCardTitle} numberOfLines={2}>{article.title}</Text>
-                      {article.author && (
-                        <Text style={styles.infoCardSubtitle} numberOfLines={1}>{article.author}</Text>
-                      )}
-                      {article.createdAt && (
-                        <Text style={styles.infoCardDate}>{formatDate(article.createdAt)}</Text>
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            ) : (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>記事がありません</Text>
-              </View>
-            )}
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              ) : (
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>記事がありません</Text>
+                </View>
+              )}
+            </View>
           </View>
 
 
@@ -468,10 +484,39 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  // 記事セクション
+  articleSectionContainer: {
+    marginBottom: 20,
+  },
+  articleSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    marginBottom: 10,
+  },
+  articleSectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  moreButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  moreButtonText: {
+    fontSize: 14,
+    color: '#007bff',
+    fontWeight: '500',
+    marginRight: 4,
+  },
   // 情報カード（横スクロール）
   infoCardsContainer: {
-    marginTop: 20,
-    marginBottom: 20,
+    marginTop: 0,
+    marginBottom: 0,
   },
   infoCardsScrollContainer: {
     paddingHorizontal: 20,
@@ -488,7 +533,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
     overflow: 'hidden',
-    minHeight: 200,
+    height: 250,
   },
   infoCardImage: {
     width: '100%',
@@ -496,22 +541,34 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
   },
   infoCardContent: {
+    flex: 1,
     padding: 15,
+    position: 'relative',
   },
   infoCardTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#333',
     marginBottom: 4,
+    lineHeight: 18,
+    paddingBottom: 20,
   },
   infoCardSubtitle: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
-    marginBottom: 8,
   },
   infoCardDate: {
     fontSize: 12,
     color: '#999',
+  },
+  infoCardFooter: {
+    position: 'absolute',
+    bottom: 10,
+    left: 15,
+    right: 15,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   // 機能アイコン行
   functionIconsContainer: {
@@ -550,7 +607,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 15,
+    marginBottom: 10,
   },
   // お気に入りサークル
   favoriteCirclesContainer: {
@@ -761,3 +818,4 @@ const styles = StyleSheet.create({
 });
 
 export default HomeScreen;
+

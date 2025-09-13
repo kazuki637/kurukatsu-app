@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,9 @@ import {
   Alert,
   Linking, // Import Linking
   SafeAreaView, // Import SafeAreaView
+  Animated, // Import Animated for animations
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, CommonActions } from '@react-navigation/native';
 import { auth, db, storage } from '../firebaseConfig';
@@ -47,6 +49,10 @@ export default function MyPageScreen({ navigation, route }) {
   
   // 統合ローディング状態：初回ロード時は全てのデータが揃うまでローディング表示
   const [isDataReady, setIsDataReady] = useState(false);
+  
+  // アニメーション用のstate
+  const profileImageOpacity = useRef(new Animated.Value(0)).current;
+  const screenOpacity = useRef(new Animated.Value(0)).current;
 
   // 画像のプリロード
   useEffect(() => {
@@ -59,8 +65,33 @@ export default function MyPageScreen({ navigation, route }) {
       Image.prefetch(userProfile.profileImageUrl).catch(() => {
         // プリロードに失敗した場合は無視（通常の読み込みにフォールバック）
       });
+    } else {
+      // 画像がない場合は即座に読み込み完了状態に設定
+      setImageLoading(false);
+      setImageError(false);
     }
   }, [userProfile?.profileImageUrl]);
+
+  // フェードインアニメーション
+  useEffect(() => {
+    if (userProfile?.profileImageUrl && userProfile.profileImageUrl.trim() !== '') {
+      // 画像がある場合：画像の読み込み完了時にフェードイン
+      if (!imageLoading && !imageError) {
+        Animated.timing(profileImageOpacity, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }).start();
+      }
+    } else {
+      // 画像がない場合：デフォルトアイコンを即座にフェードイン
+      Animated.timing(profileImageOpacity, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [imageLoading, userProfile?.profileImageUrl, imageError]);
   
   // リアルタイム未読数更新関数をグローバルに登録
   React.useEffect(() => {
@@ -179,6 +210,12 @@ export default function MyPageScreen({ navigation, route }) {
   React.useEffect(() => {
     if (isDataReady && isInitialLoad) {
       setIsInitialLoad(false);
+      // ローディング完了時に画面全体をフェードイン
+      Animated.timing(screenOpacity, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }).start();
     }
   }, [isDataReady, isInitialLoad]);
   
@@ -240,49 +277,71 @@ export default function MyPageScreen({ navigation, route }) {
     <View style={styles.container}>
       <CommonHeader title="マイページ" />
       <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView>
-          <View style={styles.profileSection}>
-            <View style={styles.profileImageContainerSimple}>
-              {userProfile?.profileImageUrl && userProfile.profileImageUrl.trim() !== '' && !imageError ? (
-                <View style={styles.profileImageWrapper}>
-                  <Image
-                    source={{ 
-                      uri: userProfile.profileImageUrl,
-                      cache: 'force-cache' // 強制キャッシュを使用
-                    }}
-                    style={styles.profileImage}
-                    onLoadStart={() => setImageLoading(true)}
-                    onLoadEnd={() => setImageLoading(false)}
-                    onError={() => {
-                      setImageError(true);
-                      setImageLoading(false);
-                    }}
-                    resizeMode="cover"
-                  />
-                  {imageLoading && (
-                    <View style={styles.imageLoadingOverlay}>
-                      <ActivityIndicator size="small" color="#007bff" />
+        <Animated.View style={[styles.mainContent, { opacity: screenOpacity }]}>
+          <ScrollView>
+          <LinearGradient
+            colors={['#2377ee', '#42a5f5']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.profileSection}
+          >
+            <View style={styles.profileContent}>
+              <View style={styles.profileImageContainer}>
+                <Animated.View style={[styles.profileImageWrapper, { opacity: profileImageOpacity }]}>
+                  {userProfile?.profileImageUrl && userProfile.profileImageUrl.trim() !== '' && !imageError ? (
+                    <>
+                      <Image
+                        source={{ 
+                          uri: userProfile.profileImageUrl,
+                          cache: 'force-cache' // 強制キャッシュを使用
+                        }}
+                        style={styles.profileImage}
+                        onLoadStart={() => setImageLoading(true)}
+                        onLoadEnd={() => setImageLoading(false)}
+                        onError={() => {
+                          setImageError(true);
+                          setImageLoading(false);
+                        }}
+                        resizeMode="cover"
+                      />
+                       {imageLoading && (
+                         <View style={styles.imageLoadingOverlay}>
+                           <ActivityIndicator size="small" color="#1976d2" />
+                         </View>
+                       )}
+                    </>
+                  ) : (
+                    <View style={[styles.profileImage, {backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
+                      <Ionicons name="person-outline" size={48} color="rgba(255,255,255,0.8)" />
                     </View>
                   )}
-                </View>
-              ) : (
-                <View style={[styles.profileImage, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
-                  <Ionicons name="person-outline" size={48} color="#aaa" />
-                </View>
-              )}
+                  <View style={styles.profileImageBorder} />
+                </Animated.View>
+                 <TouchableOpacity style={styles.editIconButton} onPress={() => navigation.navigate('ProfileEdit')}>
+                   <Ionicons name="pencil" size={16} color="#1976d2" />
+                 </TouchableOpacity>
+              </View>
+              
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>{userProfile?.name || 'ユーザー名'}</Text>
+                {(userProfile?.university || userProfile?.grade) && (
+                  <View style={styles.universityInfo}>
+                    <Ionicons name="school-outline" size={16} color="rgba(255,255,255,0.8)" />
+                    <Text style={styles.userUniversity}>
+                      {userProfile?.university || ''}
+                      {userProfile?.university && userProfile?.grade ? '・' : ''}
+                      {userProfile?.grade || ''}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              
+               <TouchableOpacity style={styles.editProfileButton} onPress={() => navigation.navigate('ProfileEdit')}>
+                 <Ionicons name="settings-outline" size={18} color="#1976d2" />
+                 <Text style={styles.editProfileButtonText}>プロフィールを編集</Text>
+               </TouchableOpacity>
             </View>
-            <Text style={styles.userName}>{userProfile?.name || 'ユーザー名'}</Text>
-            {(userProfile?.university || userProfile?.grade) && (
-              <Text style={styles.userUniversity}>
-                {userProfile?.university || ''}
-                {userProfile?.university && userProfile?.grade ? '・' : ''}
-                {userProfile?.grade || ''}
-              </Text>
-            )}
-            <TouchableOpacity style={styles.editProfileButton} onPress={() => navigation.navigate('ProfileEdit')}>
-              <Text style={styles.editProfileButtonText}>プロフィールを編集</Text>
-            </TouchableOpacity>
-          </View>
+          </LinearGradient>
           <View style={styles.contentArea}>
             <Text style={styles.sectionTitle}>所属しているサークル</Text>
             {joinedCircles.length > 0 ? (
@@ -293,17 +352,27 @@ export default function MyPageScreen({ navigation, route }) {
                   onPress={() => navigation.navigate('CircleMember', { circleId: circle.id })}
                 >
                   <View style={styles.circleCard}>
-                    {circle.imageUrl ? (
-                      <Image source={{ uri: circle.imageUrl }} style={styles.circleImage} />
-                    ) : (
-                      <View style={[styles.circleImage, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
-                        <Ionicons name="people-outline" size={40} color="#aaa" />
-                      </View>
-                    )}
+                    <View style={styles.circleImageContainer}>
+                      {circle.imageUrl ? (
+                        <Image source={{ uri: circle.imageUrl }} style={styles.circleImage} />
+                      ) : (
+                        <View style={[styles.circleImage, { backgroundColor: '#f8f9fa', justifyContent: 'center', alignItems: 'center' }]}> 
+                          <Ionicons name="people-outline" size={32} color="#6c757d" />
+                        </View>
+                      )}
+                    </View>
+                    
                     <View style={styles.circleInfo}>
-                      <Text style={styles.circleCategory}>サークル | {circle.genre || 'その他'}</Text>
+                      <View style={styles.circleCategoryContainer}>
+                        <View style={styles.categoryBadge}>
+                          <Text style={styles.circleCategory}>{circle.genre || 'その他'}</Text>
+                        </View>
+                      </View>
                       <Text style={styles.circleName}>{circle.name}</Text>
-                      <Text style={styles.circleEvent}>{circle.universityName || '大学名未設定'}</Text>
+                      <View style={styles.circleUniversityContainer}>
+                        <Ionicons name="school-outline" size={14} color="#6c757d" />
+                        <Text style={styles.circleEvent}>{circle.universityName || '大学名未設定'}</Text>
+                      </View>
                     </View>
                     
                     {/* 未読通知バッジ */}
@@ -323,19 +392,69 @@ export default function MyPageScreen({ navigation, route }) {
             )}
           </View>
 
-        </ScrollView>
+          </ScrollView>
+        </Animated.View>
       </SafeAreaView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+  container: { flex: 1, backgroundColor: '#f8f9fa' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  profileSection: { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 20 },
-  profileImageContainerSimple: { alignItems: 'center', marginBottom: 12 },
-  profileImageWrapper: { position: 'relative' },
-  profileImage: { width: 100, height: 100, borderRadius: 50 },
+  mainContent: { flex: 1 },
+  
+  // プロフィールセクションのスタイル
+  profileSection: { 
+    paddingVertical: 40, 
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  profileContent: {
+    alignItems: 'center',
+  },
+  profileImageContainer: {
+    position: 'relative',
+    marginBottom: 20,
+  },
+  profileImageWrapper: { 
+    position: 'relative',
+    alignItems: 'center',
+  },
+  profileImage: { 
+    width: 120, 
+    height: 120, 
+    borderRadius: 60,
+    borderWidth: 4,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  profileImageBorder: {
+    position: 'absolute',
+    top: -8,
+    left: -8,
+    right: -8,
+    bottom: -8,
+    borderRadius: 68,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  editIconButton: {
+    position: 'absolute',
+    bottom: 5,
+    right: 5,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
   imageLoadingOverlay: {
     position: 'absolute',
     top: 0,
@@ -345,15 +464,67 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 50,
+    borderRadius: 60,
   },
-  userName: { fontSize: 22, fontWeight: 'bold', color: '#333', marginTop: 10 },
-  userUniversity: { fontSize: 16, color: '#666', marginTop: 4 },
-  editProfileButton: { marginTop: 15, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, paddingVertical: 8, alignItems: 'center', paddingHorizontal: 24 },
-  editProfileButtonText: { color: '#333', fontWeight: 'bold', fontSize: 14 },
-  contentArea: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 },
-  contentTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15 },
-  sectionTitle: { fontSize: 18, fontWeight: 'bold', color: '#333', marginBottom: 15 },
+  userInfo: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  userName: { 
+    fontSize: 24, 
+    fontWeight: 'bold', 
+    color: '#fff', 
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  universityInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  userUniversity: { 
+    fontSize: 16, 
+    color: 'rgba(255,255,255,0.8)', 
+    marginLeft: 6,
+  },
+  editProfileButton: { 
+    backgroundColor: '#fff',
+    borderRadius: 25, 
+    paddingVertical: 12, 
+    paddingHorizontal: 30,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  editProfileButtonText: { 
+    color: '#1976d2', 
+    fontWeight: '600', 
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  contentArea: { 
+    paddingHorizontal: 20, 
+    paddingTop: 30, 
+    paddingBottom: 30,
+    backgroundColor: '#f8f9fa',
+  },
+  contentTitle: { 
+    fontSize: 20, 
+    fontWeight: 'bold', 
+    marginBottom: 15,
+    color: '#2c3e50',
+  },
+  sectionTitle: { 
+    fontSize: 20, 
+    fontWeight: '700', 
+    color: '#2c3e50', 
+    marginBottom: 20,
+    letterSpacing: 0.5,
+  },
   gridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
   gridItem: { width: (Dimensions.get('window').width - 20 * 3) / 2, marginBottom: 20 },
   gridImage: { width: '100%', height: (Dimensions.get('window').width - 20 * 3) / 2, borderRadius: 12, backgroundColor: '#e0e0e0' },
@@ -385,80 +556,118 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
-  // サークルカードスタイル（ホーム画面と同じ）
+  // サークルカードスタイル（改良版）
   circleCardContainer: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   circleCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 15,
+    borderRadius: 16,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  circleImageContainer: {
+    position: 'relative',
+    marginRight: 16,
   },
   circleImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: 15,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
   },
   circleInfo: {
     flex: 1,
   },
+  circleCategoryContainer: {
+    marginBottom: 8,
+  },
+  categoryBadge: {
+    backgroundColor: '#e3f2fd',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
   circleCategory: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 4,
+    fontSize: 11,
+    color: '#1976d2',
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   circleName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2c3e50',
+    marginBottom: 6,
+    lineHeight: 24,
+  },
+  circleUniversityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   circleEvent: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
+    color: '#6c757d',
+    marginLeft: 6,
   },
   bookmarkButton: {
     alignItems: 'center',
   },
   emptyContainer: {
     alignItems: 'center',
-    paddingVertical: 30,
+    paddingVertical: 50,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    marginTop: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   emptyText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 18,
+    color: '#6c757d',
     marginBottom: 8,
+    fontWeight: '600',
   },
   emptySubText: {
     fontSize: 14,
-    color: '#999',
+    color: '#adb5bd',
+    textAlign: 'center',
+    lineHeight: 20,
   },
-  // 未読通知バッジ（CircleMemberScreenと同じスタイル）
+  // 未読通知バッジ（改良版）
   unreadBadge: {
     backgroundColor: '#ff4757',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    borderRadius: 12,
+    minWidth: 24,
+    height: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 10,
-    paddingHorizontal: 4,
+    marginLeft: 12,
+    paddingHorizontal: 6,
+    shadowColor: '#ff4757',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   unreadBadgeText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
 });
