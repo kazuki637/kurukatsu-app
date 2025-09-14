@@ -20,7 +20,6 @@ import OnboardingScreen from './screens/OnboardingScreen';
 import HomeScreen from './screens/HomeScreen';
 import SearchScreen from './screens/SearchScreen';
 import MyPageScreen from './screens/MyPageScreen';
-import SettingsScreen from './screens/SettingsScreen';
 
 import UniversitySelectionScreen from './screens/UniversitySelectionScreen';
 import GenreSelectionScreen from './screens/GenreSelectionScreen';
@@ -322,7 +321,6 @@ function HomeStackScreen() {
       <HomeStack.Screen name="SearchResults" component={SearchResultsScreen} />
       <HomeStack.Screen name="ArticleWebView" component={ArticleWebViewScreen} />
       <HomeStack.Screen name="ArticleList" component={ArticleListScreen} />
-      <HomeStack.Screen name="Settings" component={SettingsScreen} />
       <HomeStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
       <HomeStack.Screen name="BlockManagement" component={BlockManagementScreen} />
       <HomeStack.Screen name="HelpScreen" component={HelpScreen} />
@@ -359,8 +357,11 @@ function MyPageStackScreen() {
       <MyPageStack.Screen name="CircleMember" component={CircleMemberScreen} />
       <MyPageStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} />
       <MyPageStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
-      
-      <MyPageStack.Screen name="Settings" component={SettingsScreen} />
+      <MyPageStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+      <MyPageStack.Screen name="BlockManagement" component={BlockManagementScreen} />
+      <MyPageStack.Screen name="HelpScreen" component={HelpScreen} />
+      <MyPageStack.Screen name="TermsOfServiceScreen" component={TermsOfServiceScreen} />
+      <MyPageStack.Screen name="PrivacyPolicyScreen" component={PrivacyPolicyScreen} />
     </MyPageStack.Navigator>
   );
 }

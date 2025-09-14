@@ -309,7 +309,7 @@ const SearchScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
-    backgroundColor: '#eef2f5',
+    backgroundColor: '#f5f5f5',
   },
   header: {
     width: '100%',
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
   },
   contentSafeArea: {
     flex: 1,
-    backgroundColor: '#eef2f5',
+    backgroundColor: '#f5f5f5',
   },
   container: {
     flex: 1,

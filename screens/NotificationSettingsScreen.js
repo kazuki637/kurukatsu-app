@@ -101,8 +101,6 @@ export default function NotificationSettingsScreen({ navigation }) {
       <SafeAreaView style={styles.contentSafeArea}>
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>通知の種類</Text>
-            
             <NotificationSettingItem
               label="入会申請通知"
               description="サークルに入会申請が届いた際の通知"

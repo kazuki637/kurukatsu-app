@@ -10,7 +10,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function CircleMemberManagementScreen({ route, navigation }) {
   const { circleId, initialTab } = route.params;
-  const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState([]);
   const [joinRequests, setJoinRequests] = useState([]);
   const [searchText, setSearchText] = useState('');
@@ -27,6 +26,8 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
   const [selectedMember, setSelectedMember] = useState(null);
   const [currentUserRole, setCurrentUserRole] = useState(null);
   const [circleName, setCircleName] = useState('');
+  const [membersLoading, setMembersLoading] = useState(true);
+  const [requestsLoading, setRequestsLoading] = useState(true);
 
   // 入会申請数更新関数をグローバルに登録
   React.useEffect(() => {
@@ -62,7 +63,8 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
 
   useEffect(() => {
     const fetchMembers = async () => {
-      setLoading(true);
+      setMembersLoading(true);
+      setRequestsLoading(true);
       try {
         // サークル名を取得
         const circleDoc = await getDoc(doc(db, 'circles', circleId));
@@ -94,6 +96,7 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
           };
         });
         setMembers(membersList);
+        setMembersLoading(false);
         
         // グローバルメンバー数を更新
         global.updateMemberCount(circleId, membersList.length);
@@ -118,10 +121,11 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
           }
         }
         setJoinRequests(requestsList);
+        setRequestsLoading(false);
       } catch (e) {
         Alert.alert('エラー', 'メンバー情報の取得に失敗しました');
-      } finally {
-        setLoading(false);
+        setMembersLoading(false);
+        setRequestsLoading(false);
       }
     };
     fetchMembers();
@@ -240,7 +244,6 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
       return;
     }
 
-    setLoading(true);
     try {
       // ユーザー情報を取得
       const userDoc = await getDoc(doc(db, 'users', request.userId));
@@ -312,8 +315,6 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
     } catch (e) {
       console.error('Error approving request:', e);
       Alert.alert('エラー', '申請の許可に失敗しました');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -329,7 +330,6 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
       return;
     }
 
-    setLoading(true);
     try {
       await deleteDoc(doc(db, 'circles', circleId, 'joinRequests', requestId));
       setJoinRequests(prev => prev.filter(r => r.id !== requestId));
@@ -346,8 +346,6 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
       Alert.alert('却下完了', '入会申請を却下しました');
     } catch (e) {
       Alert.alert('エラー', '申請の却下に失敗しました');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -382,9 +380,6 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
 
   const canManageRoles = currentUserRole === 'leader' || currentUserRole === 'admin';
 
-  if (loading) {
-    return <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator size="small" color="#999" /></View>;
-  }
 
   return (
     <View style={styles.container}>
@@ -436,51 +431,55 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
                 件
               </Text>
             )}
-            <FlatList
-              data={filteredMembers}
-              keyExtractor={item => item.id}
-              renderItem={({ item }) => {
-                const hasImage = item.profileImageUrl && item.profileImageUrl.trim() !== '' && !imageErrorMap[item.id];
-                return (
-                  <View style={styles.memberItem}>
-                    {hasImage ? (
-                      <Image
-                        source={{ uri: item.profileImageUrl }}
-                        style={styles.memberAvatar}
-                        onError={() => setImageErrorMap(prev => ({ ...prev, [item.id]: true }))}
-                      />
-                    ) : (
-                      <View style={[styles.memberAvatar, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
-                        <Ionicons name="person-outline" size={40} color="#aaa" />
+            {membersLoading ? (
+              <ActivityIndicator size="small" color="#999" style={{ marginTop: 40 }} />
+            ) : (
+              <FlatList
+                data={filteredMembers}
+                keyExtractor={item => item.id}
+                renderItem={({ item }) => {
+                  const hasImage = item.profileImageUrl && item.profileImageUrl.trim() !== '' && !imageErrorMap[item.id];
+                  return (
+                    <View style={styles.memberItem}>
+                      {hasImage ? (
+                        <Image
+                          source={{ uri: item.profileImageUrl }}
+                          style={styles.memberAvatar}
+                          onError={() => setImageErrorMap(prev => ({ ...prev, [item.id]: true }))}
+                        />
+                      ) : (
+                        <View style={[styles.memberAvatar, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
+                          <Ionicons name="person-outline" size={40} color="#aaa" />
+                        </View>
+                      )}
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.memberName}>{item.name || '氏名未設定'}</Text>
+                        <Text style={styles.memberInfo}>{item.university || ''} {item.grade || ''}</Text>
+                        <Text style={styles.memberRole}>{getRoleDisplayName(item.role)}</Text>
                       </View>
-                    )}
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.memberName}>{item.name || '氏名未設定'}</Text>
-                      <Text style={styles.memberInfo}>{item.university || ''} {item.grade || ''}</Text>
-                      <Text style={styles.memberRole}>{getRoleDisplayName(item.role)}</Text>
+                      {canManageRoles && item.role !== 'leader' && (
+                        <TouchableOpacity 
+                          style={styles.roleButton} 
+                          onPress={() => {
+                            setSelectedMember(item);
+                            setRoleChangeModalVisible(true);
+                          }}
+                        >
+                          <Ionicons name="settings-outline" size={28} color="#007bff" />
+                        </TouchableOpacity>
+                      )}
+                      {canManageRoles && item.role !== 'leader' && (
+                        <TouchableOpacity style={styles.removeButton} onPress={() => handleRemove(item.id)}>
+                          <Ionicons name="remove-circle" size={36} color="#f44336" />
+                        </TouchableOpacity>
+                      )}
                     </View>
-                    {canManageRoles && item.role !== 'leader' && (
-                      <TouchableOpacity 
-                        style={styles.roleButton} 
-                        onPress={() => {
-                          setSelectedMember(item);
-                          setRoleChangeModalVisible(true);
-                        }}
-                      >
-                        <Ionicons name="settings-outline" size={28} color="#007bff" />
-                      </TouchableOpacity>
-                    )}
-                    {canManageRoles && item.role !== 'leader' && (
-                      <TouchableOpacity style={styles.removeButton} onPress={() => handleRemove(item.id)}>
-                        <Ionicons name="remove-circle" size={36} color="#f44336" />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                );
-              }}
-              ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#666', marginTop: 40 }}>メンバーがいません</Text>}
-              contentContainerStyle={{ padding: 20 }}
-            />
+                  );
+                }}
+                ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#666', marginTop: 40 }}>メンバーがいません</Text>}
+                contentContainerStyle={{ padding: 20 }}
+              />
+            )}
           </>
         )}
 
@@ -503,7 +502,9 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
                 件
               </Text>
             )}
-            {filteredRequests.length > 0 ? (
+            {requestsLoading ? (
+              <ActivityIndicator size="small" color="#999" style={{ marginTop: 40 }} />
+            ) : filteredRequests.length > 0 ? (
               <FlatList
                 data={filteredRequests}
                 keyExtractor={item => item.id}

@@ -20,6 +20,7 @@ import { useFocusEffect, CommonActions } from '@react-navigation/native';
 import { auth, db, storage } from '../firebaseConfig';
 import { doc, onSnapshot, updateDoc, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { signOut } from 'firebase/auth';
 import * as ImagePicker from 'expo-image-picker';
 import CommonHeader from '../components/CommonHeader';
 import useFirestoreDoc from '../hooks/useFirestoreDoc';
@@ -46,6 +47,71 @@ export default function MyPageScreen({ navigation, route }) {
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   const [unreadCounts, setUnreadCounts] = useState({}); // 未読通知数を管理
+  
+  // ログアウト機能
+  const handleLogout = async () => {
+    Alert.alert(
+      "ログアウト",
+      "本当にログアウトしますか？",
+      [
+        {
+          text: "キャンセル",
+          style: "cancel"
+        },
+        { 
+          text: "ログアウト", 
+          onPress: async () => {
+            try {
+              await signOut(auth);
+            } catch (error) {
+              console.error('Error logging out:', error);
+              Alert.alert('ログアウトエラー', 'ログアウトに失敗しました。');
+            }
+          },
+          style: 'destructive'
+        }
+      ]
+    );
+  };
+
+  // 設定項目のリスト（個別カード）
+  const settingsOptions = [];
+
+  // 統合メニュー項目のリスト
+  const getIntegratedSettingsItems = () => {
+    return [
+      {
+        label: '通知設定',
+        icon: 'notifications-outline',
+        onPress: () => navigation.navigate('NotificationSettings')
+      },
+      {
+        label: 'ブロックリスト',
+        icon: 'lock-closed-outline',
+        onPress: () => navigation.navigate('BlockManagement')
+      }
+    ];
+  };
+
+  const getIntegratedInfoItems = () => {
+    return [
+      {
+        label: 'お問い合わせ',
+        icon: 'help-circle-outline',
+        onPress: () => navigation.navigate('HelpScreen')
+      },
+      {
+        label: '利用規約',
+        icon: 'document-text-outline',
+        onPress: () => navigation.navigate('TermsOfServiceScreen')
+      },
+      {
+        label: 'プライバシーポリシー',
+        icon: 'shield-checkmark-outline',
+        onPress: () => navigation.navigate('PrivacyPolicyScreen')
+      }
+    ];
+  };
   
   // 統合ローディング状態：初回ロード時は全てのデータが揃うまでローディング表示
   const [isDataReady, setIsDataReady] = useState(false);
@@ -279,12 +345,7 @@ export default function MyPageScreen({ navigation, route }) {
       <SafeAreaView style={{ flex: 1 }}>
         <Animated.View style={[styles.mainContent, { opacity: screenOpacity }]}>
           <ScrollView>
-          <LinearGradient
-            colors={['#2377ee', '#42a5f5']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.profileSection}
-          >
+          <View style={styles.profileSection}>
             <View style={styles.profileContent}>
               <View style={styles.profileImageContainer}>
                 <Animated.View style={[styles.profileImageWrapper, { opacity: profileImageOpacity }]}>
@@ -311,22 +372,18 @@ export default function MyPageScreen({ navigation, route }) {
                        )}
                     </>
                   ) : (
-                    <View style={[styles.profileImage, {backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
-                      <Ionicons name="person-outline" size={48} color="rgba(255,255,255,0.8)" />
+                    <View style={[styles.profileImage, {backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
+                      <Ionicons name="person-outline" size={40} color="#999" />
                     </View>
                   )}
-                  <View style={styles.profileImageBorder} />
                 </Animated.View>
-                 <TouchableOpacity style={styles.editIconButton} onPress={() => navigation.navigate('ProfileEdit')}>
-                   <Ionicons name="pencil" size={16} color="#1976d2" />
-                 </TouchableOpacity>
               </View>
               
               <View style={styles.userInfo}>
                 <Text style={styles.userName}>{userProfile?.name || 'ユーザー名'}</Text>
                 {(userProfile?.university || userProfile?.grade) && (
                   <View style={styles.universityInfo}>
-                    <Ionicons name="school-outline" size={16} color="rgba(255,255,255,0.8)" />
+                    <Ionicons name="school-outline" size={16} color="#666" />
                     <Text style={styles.userUniversity}>
                       {userProfile?.university || ''}
                       {userProfile?.university && userProfile?.grade ? '・' : ''}
@@ -336,12 +393,11 @@ export default function MyPageScreen({ navigation, route }) {
                 )}
               </View>
               
-               <TouchableOpacity style={styles.editProfileButton} onPress={() => navigation.navigate('ProfileEdit')}>
-                 <Ionicons name="settings-outline" size={18} color="#1976d2" />
-                 <Text style={styles.editProfileButtonText}>プロフィールを編集</Text>
-               </TouchableOpacity>
+                 <TouchableOpacity style={styles.editProfileButton} onPress={() => navigation.navigate('ProfileEdit')}>
+                   <Text style={styles.editProfileButtonText}>プロフィールを編集</Text>
+                 </TouchableOpacity>
             </View>
-          </LinearGradient>
+          </View>
           <View style={styles.contentArea}>
             <Text style={styles.sectionTitle}>所属しているサークル</Text>
             {joinedCircles.length > 0 ? (
@@ -392,6 +448,64 @@ export default function MyPageScreen({ navigation, route }) {
             )}
           </View>
 
+          {/* 設定セクション */}
+          <View style={styles.settingsSection}>
+            <Text style={styles.sectionTitle}>設定</Text>
+            <View style={styles.integratedSettingsCard}>
+              {getIntegratedSettingsItems().map((item, index) => (
+                <TouchableOpacity
+                  key={item.label}
+                  style={[
+                    styles.integratedSettingItem,
+                    index < getIntegratedSettingsItems().length - 1 && styles.integratedSettingItemBorder
+                  ]}
+                  onPress={item.onPress}
+                >
+                  <View style={styles.settingItemLeft}>
+                    <Ionicons name={item.icon} size={20} color="#333" />
+                    <Text style={styles.settingItemText}>{item.label}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#ccc" />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* 情報セクション */}
+          <View style={styles.infoSection}>
+            <View style={styles.integratedInfoCard}>
+              {getIntegratedInfoItems().map((item, index) => (
+                <TouchableOpacity
+                  key={item.label}
+                  style={[
+                    styles.integratedSettingItem,
+                    index < getIntegratedInfoItems().length - 1 && styles.integratedSettingItemBorder
+                  ]}
+                  onPress={item.onPress}
+                >
+                  <View style={styles.settingItemLeft}>
+                    <Ionicons name={item.icon} size={20} color="#333" />
+                    <Text style={styles.settingItemText}>{item.label}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#ccc" />
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* ログアウトセクション */}
+          <View style={styles.logoutSection}>
+            <TouchableOpacity
+              style={styles.logoutItem}
+              onPress={handleLogout}
+            >
+              <View style={styles.settingItemLeft}>
+                <Ionicons name="log-out-outline" size={20} color="#ff3b30" />
+                <Text style={styles.logoutText}>ログアウト</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
           </ScrollView>
         </Animated.View>
       </SafeAreaView>
@@ -400,16 +514,14 @@ export default function MyPageScreen({ navigation, route }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
+  container: { flex: 1, backgroundColor: '#f5f5f5' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   mainContent: { flex: 1 },
   
   // プロフィールセクションのスタイル
   profileSection: { 
-    paddingVertical: 40, 
+    paddingVertical: 30, 
     paddingHorizontal: 20,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
   },
   profileContent: {
     alignItems: 'center',
@@ -423,11 +535,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   profileImage: { 
-    width: 120, 
-    height: 120, 
-    borderRadius: 60,
+    width: 100, 
+    height: 100, 
+    borderRadius: 50,
     borderWidth: 4,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: '#e0e0e0',
   },
   profileImageBorder: {
     position: 'absolute',
@@ -437,7 +549,7 @@ const styles = StyleSheet.create({
     bottom: -8,
     borderRadius: 68,
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
+    borderColor: '#e0e0e0',
   },
   editIconButton: {
     position: 'absolute',
@@ -471,9 +583,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   userName: { 
-    fontSize: 24, 
+    fontSize: 22, 
     fontWeight: 'bold', 
-    color: '#fff', 
+    color: '#333', 
     marginBottom: 8,
     textAlign: 'center',
   },
@@ -484,33 +596,29 @@ const styles = StyleSheet.create({
   },
   userUniversity: { 
     fontSize: 16, 
-    color: 'rgba(255,255,255,0.8)', 
+    color: '#666', 
     marginLeft: 6,
   },
   editProfileButton: { 
-    backgroundColor: '#fff',
-    borderRadius: 25, 
-    paddingVertical: 12, 
-    paddingHorizontal: 30,
+    backgroundColor: 'transparent',
+    borderRadius: 8, 
+    paddingVertical: 8, 
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   editProfileButtonText: { 
-    color: '#1976d2', 
-    fontWeight: '600', 
-    fontSize: 16,
-    marginLeft: 8,
+    color: '#333', 
+    fontWeight: '500', 
+    fontSize: 14,
   },
   contentArea: { 
     paddingHorizontal: 20, 
-    paddingTop: 30, 
-    paddingBottom: 30,
-    backgroundColor: '#f8f9fa',
+    paddingTop: 20, 
+    paddingBottom: 20,
+    backgroundColor: '#f5f5f5',
   },
   contentTitle: { 
     fontSize: 20, 
@@ -556,7 +664,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
-  // サークルカードスタイル（改良版）
+  // サークルカードスタイル（設定項目と統一）
   circleCardContainer: {
     marginBottom: 16,
   },
@@ -564,18 +672,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 12,
     padding: 20,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 1,
     },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   circleImageContainer: {
     position: 'relative',
@@ -629,13 +735,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 50,
     backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 12,
     marginTop: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   emptyText: {
     fontSize: 18,
@@ -659,15 +768,96 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginLeft: 12,
     paddingHorizontal: 6,
-    shadowColor: '#ff4757',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
   },
   unreadBadgeText: {
     color: '#fff',
     fontSize: 12,
     fontWeight: '700',
+  },
+
+  // 設定セクションのスタイル
+  settingsSection: {
+    marginTop: 10,
+    paddingHorizontal: 20,
+  },
+  infoSection: {
+    marginTop: 15,
+    paddingHorizontal: 20,
+  },
+  integratedSettingsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  integratedInfoCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  integratedSettingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  integratedSettingItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  settingItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  settingItemText: {
+    fontSize: 16,
+    color: '#333',
+    marginLeft: 12,
+    fontWeight: '400',
+  },
+
+  // ログアウトセクションのスタイル
+  logoutSection: {
+    marginTop: 15,
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  logoutItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  logoutText: {
+    fontSize: 16,
+    color: '#ff3b30',
+    marginLeft: 12,
+    fontWeight: '400',
   },
 });

@@ -387,7 +387,7 @@ const SearchResultsScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
-    backgroundColor: '#eef2f5',
+    backgroundColor: '#f5f5f5',
   },
   header: {
     width: '100%',
@@ -421,7 +421,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#f5f5f5',
   },
   listContent: {
     paddingHorizontal: 15,

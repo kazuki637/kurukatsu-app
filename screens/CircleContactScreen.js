@@ -12,10 +12,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function CircleContactScreen({ route, navigation }) {
   const { circleId } = route.params;
-  const [loading, setLoading] = useState(true);
   const [members, setMembers] = useState([]); // メンバー一覧
   const [selectedUids, setSelectedUids] = useState([]); // 選択されたuid
   const [selectAll, setSelectAll] = useState(false);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(true); // メンバー情報取得中フラグ
   const [modalVisible, setModalVisible] = useState(false); // 宛先選択モーダル
   const [messageType, setMessageType] = useState('normal'); // 通常連絡, 出欠確認
   const [title, setTitle] = useState('');
@@ -31,6 +31,11 @@ export default function CircleContactScreen({ route, navigation }) {
     const currentUser = auth.currentUser;
     if (!currentUser) return true;
     return selectedUids.length === 1 && selectedUids.includes(currentUser.uid);
+  };
+
+  // 送信ボタンが無効かどうかを判定
+  const isSendButtonDisabled = () => {
+    return isLoadingMembers || isOnlySelfSelected();
   };
 
   // メンバー数更新関数をグローバルに登録
@@ -51,7 +56,7 @@ export default function CircleContactScreen({ route, navigation }) {
   // 初回ロード時にメンバー一覧取得
   useEffect(() => {
     const fetchMembers = async () => {
-      setLoading(true);
+      setIsLoadingMembers(true);
       try {
         const currentUser = auth.currentUser;
         if (!currentUser) {
@@ -91,7 +96,7 @@ export default function CircleContactScreen({ route, navigation }) {
         Alert.alert('エラー', 'メンバー一覧の取得に失敗しました');
         navigation.goBack();
       } finally {
-        setLoading(false);
+        setIsLoadingMembers(false);
       }
     };
     fetchMembers();
@@ -148,7 +153,6 @@ export default function CircleContactScreen({ route, navigation }) {
       Alert.alert('エラー', '回答期限を設定してください');
       return;
     }
-    setLoading(true);
     try {
       const sender = auth.currentUser;
       if (!sender) {
@@ -238,14 +242,9 @@ export default function CircleContactScreen({ route, navigation }) {
     } catch (e) {
       console.error('Error sending message:', e);
       Alert.alert('エラー', 'メッセージの送信に失敗しました');
-    } finally {
-      setLoading(false);
     }
   };
 
-  if (loading) {
-    return <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator size="small" color="#999" /></View>;
-  }
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
@@ -275,14 +274,16 @@ export default function CircleContactScreen({ route, navigation }) {
             <Text style={{ color: '#007bff', fontWeight: 'bold' }}>宛先を選択</Text>
           </TouchableOpacity>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 16 }}>
-            {selectedUids.length === members.length && members.length > 0 ? (
+            {isLoadingMembers ? (
+              <Text style={{ color: '#007bff' }}>選択中のメンバー（1人、自分含む）</Text>
+            ) : selectedUids.length === members.length && members.length > 0 ? (
               <Text style={{ color: '#007bff' }}>全員（自分含む）</Text>
             ) : selectedUids.length > 0 ? (
               <Text style={{ color: '#007bff' }}>選択中のメンバー（{selectedUids.length}人、自分含む）</Text>
             ) : (
               <Text style={{ color: '#007bff' }}>自分（強制選択）</Text>
             )}
-            {isOnlySelfSelected() && (
+            {(isLoadingMembers || isOnlySelfSelected()) && (
               <Text style={{ color: '#dc3545', fontSize: 12, marginTop: 4 }}>
                 宛先を選択してください（自分以外のメンバーを選択してください）
               </Text>
@@ -339,13 +340,13 @@ export default function CircleContactScreen({ route, navigation }) {
           {/* 送信ボタン */}
           <TouchableOpacity 
             style={{ 
-              backgroundColor: isOnlySelfSelected() ? '#ccc' : '#007bff', 
+              backgroundColor: isSendButtonDisabled() ? '#ccc' : '#007bff', 
               borderRadius: 8, 
               padding: 16, 
               alignItems: 'center' 
             }} 
             onPress={handleSend}
-            disabled={isOnlySelfSelected()}
+            disabled={isSendButtonDisabled()}
           >
             <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>送信</Text>
           </TouchableOpacity>

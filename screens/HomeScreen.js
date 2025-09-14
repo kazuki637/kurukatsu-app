@@ -249,14 +249,6 @@ const HomeScreen = ({ navigation }) => {
             resizeMode="contain"
           />
         }
-        rightButton={
-          <TouchableOpacity 
-            onPress={() => navigation.navigate('Settings')}
-            style={styles.settingsButton}
-          >
-            <Ionicons name="settings-outline" size={26} color="#333" />
-          </TouchableOpacity>
-        }
       />
       <SafeAreaView style={styles.contentSafeArea}>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -803,12 +795,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: 'bold',
-  },
-  // 設定ボタン
-  settingsButton: {
-    padding: 2,
-    borderRadius: 20,
-    backgroundColor: 'transparent',
   },
   // ヘッダータイトル画像
   headerTitleImage: {

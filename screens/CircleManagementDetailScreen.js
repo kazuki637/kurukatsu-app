@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, StatusBar, ActivityIndicator, Image, Alert, Dimensions, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, StatusBar, ActivityIndicator, Image, Alert, Dimensions, ScrollView, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -25,6 +25,8 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
   const [userRole, setUserRole] = useState(null);
   const [joinRequestsCount, setJoinRequestsCount] = useState(0);
   const [imageError, setImageError] = useState(false);
+  const [isCardFlipped, setIsCardFlipped] = useState(false);
+  const flipAnimation = useState(new Animated.Value(0))[0];
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -96,39 +98,29 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
 
   if (loading) {
     return (
-      <LinearGradient
-        colors={['#1e3a8a', '#3b82f6', '#60a5fa']}
-        style={styles.fullScreenContainer}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
+      <View style={styles.fullScreenContainer}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>{circleName || "サークル管理"}</Text>
         </View>
         <SafeAreaView style={styles.contentSafeArea}>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color="#007bff" />
           </View>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     );
   }
 
   if (!user) {
     return (
-      <LinearGradient
-        colors={['#1e3a8a', '#3b82f6', '#60a5fa']}
-        style={styles.fullScreenContainer}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
+      <View style={styles.fullScreenContainer}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>{circleName || "サークル管理"}</Text>
         </View>
         <SafeAreaView style={styles.contentSafeArea}>
-          <Text style={{ textAlign: 'center', marginTop: 40, color: '#fff' }}>ログインしてください</Text>
+          <Text style={{ textAlign: 'center', marginTop: 40, color: '#666' }}>ログインしてください</Text>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     );
   }
 
@@ -143,9 +135,9 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
     );
   }
 
-  // 管理ボタンのリスト（代表者のみ「代表者を引き継ぐ」ボタンを表示）
+  // 管理ボタンのリスト（moomoo証券スタイル）
   const getManagementButtonsGrid = () => {
-    const baseButtons = [
+    return [
       {
         label: 'プロフィール編集',
         icon: 'create-outline',
@@ -154,7 +146,24 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
       {
         label: 'メンバー管理',
         icon: 'people-outline',
-        onPress: () => navigation.navigate('CircleMemberManagement', { circleId })
+        onPress: () => navigation.navigate('CircleMemberManagement', { circleId }),
+        hasNotification: joinRequestsCount > 0,
+        notificationCount: joinRequestsCount
+      },
+      {
+        label: '代表者を引き継ぐ',
+        icon: 'swap-horizontal-outline',
+        onPress: () => {
+          if (userRole === 'leader') {
+            navigation.navigate('CircleLeadershipTransfer', { circleId, circleName });
+          } else {
+            Alert.alert(
+              'アクセス権限がありません',
+              '代表者のみが利用できる機能です。',
+              [{ text: 'OK' }]
+            );
+          }
+        }
       },
       {
         label: '連絡',
@@ -169,31 +178,83 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
       {
         label: 'サークル設定',
         icon: 'settings-outline',
-        onPress: () => navigation.navigate('CircleSettings', { circleId })
+        onPress: () => {
+          if (userRole === 'leader') {
+            navigation.navigate('CircleSettings', { circleId });
+          } else {
+            Alert.alert(
+              'アクセス権限がありません',
+              '代表者のみが利用できる機能です。',
+              [{ text: 'OK' }]
+            );
+          }
+        }
       }
     ];
+  };
 
-    // 代表者のみ「代表者を引き継ぐ」ボタンを追加
-    if (userRole === 'leader') {
-      baseButtons.splice(2, 0, {
-        label: '代表者を引き継ぐ',
-        icon: 'swap-horizontal-outline',
-        onPress: () => navigation.navigate('CircleLeadershipTransfer', { circleId, circleName })
-      });
-    }
+  // メニュー項目のリスト
+  const getMenuItems = () => {
+    return [
+      {
+        label: 'お友達紹介プログラム',
+        icon: 'people',
+        onPress: () => {
+          // TODO: お友達紹介プログラム画面への遷移
+          Alert.alert('お知らせ', 'お友達紹介プログラム機能は準備中です');
+        }
+      }
+    ];
+  };
 
-    return baseButtons;
+  // 統合メニュー項目のリスト
+  const getIntegratedMenuItems = () => {
+    return [
+      {
+        label: 'ミッション',
+        icon: 'trophy',
+        onPress: () => {
+          // TODO: ミッション画面への遷移
+          Alert.alert('お知らせ', 'ミッション機能は準備中です');
+        }
+      },
+      {
+        label: 'ポイント交換所',
+        icon: 'storefront',
+        onPress: () => {
+          // TODO: ポイント交換所画面への遷移
+          Alert.alert('お知らせ', 'ポイント交換所機能は準備中です');
+        }
+      },
+      {
+        label: 'キャンペーン情報',
+        icon: 'flame',
+        onPress: () => {
+          // TODO: キャンペーン情報画面への遷移
+          Alert.alert('お知らせ', 'キャンペーン情報機能は準備中です');
+        }
+      }
+    ];
   };
 
   const managementButtonsGrid = getManagementButtonsGrid();
+  const menuItems = getMenuItems();
+  const integratedMenuItems = getIntegratedMenuItems();
+
+  // カードをひっくり返す関数
+  const flipCard = () => {
+    const toValue = isCardFlipped ? 0 : 1;
+    setIsCardFlipped(!isCardFlipped);
+    
+    Animated.timing(flipAnimation, {
+      toValue,
+      duration: 600,
+      useNativeDriver: true,
+    }).start();
+  };
 
   return (
-    <LinearGradient
-      colors={['#1e3a8a', '#3b82f6', '#60a5fa']}
-      style={styles.fullScreenContainer}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-    >
+    <View style={styles.fullScreenContainer}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{circleName || "サークル管理"}</Text>
       </View>
@@ -226,11 +287,90 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
             </View>
           </View>
 
-          {/* 管理ボタン（グリッド） */}
+          {/* クルカツポイントカード */}
+          <View style={styles.kurukatsuPointsSection}>
+            <View style={styles.kurukatsuPointsCardContainer}>
+              <Animated.View 
+                style={[
+                  styles.kurukatsuPointsCard,
+                  {
+                    transform: [{
+                      rotateY: flipAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '180deg'],
+                      })
+                    }]
+                  }
+                ]}
+                pointerEvents={isCardFlipped ? 'none' : 'auto'}
+              >
+                {/* カードの表 */}
+                <View style={styles.kurukatsuPointsCardFront}>
+                  <Text style={styles.kurukatsuPointsTitle}>クルカツポイント</Text>
+                  <View style={styles.kurukatsuPointsContent}>
+                    <Image source={require('../assets/KP.png')} style={styles.kurukatsuPointsIcon} />
+                    <Text style={styles.kurukatsuPointsAmount}>0</Text>
+                    <Text style={styles.kurukatsuPointsUnit}>pt</Text>
+                  </View>
+                  {/* tapボタン（表） */}
+                  <TouchableOpacity 
+                    style={[styles.kurukatsuPointsTapButton, styles.kurukatsuPointsTapButtonFront]}
+                    onPress={flipCard}
+                  >
+                    <Text style={[styles.kurukatsuPointsTapText, styles.kurukatsuPointsTapTextFront]}>詳細を見る</Text>
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
+              
+              <Animated.View 
+                style={[
+                  styles.kurukatsuPointsCard,
+                  styles.kurukatsuPointsCardBack,
+                  {
+                    transform: [{
+                      rotateY: flipAnimation.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['180deg', '360deg'],
+                      })
+                    }]
+                  }
+                ]}
+                pointerEvents={isCardFlipped ? 'auto' : 'none'}
+              >
+                {/* カードの裏 */}
+                <View style={styles.kurukatsuPointsCardFront}>
+                  <Text style={styles.kurukatsuPointsTitle}>クルカツポイント</Text>
+                  <View style={styles.kurukatsuPointsBackButtons}>
+                    <TouchableOpacity style={styles.kurukatsuPointsBackButton}>
+                      <Ionicons name="time-outline" size={20} color="#007bff" />
+                      <Text style={styles.kurukatsuPointsBackButtonText}>履歴</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.kurukatsuPointsBackButton}>
+                      <Ionicons name="add-circle-outline" size={20} color="#007bff" />
+                      <Text style={styles.kurukatsuPointsBackButtonText}>貯める</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.kurukatsuPointsBackButton}>
+                      <Ionicons name="remove-circle-outline" size={20} color="#007bff" />
+                      <Text style={styles.kurukatsuPointsBackButtonText}>使う</Text>
+                    </TouchableOpacity>
+                  </View>
+                  {/* tapボタン（裏） */}
+                  <TouchableOpacity 
+                    style={[styles.kurukatsuPointsTapButton, styles.kurukatsuPointsTapButtonBack]}
+                    onPress={flipCard}
+                  >
+                    <Text style={[styles.kurukatsuPointsTapText, styles.kurukatsuPointsTapTextBack]}>戻る</Text>
+                  </TouchableOpacity>
+                </View>
+              </Animated.View>
+            </View>
+          </View>
+
+          {/* 管理ボタン（moomoo証券スタイル） */}
           <View style={styles.managementGridSection}>
-            {Array.from({ length: GRID_ROWS }).map((_, rowIdx) => (
-              <View style={styles.managementRow3col} key={rowIdx}>
-                {managementButtonsGrid.slice(rowIdx * GRID_COLUMNS, rowIdx * GRID_COLUMNS + GRID_COLUMNS).map((btn, colIdx) => (
+            {Array.from({ length: 2 }).map((_, rowIdx) => (
+              <View style={[styles.managementRow3col, rowIdx === 1 && styles.managementRow3colLast]} key={rowIdx}>
+                {managementButtonsGrid.slice(rowIdx * 3, rowIdx * 3 + 3).map((btn, colIdx) => (
                   btn ? (
                     <TouchableOpacity
                       key={btn.label}
@@ -238,11 +378,11 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
                       onPress={btn.onPress}
                     >
                       <View style={styles.buttonContent}>
-                        <Ionicons name={btn.icon} size={28} color="#007bff" />
+                        <Ionicons name={btn.icon} size={24} color="#007bff" />
                         <Text style={styles.managementGridItemText}>{btn.label}</Text>
-                        {btn.label === 'メンバー管理' && joinRequestsCount > 0 && (
+                        {btn.hasNotification && (
                           <View style={styles.notificationBadge}>
-                            <Text style={styles.notificationBadgeText}>{joinRequestsCount}</Text>
+                            <Text style={styles.notificationBadgeText}>{btn.notificationCount}</Text>
                           </View>
                         )}
                       </View>
@@ -253,27 +393,64 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
                 ))}
               </View>
             ))}
-            
+          </View>
 
+          {/* メニュー項目（moomoo証券スタイル） */}
+          <View style={styles.menuSection}>
+            {menuItems.map((item, index) => (
+              <TouchableOpacity
+                key={item.label}
+                style={styles.menuItem}
+                onPress={item.onPress}
+              >
+                <View style={styles.menuItemLeft}>
+                  <Ionicons name={item.icon} size={20} color="#007bff" />
+                  <Text style={styles.menuItemText}>{item.label}</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#ccc" />
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* 統合メニュー項目（一つのカード） */}
+          <View style={styles.integratedMenuSection}>
+            <View style={styles.integratedMenuCard}>
+              {integratedMenuItems.map((item, index) => (
+                <TouchableOpacity
+                  key={item.label}
+                  style={[
+                    styles.integratedMenuItem,
+                    index < integratedMenuItems.length - 1 && styles.integratedMenuItemBorder
+                  ]}
+                  onPress={item.onPress}
+                >
+                  <View style={styles.menuItemLeft}>
+                    <Ionicons name={item.icon} size={20} color="#007bff" />
+                    <Text style={styles.menuItemText}>{item.label}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color="#ccc" />
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </ScrollView>
       </SafeAreaView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
-    backgroundColor: '#1e3a8a',
+    backgroundColor: '#f5f5f5',
   },
   header: {
     width: '100%',
     height: 100,
     paddingTop: StatusBar.currentHeight,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.2)',
+    borderBottomColor: '#e0e0e0',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
@@ -281,7 +458,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#333',
     position: 'absolute',
     bottom: 10,
     left: 0,
@@ -298,19 +475,20 @@ const styles = StyleSheet.create({
   },
   circleDetailContainer: {
     flex: 1,
+    backgroundColor: '#f5f5f5',
   },
   circleInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 20,
-    marginBottom: 10,
+    marginBottom: 0,
     paddingHorizontal: 20,
   },
   circleImageLargeContainer: {
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#e0e0e0',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -334,38 +512,40 @@ const styles = StyleSheet.create({
   circleInfoName: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#333',
   },
   circleInfoSub: {
     fontSize: 13,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: '#666',
     marginTop: 4,
   },
 
   managementGridSection: {
-    flex: 1,
-    paddingHorizontal: 10,
-    marginTop: 10,
+    marginTop: 25,
+    paddingHorizontal: 20,
+    marginBottom: 0,
   },
   managementRow3col: {
     flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    marginBottom: BUTTON_GRID_GAP,
-    marginHorizontal: 0,
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  managementRow3colLast: {
+    marginBottom: 0,
   },
   managementGridItem3col: {
-    width: BUTTON_SIZE_3COL,
-    height: BUTTON_SIZE_3COL,
-    backgroundColor: '#ffffff',
-    borderRadius: 14,
+    width: (Dimensions.get('window').width - 60) / 3,
+    height: 80,
+    backgroundColor: '#fff',
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
   managementGridItemText: {
-    fontSize: 10,
-    color: '#1e3a8a',
+    fontSize: 11,
+    color: '#333',
     textAlign: 'center',
-    marginTop: 4,
+    marginTop: 6,
     fontWeight: '500',
   },
   buttonContent: {
@@ -375,19 +555,203 @@ const styles = StyleSheet.create({
   },
   notificationBadge: {
     position: 'absolute',
-    top: -8,
-    right: -8,
+    top: -5,
+    right: -5,
     backgroundColor: '#ff4757',
     borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    minWidth: 18,
+    height: 18,
     justifyContent: 'center',
     alignItems: 'center',
   },
   notificationBadgeText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: 'bold',
+  },
+
+  menuSection: {
+    marginTop: 25,
+    paddingVertical: 0,
+    paddingHorizontal: 20,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  menuItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  menuItemText: {
+    fontSize: 16,
+    color: '#333',
+    marginLeft: 12,
+    fontWeight: '400',
+  },
+
+  // クルカツポイントカードのスタイル
+  kurukatsuPointsSection: {
+    marginTop: 15,
+    paddingHorizontal: 40,
+  },
+  kurukatsuPointsCardContainer: {
+    position: 'relative',
+  },
+  kurukatsuPointsCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+    backfaceVisibility: 'hidden',
+  },
+  kurukatsuPointsCardBack: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+    backfaceVisibility: 'hidden',
+  },
+  kurukatsuPointsCardFront: {
+    flex: 1,
+    position: 'relative',
+    minHeight: 130,
+  },
+  kurukatsuPointsTapButton: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  kurukatsuPointsTapText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  kurukatsuPointsTapButtonFront: {
+    backgroundColor: 'rgba(0, 123, 255, 0.1)',
+  },
+  kurukatsuPointsTapTextFront: {
+    color: '#007bff',
+  },
+  kurukatsuPointsTapButtonBack: {
+    backgroundColor: 'rgba(128, 128, 128, 0.1)',
+  },
+  kurukatsuPointsTapTextBack: {
+    color: '#808080',
+  },
+  kurukatsuPointsBackButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'baseline',
+    paddingVertical: 20,
+    minHeight: 80,
+  },
+  kurukatsuPointsBackButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+  },
+  kurukatsuPointsBackButtonText: {
+    fontSize: 16,
+    color: '#007bff',
+    fontWeight: '300',
+    marginTop: 8,
+  },
+  kurukatsuPointsTitle: {
+    fontSize: 16,
+    fontWeight: '300',
+    color: '#666',
+    marginBottom: 15,
+  },
+  kurukatsuPointsContent: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    minHeight: 80,
+  },
+  kurukatsuPointsIcon: {
+    width: 24,
+    height: 24,
+    marginRight: 8,
+  },
+  kurukatsuPointsAmount: {
+    fontSize: 40,
+    fontWeight: 'bold',
+    color: '#007bff',
+  },
+  kurukatsuPointsUnit: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#007bff',
+    marginLeft: 4,
+  },
+  kurukatsuPointsDescription: {
+    fontSize: 14,
+    color: '#666',
+  },
+
+  integratedMenuSection: {
+    marginTop: 15,
+    paddingHorizontal: 20,
+  },
+  integratedMenuCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  integratedMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  integratedMenuItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
 
 }); 
