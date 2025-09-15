@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
   },
   articleSectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '500',
     color: '#333',
   },
   moreButton: {
@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '500',
     color: '#333',
     marginBottom: 10,
   },

@@ -309,7 +309,7 @@ export default function CircleManagementScreen({ navigation }) {
       end={{ x: 1, y: 1 }}
     >
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>サークル管理</Text>
+        <Text style={styles.headerTitle}>サークル運営</Text>
       </View>
       <SafeAreaView style={styles.contentSafeArea}>
           <View style={styles.loadingContainer}>
@@ -330,7 +330,7 @@ export default function CircleManagementScreen({ navigation }) {
         end={{ x: 1, y: 1 }}
       >
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>サークル管理</Text>
+          <Text style={styles.headerTitle}>サークル運営</Text>
         </View>
         <SafeAreaView style={styles.contentSafeArea}>
           <View style={styles.loadingContainer}>
@@ -350,7 +350,7 @@ export default function CircleManagementScreen({ navigation }) {
         end={{ x: 1, y: 1 }}
       >
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>サークル管理</Text>
+          <Text style={styles.headerTitle}>サークル運営</Text>
         </View>
         <SafeAreaView style={styles.contentSafeArea}>
           <Animated.View style={[styles.mainContentWrapper, { opacity: fadeAnim }]}>
@@ -471,7 +471,7 @@ export default function CircleManagementScreen({ navigation }) {
       end={{ x: 1, y: 1 }}
     >
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>サークル管理</Text>
+        <Text style={styles.headerTitle}>サークル運営</Text>
       </View>
       <SafeAreaView style={styles.contentSafeArea}>
         <Animated.View style={{ flex: 1, opacity: fadeAnim }}>

@@ -46,8 +46,12 @@ import CircleScheduleManagementScreen from './screens/CircleScheduleManagementSc
 import AddScheduleScreen from './screens/AddScheduleScreen';
 import CircleContactScreen from './screens/CircleContactScreen';
 import CircleMemberScreen from './screens/CircleMemberScreen';
+import CircleMemberScheduleScreen from './screens/CircleMemberScheduleScreen';
+import CircleMemberContactScreen from './screens/CircleMemberContactScreen';
+import CircleMemberMemberListScreen from './screens/CircleMemberMemberListScreen';
 import CircleSettingsScreen from './screens/CircleSettingsScreen';
 import CircleMessageDetailScreen from './screens/CircleMessageDetailScreen';
+import SettingScreen from './screens/SettingScreen';
 import CircleManagementDetailScreen from './screens/CircleManagementDetailScreen';
 import CircleLeadershipTransferScreen from './screens/CircleLeadershipTransferScreen';
 import ReportScreen from './screens/ReportScreen';
@@ -81,7 +85,7 @@ const handleDirectNavigation = (data) => {
   try {
     if (data.type === 'joinRequest') {
       // 入会申請通知の場合：直接CircleMemberManagement画面に遷移
-      navigationRef.navigate('サークル管理', {
+      navigationRef.navigate('サークル運営', {
         screen: 'CircleMemberManagement',
         params: {
           circleId: data.circleId,
@@ -317,6 +321,9 @@ function HomeStackScreen() {
       <HomeStack.Screen name="Home" component={HomeScreen} />
       <HomeStack.Screen name="CircleDetail" component={CircleProfileScreen} />
       <HomeStack.Screen name="CircleMember" component={CircleMemberScreen} />
+      <HomeStack.Screen name="CircleMemberSchedule" component={CircleMemberScheduleScreen} />
+      <HomeStack.Screen name="CircleMemberContact" component={CircleMemberContactScreen} />
+      <HomeStack.Screen name="CircleMemberMemberList" component={CircleMemberMemberListScreen} />
       <HomeStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} />
       <HomeStack.Screen name="SearchResults" component={SearchResultsScreen} />
       <HomeStack.Screen name="ArticleWebView" component={ArticleWebViewScreen} />
@@ -326,6 +333,7 @@ function HomeStackScreen() {
       <HomeStack.Screen name="HelpScreen" component={HelpScreen} />
       <HomeStack.Screen name="TermsOfServiceScreen" component={TermsOfServiceScreen} />
       <HomeStack.Screen name="PrivacyPolicyScreen" component={PrivacyPolicyScreen} />
+      <HomeStack.Screen name="Settings" component={SettingScreen} />
     </HomeStack.Navigator>
   );
 }
@@ -355,6 +363,9 @@ function MyPageStackScreen() {
       <MyPageStack.Screen name="MyPage" component={MyPageScreen} />
       <MyPageStack.Screen name="CircleDetail" component={CircleProfileScreen} />
       <MyPageStack.Screen name="CircleMember" component={CircleMemberScreen} />
+      <MyPageStack.Screen name="CircleMemberSchedule" component={CircleMemberScheduleScreen} />
+      <MyPageStack.Screen name="CircleMemberContact" component={CircleMemberContactScreen} />
+      <MyPageStack.Screen name="CircleMemberMemberList" component={CircleMemberMemberListScreen} />
       <MyPageStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} />
       <MyPageStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
       <MyPageStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
@@ -362,6 +373,7 @@ function MyPageStackScreen() {
       <MyPageStack.Screen name="HelpScreen" component={HelpScreen} />
       <MyPageStack.Screen name="TermsOfServiceScreen" component={TermsOfServiceScreen} />
       <MyPageStack.Screen name="PrivacyPolicyScreen" component={PrivacyPolicyScreen} />
+      <MyPageStack.Screen name="Settings" component={SettingScreen} />
     </MyPageStack.Navigator>
   );
 }
@@ -383,7 +395,11 @@ function CircleManagementStackScreen() {
       <CircleManagementStack.Screen name="CircleLeadershipTransfer" component={CircleLeadershipTransferScreen} options={{ headerShown: false, gestureEnabled: true }} />
 
       <CircleManagementStack.Screen name="CircleMember" component={CircleMemberScreen} options={{ headerShown: false, gestureEnabled: true }} />
+      <CircleManagementStack.Screen name="CircleMemberSchedule" component={CircleMemberScheduleScreen} options={{ headerShown: false, gestureEnabled: true }} />
+      <CircleManagementStack.Screen name="CircleMemberContact" component={CircleMemberContactScreen} options={{ headerShown: false, gestureEnabled: true }} />
+      <CircleManagementStack.Screen name="CircleMemberMemberList" component={CircleMemberMemberListScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} options={{ headerShown: false, gestureEnabled: true }} />
+      <CircleManagementStack.Screen name="Settings" component={SettingScreen} options={{ headerShown: false, gestureEnabled: true }} />
     </CircleManagementStack.Navigator>
   );
 }
@@ -404,7 +420,7 @@ function MainTabNavigator() {
             iconName = focused ? 'search' : 'search-outline';
           } else if (route.name === 'マイページ') {
             iconName = focused ? 'person' : 'person-outline';
-          } else if (route.name === 'サークル管理') {
+          } else if (route.name === 'サークル運営') {
             iconName = focused ? 'people' : 'people-outline';
           }
 
@@ -424,7 +440,7 @@ function MainTabNavigator() {
       <Tab.Screen name="ホーム" component={HomeStackScreen} />
       <Tab.Screen name="検索" component={SearchStackScreen} />
       <Tab.Screen name="マイページ" component={MyPageStackScreen} />
-      <Tab.Screen name="サークル管理" component={CircleManagementStackScreen} />
+      <Tab.Screen name="サークル運営" component={CircleManagementStackScreen} />
     </Tab.Navigator>
   );
 }

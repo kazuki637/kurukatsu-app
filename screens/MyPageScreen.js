@@ -24,6 +24,7 @@ import { signOut } from 'firebase/auth';
 import * as ImagePicker from 'expo-image-picker';
 import CommonHeader from '../components/CommonHeader';
 import useFirestoreDoc from '../hooks/useFirestoreDoc';
+import { useNotificationBadge } from '../hooks/useNotificationBadge';
 
 const { width } = Dimensions.get('window');
 const gridItemSize = (width - 20 * 3) / 2;
@@ -46,72 +47,9 @@ export default function MyPageScreen({ navigation, route }) {
   const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
-  const [unreadCounts, setUnreadCounts] = useState({}); // 未読通知数を管理
+  // 通知バッジフックを使用
+  const { unreadCounts, isLoading: notificationLoading } = useNotificationBadge();
   
-  // ログアウト機能
-  const handleLogout = async () => {
-    Alert.alert(
-      "ログアウト",
-      "本当にログアウトしますか？",
-      [
-        {
-          text: "キャンセル",
-          style: "cancel"
-        },
-        { 
-          text: "ログアウト", 
-          onPress: async () => {
-            try {
-              await signOut(auth);
-            } catch (error) {
-              console.error('Error logging out:', error);
-              Alert.alert('ログアウトエラー', 'ログアウトに失敗しました。');
-            }
-          },
-          style: 'destructive'
-        }
-      ]
-    );
-  };
-
-  // 設定項目のリスト（個別カード）
-  const settingsOptions = [];
-
-  // 統合メニュー項目のリスト
-  const getIntegratedSettingsItems = () => {
-    return [
-      {
-        label: '通知設定',
-        icon: 'notifications-outline',
-        onPress: () => navigation.navigate('NotificationSettings')
-      },
-      {
-        label: 'ブロックリスト',
-        icon: 'lock-closed-outline',
-        onPress: () => navigation.navigate('BlockManagement')
-      }
-    ];
-  };
-
-  const getIntegratedInfoItems = () => {
-    return [
-      {
-        label: 'お問い合わせ',
-        icon: 'help-circle-outline',
-        onPress: () => navigation.navigate('HelpScreen')
-      },
-      {
-        label: '利用規約',
-        icon: 'document-text-outline',
-        onPress: () => navigation.navigate('TermsOfServiceScreen')
-      },
-      {
-        label: 'プライバシーポリシー',
-        icon: 'shield-checkmark-outline',
-        onPress: () => navigation.navigate('PrivacyPolicyScreen')
-      }
-    ];
-  };
   
   // 統合ローディング状態：初回ロード時は全てのデータが揃うまでローディング表示
   const [isDataReady, setIsDataReady] = useState(false);
@@ -159,21 +97,7 @@ export default function MyPageScreen({ navigation, route }) {
     }
   }, [imageLoading, userProfile?.profileImageUrl, imageError]);
   
-  // リアルタイム未読数更新関数をグローバルに登録
-  React.useEffect(() => {
-    global.updateMyPageUnreadCounts = (circleId, delta) => {
-      setUnreadCounts(prev => ({
-        ...prev,
-        [circleId]: Math.max(0, (prev[circleId] || 0) + delta)
-      }));
-    };
-
-
-    
-    return () => {
-      delete global.updateMyPageUnreadCounts;
-    };
-  }, []);
+  // グローバル関数は削除（useNotificationBadgeフックで管理）
   
   // プロフィール編集完了時のイベントベース更新
   React.useEffect(() => {
@@ -189,56 +113,22 @@ export default function MyPageScreen({ navigation, route }) {
 
 
 
-  // userProfile取得後にサークル情報と未読通知数を一括取得
+  // userProfile取得後にサークル情報を取得（未読通知数はuseNotificationBadgeフックで管理）
   React.useEffect(() => {
-    const fetchCirclesAndUnreadCounts = async () => {
+    const fetchCircles = async () => {
       if (!userProfile) return;
       
       try {
-        // 並列でサークル情報と未読通知数を取得
-        const promises = [];
-        
-        // joinedCircles取得のPromise
+        // joinedCircles取得
         if (userProfile.joinedCircleIds && Array.isArray(userProfile.joinedCircleIds) && userProfile.joinedCircleIds.length > 0) {
           const circlesRef = collection(db, 'circles');
           const q = query(circlesRef, where('__name__', 'in', userProfile.joinedCircleIds));
-          promises.push(getDocs(q));
+          const circlesSnapshot = await getDocs(q);
+          const joined = circlesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setJoinedCircles(joined);
         } else {
-          promises.push(Promise.resolve({ docs: [] }));
+          setJoinedCircles([]);
         }
-        
-        // 未読通知数取得のPromise
-        if (userProfile.joinedCircleIds && Array.isArray(userProfile.joinedCircleIds) && userProfile.joinedCircleIds.length > 0) {
-          const q = query(
-            collection(db, 'users', userId, 'circleMessages'),
-            where('circleId', 'in', userProfile.joinedCircleIds),
-            where('readAt', '==', null)
-          );
-          promises.push(getDocs(q));
-        } else {
-          promises.push(Promise.resolve({ docs: [] }));
-        }
-        
-
-        
-        // 並列実行
-        const [circlesSnapshot, unreadSnapshot] = await Promise.all(promises);
-        
-        // joinedCircles処理
-        const joined = circlesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setJoinedCircles(joined);
-        
-        // 未読通知数処理
-        if (unreadSnapshot.docs.length > 0) {
-          const unreadCountsData = {};
-          unreadSnapshot.docs.forEach(doc => {
-            const circleId = doc.data().circleId;
-            unreadCountsData[circleId] = (unreadCountsData[circleId] || 0) + 1;
-          });
-          setUnreadCounts(unreadCountsData);
-        }
-        
-
 
         // 初回ロード時は全てのデータが揃ったことを示す
         if (isInitialLoad) {
@@ -246,9 +136,8 @@ export default function MyPageScreen({ navigation, route }) {
         }
 
       } catch (e) {
-        console.error('Error fetching circles and unread counts:', e);
+        console.error('Error fetching circles:', e);
         setJoinedCircles([]);
-        setUnreadCounts({});
         
         // エラー時もデータ準備完了として扱う
         if (isInitialLoad) {
@@ -259,7 +148,7 @@ export default function MyPageScreen({ navigation, route }) {
     
     // userProfileが存在し、必要なIDが変更された場合のみ実行
     if (userProfile && userProfile.joinedCircleIds !== undefined && Array.isArray(userProfile.joinedCircleIds)) {
-      fetchCirclesAndUnreadCounts();
+      fetchCircles();
     } else if (userProfile && isInitialLoad) {
       // userProfileは存在するが、joinedCircleIdsが未定義の場合
       // 初回ロード時はデータ準備完了として扱う
@@ -286,17 +175,25 @@ export default function MyPageScreen({ navigation, route }) {
   }, [isDataReady, isInitialLoad]);
   
   // 統合ローディング条件：初回ロード時は全てのデータが揃うまでローディング表示
-  const isInitialLoading = (loading && isInitialLoad) || (isInitialLoad && !isDataReady);
+  const isInitialLoading = (loading && isInitialLoad) || (isInitialLoad && !isDataReady) || notificationLoading;
   
   if (isInitialLoading) {
     return (
       <View style={styles.container}>
-        <CommonHeader title="マイページ" />
-        <SafeAreaView style={{ flex: 1 }}>
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#999" style={{ marginTop: 10 }} />
-          </View>
-        </SafeAreaView>
+        <CommonHeader 
+          title="マイページ" 
+          rightButton={
+            <TouchableOpacity 
+              onPress={() => navigation.navigate('Settings')}
+              style={styles.settingsButton}
+            >
+              <Ionicons name="settings-outline" size={24} color="#333" />
+            </TouchableOpacity>
+          }
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color="#999" style={{ marginTop: 10 }} />
+        </View>
       </View>
     );
   }
@@ -305,20 +202,28 @@ export default function MyPageScreen({ navigation, route }) {
   if (error) {
     return (
       <View style={styles.container}>
-        <CommonHeader title="マイページ" />
-        <SafeAreaView style={{ flex: 1 }}>
-          <View style={styles.loadingContainer}>
-            <Text>ユーザーデータの取得に失敗しました</Text>
-            <TouchableOpacity onPress={() => {
-              // 画面を再マウントして再読み込みを実現
-              setImageError(false);
-              setIsInitialLoad(true);
-              setIsDataReady(false);
-            }} style={{ marginTop: 10 }}>
-              <Text style={{ color: '#007bff' }}>再読み込み</Text>
+        <CommonHeader 
+          title="マイページ" 
+          rightButton={
+            <TouchableOpacity 
+              onPress={() => navigation.navigate('Settings')}
+              style={styles.settingsButton}
+            >
+              <Ionicons name="settings-outline" size={24} color="#333" />
             </TouchableOpacity>
-          </View>
-        </SafeAreaView>
+          }
+        />
+        <View style={styles.loadingContainer}>
+          <Text>ユーザーデータの取得に失敗しました</Text>
+          <TouchableOpacity onPress={() => {
+            // 画面を再マウントして再読み込みを実現
+            setImageError(false);
+            setIsInitialLoad(true);
+            setIsDataReady(false);
+          }} style={{ marginTop: 10 }}>
+            <Text style={{ color: '#007bff' }}>再読み込み</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -328,23 +233,40 @@ export default function MyPageScreen({ navigation, route }) {
   if (!userProfile && !isInitialLoad) {
     return (
       <View style={styles.container}>
-        <CommonHeader title="マイページ" />
-        <SafeAreaView style={{ flex: 1 }}>
-          <View style={styles.loadingContainer}>
-            <Text>プロフィール情報を読み込み中...</Text>
-            <ActivityIndicator size="large" color="#007bff" style={{ marginTop: 10 }} />
-          </View>
-        </SafeAreaView>
+        <CommonHeader 
+          title="マイページ" 
+          rightButton={
+            <TouchableOpacity 
+              onPress={() => navigation.navigate('Settings')}
+              style={styles.settingsButton}
+            >
+              <Ionicons name="settings-outline" size={24} color="#333" />
+            </TouchableOpacity>
+          }
+        />
+        <View style={styles.loadingContainer}>
+          <Text>プロフィール情報を読み込み中...</Text>
+          <ActivityIndicator size="large" color="#007bff" style={{ marginTop: 10 }} />
+        </View>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <CommonHeader title="マイページ" />
-      <SafeAreaView style={{ flex: 1 }}>
-        <Animated.View style={[styles.mainContent, { opacity: screenOpacity }]}>
-          <ScrollView>
+      <CommonHeader 
+        title="マイページ" 
+        rightButton={
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('Settings')}
+            style={styles.settingsButton}
+          >
+            <Ionicons name="settings-outline" size={24} color="#333" />
+          </TouchableOpacity>
+        }
+      />
+      <Animated.View style={[styles.mainContent, { opacity: screenOpacity }]}>
+        <ScrollView showsVerticalScrollIndicator={false}>
           <View style={styles.profileSection}>
             <View style={styles.profileContent}>
               <View style={styles.profileImageContainer}>
@@ -373,7 +295,7 @@ export default function MyPageScreen({ navigation, route }) {
                     </>
                   ) : (
                     <View style={[styles.profileImage, {backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
-                      <Ionicons name="person-outline" size={40} color="#999" />
+                      <Ionicons name="person-outline" size={50} color="#999" />
                     </View>
                   )}
                 </Animated.View>
@@ -391,11 +313,10 @@ export default function MyPageScreen({ navigation, route }) {
                     </Text>
                   </View>
                 )}
+                <TouchableOpacity style={styles.editProfileButton} onPress={() => navigation.navigate('ProfileEdit')}>
+                  <Text style={styles.editProfileButtonText}>プロフィールを編集</Text>
+                </TouchableOpacity>
               </View>
-              
-                 <TouchableOpacity style={styles.editProfileButton} onPress={() => navigation.navigate('ProfileEdit')}>
-                   <Text style={styles.editProfileButtonText}>プロフィールを編集</Text>
-                 </TouchableOpacity>
             </View>
           </View>
           <View style={styles.contentArea}>
@@ -448,67 +369,9 @@ export default function MyPageScreen({ navigation, route }) {
             )}
           </View>
 
-          {/* 設定セクション */}
-          <View style={styles.settingsSection}>
-            <Text style={styles.sectionTitle}>設定</Text>
-            <View style={styles.integratedSettingsCard}>
-              {getIntegratedSettingsItems().map((item, index) => (
-                <TouchableOpacity
-                  key={item.label}
-                  style={[
-                    styles.integratedSettingItem,
-                    index < getIntegratedSettingsItems().length - 1 && styles.integratedSettingItemBorder
-                  ]}
-                  onPress={item.onPress}
-                >
-                  <View style={styles.settingItemLeft}>
-                    <Ionicons name={item.icon} size={20} color="#333" />
-                    <Text style={styles.settingItemText}>{item.label}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color="#ccc" />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
 
-          {/* 情報セクション */}
-          <View style={styles.infoSection}>
-            <View style={styles.integratedInfoCard}>
-              {getIntegratedInfoItems().map((item, index) => (
-                <TouchableOpacity
-                  key={item.label}
-                  style={[
-                    styles.integratedSettingItem,
-                    index < getIntegratedInfoItems().length - 1 && styles.integratedSettingItemBorder
-                  ]}
-                  onPress={item.onPress}
-                >
-                  <View style={styles.settingItemLeft}>
-                    <Ionicons name={item.icon} size={20} color="#333" />
-                    <Text style={styles.settingItemText}>{item.label}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color="#ccc" />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* ログアウトセクション */}
-          <View style={styles.logoutSection}>
-            <TouchableOpacity
-              style={styles.logoutItem}
-              onPress={handleLogout}
-            >
-              <View style={styles.settingItemLeft}>
-                <Ionicons name="log-out-outline" size={20} color="#ff3b30" />
-                <Text style={styles.logoutText}>ログアウト</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          </ScrollView>
-        </Animated.View>
-      </SafeAreaView>
+        </ScrollView>
+      </Animated.View>
     </View>
   );
 }
@@ -518,26 +381,44 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   mainContent: { flex: 1 },
   
+  // ヘッダーセクションのスタイル
+  headerSection: {
+    backgroundColor: '#1976d2',
+    paddingTop: 100,
+    paddingBottom: 150,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  
   // プロフィールセクションのスタイル
   profileSection: { 
     paddingVertical: 30, 
     paddingHorizontal: 20,
+    marginTop: 0,
   },
   profileContent: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
   profileImageContainer: {
     position: 'relative',
-    marginBottom: 20,
+    marginRight: 20,
   },
   profileImageWrapper: { 
     position: 'relative',
     alignItems: 'center',
   },
   profileImage: { 
-    width: 100, 
-    height: 100, 
-    borderRadius: 50,
+    width: 120, 
+    height: 120, 
+    borderRadius: 60,
     borderWidth: 4,
     borderColor: '#e0e0e0',
   },
@@ -579,20 +460,20 @@ const styles = StyleSheet.create({
     borderRadius: 60,
   },
   userInfo: {
-    alignItems: 'center',
-    marginBottom: 20,
+    flex: 1,
+    justifyContent: 'center',
   },
   userName: { 
     fontSize: 22, 
     fontWeight: 'bold', 
     color: '#333', 
     marginBottom: 8,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   universityInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
   },
   userUniversity: { 
     fontSize: 16, 
@@ -608,11 +489,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#e0e0e0',
+    alignSelf: 'flex-start',
+    marginTop: 12,
   },
   editProfileButtonText: { 
     color: '#333', 
     fontWeight: '500', 
     fontSize: 14,
+  },
+  settingsButton: {
+    padding: 0,
   },
   contentArea: { 
     paddingHorizontal: 20, 
@@ -628,7 +514,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: { 
     fontSize: 20, 
-    fontWeight: '700', 
+    fontWeight: '500', 
     color: '#2c3e50', 
     marginBottom: 20,
     letterSpacing: 0.5,

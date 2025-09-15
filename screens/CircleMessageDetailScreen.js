@@ -9,6 +9,7 @@ import { useRef } from 'react';
 import { useEffect } from 'react';
 import { auth } from '../firebaseConfig';
 import { collection, setDoc, doc, serverTimestamp, getDocs, getDoc, addDoc, deleteDoc } from 'firebase/firestore';
+// import { updateUnreadCounts } from '../hooks/useNotificationBadge'; // リアルタイムリスナーが自動更新するため不要
 import { startTransition } from 'react';
 
 export default function CircleMessageDetailScreen({ route, navigation }) {
@@ -376,19 +377,12 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
         const userMessageRef = doc(db, 'users', user.uid, 'circleMessages', message.id);
         await setDoc(userMessageRef, { readAt: serverTimestamp() }, { merge: true });
         
-        // 既読操作時にリアルタイムで未読数を減算
-        if (global.updateHomeUnreadCounts) {
-          global.updateHomeUnreadCounts(message.circleId, -1);
-        }
-        if (global.updateMyPageUnreadCounts) {
-          global.updateMyPageUnreadCounts(message.circleId, -1);
-        }
-        if (global.updateCircleMemberUnreadCounts) {
-          global.updateCircleMemberUnreadCounts(message.circleId, -1);
-        }
+        // 個別メッセージの未読状態を更新
         if (global.updateMessageReadStatus) {
           global.updateMessageReadStatus(message.id, true);
         }
+        
+        // 未読数の更新はuseNotificationBadgeフックのリアルタイムリスナーが自動的に処理
         
         // 2. サークルメンバー一覧取得
         const membersRef = collection(db, 'circles', message.circleId, 'members');
