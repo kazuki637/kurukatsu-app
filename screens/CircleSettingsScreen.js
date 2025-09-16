@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert, ActivityIndicator, Image, Platform, KeyboardAvoidingView, Animated } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert, ActivityIndicator, Image, Platform, KeyboardAvoidingView, Animated, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { db, storage } from '../firebaseConfig';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
@@ -19,6 +19,8 @@ const FREQUENCIES = ['週１回', '週２回', '週３回', '月１回', '不定
 const ACTIVITY_WEEKDAYS = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日', '不定期'];
 const GENDER_RATIO_OPTIONS = ['男性多め', '女性多め', '半々'];
 const MEMBERS_OPTIONS = ['1-10人', '11-30人', '31-50人', '51-100人', '100人以上'];
+
+const { width } = Dimensions.get('window');
 
 export default function CircleSettingsScreen({ route, navigation }) {
   const { circleId } = route.params;
@@ -277,279 +279,331 @@ export default function CircleSettingsScreen({ route, navigation }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      <CommonHeader title="サークル設定" showBackButton onBack={() => navigation.goBack()} rightButtonLabel="保存" onRightButtonPress={handleSave} />
+      <CommonHeader 
+        title="サークル設定" 
+        rightButtonLabel="保存" 
+        onRightButtonPress={handleSave}
+        rightButtonDisabled={isSaving || loading}
+      />
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 40}
         >
-          <ScrollView contentContainerStyle={{ padding: 20 }}>
+          <ScrollView 
+            contentContainerStyle={styles.bodyContent} 
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={{ height: 16 }} />
             {/* サークルアイコン画像 */}
-            <Text style={styles.label}>サークルアイコン画像</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: 8, marginBottom: 16 }}>
-              <TouchableOpacity style={[styles.circleImagePicker, {marginTop: 0, marginBottom: 0}]} onPress={pickCircleImage}>
-                <Animated.View style={[styles.circleImageWrapper, { opacity: circleImageOpacity }]}>
-                  {circleImage || circleImageUrl ? (
-                    <Image 
-                      source={{ uri: circleImage || circleImageUrl }} 
-                      style={styles.circleImage}
-                      onLoad={() => setImageLoading(false)}
-                      onError={() => {
-                        setImageLoading(false);
-                        setImageError(true);
-                      }}
-                      fadeDuration={300}
-                    />
-                  ) : (
-                    <View style={styles.defaultImageContainer}>
-                      <Ionicons name="image-outline" size={100} color="#ccc" />
-                    </View>
-                  )}
-                </Animated.View>
-              </TouchableOpacity>
-              {/* 必要ならここにゴミ箱ボタン等も追加可能 */}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>サークルアイコン画像<Text style={styles.optional}>(任意)</Text></Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start' }}>
+                <TouchableOpacity onPress={pickCircleImage} style={styles.imagePicker}>
+                  <Animated.View style={{ opacity: circleImageOpacity }}>
+                    {circleImage || circleImageUrl ? (
+                      <Image 
+                        source={{ uri: circleImage || circleImageUrl }} 
+                        style={styles.circleImage}
+                        onLoad={() => setImageLoading(false)}
+                        onError={() => {
+                          setImageLoading(false);
+                          setImageError(true);
+                        }}
+                        fadeDuration={300}
+                      />
+                    ) : (
+                      <View style={[styles.circleImage, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
+                        <Ionicons name="image-outline" size={60} color="#aaa" />
+                      </View>
+                    )}
+                  </Animated.View>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* サークル種別選択 */}
-            <Text style={styles.label}>サークル種別</Text>
-            <View style={styles.circleTypeContainer}>
-              <TouchableOpacity 
-                style={styles.circleTypeButton} 
-                onPress={() => {
-                  setCircleType('学内サークル');
-                  checkForChanges();
-                }}
-              >
-                <View style={styles.radioButton}>
-                  {circleType === '学内サークル' && <View style={styles.radioButtonInner} />}
-                </View>
-                <Text style={styles.circleTypeText}>学内サークル</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.circleTypeButton} 
-                onPress={() => {
-                  setCircleType('インカレサークル');
-                  checkForChanges();
-                }}
-              >
-                <View style={styles.radioButton}>
-                  {circleType === 'インカレサークル' && <View style={styles.radioButtonInner} />}
-                </View>
-                <Text style={styles.circleTypeText}>インカレサークル</Text>
-              </TouchableOpacity>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>サークル種別</Text>
+              <View style={styles.selectRow}>
+                <TouchableOpacity 
+                  style={[styles.selectButton, circleType === '学内サークル' && styles.selectedButton]} 
+                  onPress={() => {
+                    setCircleType('学内サークル');
+                    checkForChanges();
+                  }}
+                >
+                  <Text style={[styles.selectButtonText, circleType === '学内サークル' && styles.selectedButtonText]}>学内サークル</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.selectButton, circleType === 'インカレサークル' && styles.selectedButton]} 
+                  onPress={() => {
+                    setCircleType('インカレサークル');
+                    checkForChanges();
+                  }}
+                >
+                  <Text style={[styles.selectButtonText, circleType === 'インカレサークル' && styles.selectedButtonText]}>インカレサークル</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
-            <Text style={styles.label}>サークル名</Text>
-            <TextInput style={styles.input} value={name} onChangeText={(text) => {
-              setName(text);
-              checkForChanges();
-            }} />
-            <Text style={styles.label}>大学名</Text>
-            <TextInput 
-              style={[styles.input, styles.disabledInput]} 
-              value={universityName} 
-              onChangeText={setUniversityName}
-              editable={false}
-              placeholder="登録時に設定された大学名"
-            />
-            <Text style={styles.label}>代表者連絡先</Text>
-            <TextInput 
-              style={[styles.input, styles.disabledInput]} 
-              value={contactInfo} 
-              onChangeText={setContactInfo}
-              editable={false}
-              placeholder="登録時に設定された連絡先"
-            />
-            <Text style={styles.label}>ジャンル</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
-              {GENRES.map(item => (
-                <TouchableOpacity key={item} style={[styles.optionButton, genre === item && styles.optionButtonActive]} onPress={() => {
-                  const newGenre = item;
-                  setGenre(newGenre);
-                  // 状態変更を即座に検知
-                  if (!circle) return;
-                  
-                  const originalFeatures = circle.features || [];
-                  const currentFeatures = features || [];
-                  const featuresChanged = 
-                    originalFeatures.length !== currentFeatures.length ||
-                    !originalFeatures.every(feature => currentFeatures.includes(feature)) ||
-                    !currentFeatures.every(feature => originalFeatures.includes(feature));
-                  
-                  const hasChanges = 
-                    name !== (circle.name || '') ||
-                    newGenre !== (circle.genre || '') ||
-                    featuresChanged ||
-                    frequency !== (circle.frequency || '') ||
-                    members !== (circle.members || '') ||
-                    genderratio !== (circle.genderratio || '') ||
-                    circleImage !== null;
-                  
-                  setHasUnsavedChanges(hasChanges);
-                }}>
-                  <Text style={[styles.optionButtonText, genre === item && styles.optionButtonTextActive]}>{item}</Text>
-                </TouchableOpacity>
-              ))}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>サークル名</Text>
+              <TextInput 
+                style={styles.input} 
+                value={name} 
+                onChangeText={(text) => {
+                  setName(text);
+                  checkForChanges();
+                }} 
+                placeholder="サークル名を入力してください"
+                placeholderTextColor="#a1a1aa"
+              />
             </View>
-            <Text style={styles.label}>特色（複数選択可）</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
-              {FEATURES.map(item => (
-                <TouchableOpacity key={item} style={[styles.optionButton, features.includes(item) && styles.optionButtonActive]} onPress={() => {
-                  const newFeatures = features.includes(item) ? features.filter(f => f !== item) : [...features, item];
-                  setFeatures(newFeatures);
-                  // 状態変更を即座に検知
-                  if (!circle) return;
-                  
-                  const originalFeatures = circle.features || [];
-                  const featuresChanged = 
-                    originalFeatures.length !== newFeatures.length ||
-                    !originalFeatures.every(feature => newFeatures.includes(feature)) ||
-                    !newFeatures.every(feature => originalFeatures.includes(feature));
-                  
-                  const hasChanges = 
-                    name !== (circle.name || '') ||
-                    genre !== (circle.genre || '') ||
-                    featuresChanged ||
-                    frequency !== (circle.frequency || '') ||
-                    members !== (circle.members || '') ||
-                    genderratio !== (circle.genderratio || '') ||
-                    circleImage !== null;
-                  
-                  setHasUnsavedChanges(hasChanges);
-                }}>
-                  <Text style={[styles.optionButtonText, features.includes(item) && styles.optionButtonTextActive]}>{item}</Text>
-                </TouchableOpacity>
-              ))}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>大学名</Text>
+              <TextInput 
+                style={[styles.input, styles.disabledInput]} 
+                value={universityName} 
+                onChangeText={setUniversityName}
+                editable={false}
+                placeholder="登録時に設定された大学名"
+                placeholderTextColor="#a1a1aa"
+              />
             </View>
-            <Text style={styles.label}>活動頻度</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
-              {FREQUENCIES.map(item => (
-                <TouchableOpacity key={item} style={[styles.optionButton, frequency === item && styles.optionButtonActive]} onPress={() => {
-                  const newFrequency = item;
-                  setFrequency(newFrequency);
-                  // 状態変更を即座に検知
-                  if (!circle) return;
-                  
-                  const originalFeatures = circle.features || [];
-                  const currentFeatures = features || [];
-                  const featuresChanged = 
-                    originalFeatures.length !== currentFeatures.length ||
-                    !originalFeatures.every(feature => currentFeatures.includes(feature)) ||
-                    !currentFeatures.every(feature => originalFeatures.includes(feature));
-                  
-                  const hasChanges = 
-                    name !== (circle.name || '') ||
-                    genre !== (circle.genre || '') ||
-                    featuresChanged ||
-                    newFrequency !== (circle.frequency || '') ||
-                    members !== (circle.members || '') ||
-                    genderratio !== (circle.genderratio || '') ||
-                    circleImage !== null;
-                  
-                  setHasUnsavedChanges(hasChanges);
-                }}>
-                  <Text style={[styles.optionButtonText, frequency === item && styles.optionButtonTextActive]}>{item}</Text>
-                </TouchableOpacity>
-              ))}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>代表者連絡先</Text>
+              <TextInput 
+                style={[styles.input, styles.disabledInput]} 
+                value={contactInfo} 
+                onChangeText={setContactInfo}
+                editable={false}
+                placeholder="登録時に設定された連絡先"
+                placeholderTextColor="#a1a1aa"
+              />
             </View>
-            <Text style={styles.label}>活動曜日（複数選択可）</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
-              {ACTIVITY_WEEKDAYS.map(item => (
-                <TouchableOpacity key={item} style={[styles.optionButton, activityDays.includes(item) && styles.optionButtonActive]} onPress={() => {
-                  const newActivityDays = activityDays.includes(item) ? activityDays.filter(d => d !== item) : [...activityDays, item];
-                  setActivityDays(newActivityDays);
-                  // 状態変更を即座に検知
-                  if (!circle) return;
-                  
-                  const originalFeatures = circle.features || [];
-                  const currentFeatures = features || [];
-                  const featuresChanged = 
-                    originalFeatures.length !== currentFeatures.length ||
-                    !originalFeatures.every(feature => currentFeatures.includes(feature)) ||
-                    !currentFeatures.every(feature => originalFeatures.includes(feature));
-                  
-                  const hasChanges = 
-                    name !== (circle.name || '') ||
-                    genre !== (circle.genre || '') ||
-                    featuresChanged ||
-                    frequency !== (circle.frequency || '') ||
-                    JSON.stringify(newActivityDays.sort()) !== JSON.stringify((circle.activityDays || []).sort()) ||
-                    members !== (circle.members || '') ||
-                    genderratio !== (circle.genderratio || '') ||
-                    circleImage !== null;
-                  
-                  setHasUnsavedChanges(hasChanges);
-                }}>
-                  <Text style={[styles.optionButtonText, activityDays.includes(item) && styles.optionButtonTextActive]}>{item}</Text>
-                </TouchableOpacity>
-              ))}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>ジャンル</Text>
+              <View style={styles.selectRow}>
+                {GENRES.map(item => (
+                  <TouchableOpacity 
+                    key={item} 
+                    style={[styles.selectButton, genre === item && styles.selectedButton]} 
+                    onPress={() => {
+                      const newGenre = item;
+                      setGenre(newGenre);
+                      if (!circle) return;
+                      
+                      const originalFeatures = circle.features || [];
+                      const currentFeatures = features || [];
+                      const featuresChanged = 
+                        originalFeatures.length !== currentFeatures.length ||
+                        !originalFeatures.every(feature => currentFeatures.includes(feature)) ||
+                        !currentFeatures.every(feature => originalFeatures.includes(feature));
+                      
+                      const hasChanges = 
+                        name !== (circle.name || '') ||
+                        newGenre !== (circle.genre || '') ||
+                        featuresChanged ||
+                        frequency !== (circle.frequency || '') ||
+                        members !== (circle.members || '') ||
+                        genderratio !== (circle.genderratio || '') ||
+                        circleImage !== null;
+                      
+                      setHasUnsavedChanges(hasChanges);
+                    }}
+                  >
+                    <Text style={[styles.selectButtonText, genre === item && styles.selectedButtonText]}>{item}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-            <Text style={styles.label}>人数</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
-              {MEMBERS_OPTIONS.map(item => (
-                <TouchableOpacity key={item} style={[styles.optionButton, members === item && styles.optionButtonActive]} onPress={() => {
-                  const newMembers = item;
-                  setMembers(newMembers);
-                  // 状態変更を即座に検知
-                  if (!circle) return;
-                  
-                  const originalFeatures = circle.features || [];
-                  const currentFeatures = features || [];
-                  const featuresChanged = 
-                    originalFeatures.length !== currentFeatures.length ||
-                    !originalFeatures.every(feature => currentFeatures.includes(feature)) ||
-                    !currentFeatures.every(feature => originalFeatures.includes(feature));
-                  
-                  const hasChanges = 
-                    name !== (circle.name || '') ||
-                    genre !== (circle.genre || '') ||
-                    featuresChanged ||
-                    frequency !== (circle.frequency || '') ||
-                    newMembers !== (circle.members || '') ||
-                    genderratio !== (circle.genderratio || '') ||
-                    circleImage !== null;
-                  
-                  setHasUnsavedChanges(hasChanges);
-                }}>
-                  <Text style={[styles.optionButtonText, members === item && styles.optionButtonTextActive]}>{item}</Text>
-                </TouchableOpacity>
-              ))}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>特色（複数選択可）</Text>
+              <View style={styles.selectRow}>
+                {FEATURES.map(item => (
+                  <TouchableOpacity 
+                    key={item} 
+                    style={[styles.selectButton, features.includes(item) && styles.selectedButton]} 
+                    onPress={() => {
+                      const newFeatures = features.includes(item) ? features.filter(f => f !== item) : [...features, item];
+                      setFeatures(newFeatures);
+                      if (!circle) return;
+                      
+                      const originalFeatures = circle.features || [];
+                      const featuresChanged = 
+                        originalFeatures.length !== newFeatures.length ||
+                        !originalFeatures.every(feature => newFeatures.includes(feature)) ||
+                        !newFeatures.every(feature => originalFeatures.includes(feature));
+                      
+                      const hasChanges = 
+                        name !== (circle.name || '') ||
+                        genre !== (circle.genre || '') ||
+                        featuresChanged ||
+                        frequency !== (circle.frequency || '') ||
+                        members !== (circle.members || '') ||
+                        genderratio !== (circle.genderratio || '') ||
+                        circleImage !== null;
+                      
+                      setHasUnsavedChanges(hasChanges);
+                    }}
+                  >
+                    <Text style={[styles.selectButtonText, features.includes(item) && styles.selectedButtonText]}>{item}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-            <Text style={styles.label}>男女比</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
-              {GENDER_RATIO_OPTIONS.map(item => (
-                <TouchableOpacity key={item} style={[styles.optionButton, genderratio === item && styles.optionButtonActive]} onPress={() => {
-                  const newGenderratio = item;
-                  setGenderratio(newGenderratio);
-                  // 状態変更を即座に検知
-                  if (!circle) return;
-                  
-                  const originalFeatures = circle.features || [];
-                  const currentFeatures = features || [];
-                  const featuresChanged = 
-                    originalFeatures.length !== currentFeatures.length ||
-                    !originalFeatures.every(feature => currentFeatures.includes(feature)) ||
-                    !currentFeatures.every(feature => originalFeatures.includes(feature));
-                  
-                  const hasChanges = 
-                    name !== (circle.name || '') ||
-                    genre !== (circle.genre || '') ||
-                    featuresChanged ||
-                    frequency !== (circle.frequency || '') ||
-                    members !== (circle.members || '') ||
-                    newGenderratio !== (circle.genderratio || '') ||
-                    circleImage !== null;
-                  
-                  setHasUnsavedChanges(hasChanges);
-                }}>
-                  <Text style={[styles.optionButtonText, genderratio === item && styles.optionButtonTextActive]}>{item}</Text>
-                </TouchableOpacity>
-              ))}
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>活動頻度</Text>
+              <View style={styles.selectRow}>
+                {FREQUENCIES.map(item => (
+                  <TouchableOpacity 
+                    key={item} 
+                    style={[styles.selectButton, frequency === item && styles.selectedButton]} 
+                    onPress={() => {
+                      const newFrequency = item;
+                      setFrequency(newFrequency);
+                      if (!circle) return;
+                      
+                      const originalFeatures = circle.features || [];
+                      const currentFeatures = features || [];
+                      const featuresChanged = 
+                        originalFeatures.length !== currentFeatures.length ||
+                        !originalFeatures.every(feature => currentFeatures.includes(feature)) ||
+                        !currentFeatures.every(feature => originalFeatures.includes(feature));
+                      
+                      const hasChanges = 
+                        name !== (circle.name || '') ||
+                        genre !== (circle.genre || '') ||
+                        featuresChanged ||
+                        newFrequency !== (circle.frequency || '') ||
+                        members !== (circle.members || '') ||
+                        genderratio !== (circle.genderratio || '') ||
+                        circleImage !== null;
+                      
+                      setHasUnsavedChanges(hasChanges);
+                    }}
+                  >
+                    <Text style={[styles.selectButtonText, frequency === item && styles.selectedButtonText]}>{item}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>活動曜日（複数選択可）</Text>
+              <View style={styles.selectRow}>
+                {ACTIVITY_WEEKDAYS.map(item => (
+                  <TouchableOpacity 
+                    key={item} 
+                    style={[styles.selectButton, activityDays.includes(item) && styles.selectedButton]} 
+                    onPress={() => {
+                      const newActivityDays = activityDays.includes(item) ? activityDays.filter(d => d !== item) : [...activityDays, item];
+                      setActivityDays(newActivityDays);
+                      if (!circle) return;
+                      
+                      const originalFeatures = circle.features || [];
+                      const currentFeatures = features || [];
+                      const featuresChanged = 
+                        originalFeatures.length !== currentFeatures.length ||
+                        !originalFeatures.every(feature => currentFeatures.includes(feature)) ||
+                        !currentFeatures.every(feature => originalFeatures.includes(feature));
+                      
+                      const hasChanges = 
+                        name !== (circle.name || '') ||
+                        genre !== (circle.genre || '') ||
+                        featuresChanged ||
+                        frequency !== (circle.frequency || '') ||
+                        JSON.stringify(newActivityDays.sort()) !== JSON.stringify((circle.activityDays || []).sort()) ||
+                        members !== (circle.members || '') ||
+                        genderratio !== (circle.genderratio || '') ||
+                        circleImage !== null;
+                      
+                      setHasUnsavedChanges(hasChanges);
+                    }}
+                  >
+                    <Text style={[styles.selectButtonText, activityDays.includes(item) && styles.selectedButtonText]}>{item}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>人数</Text>
+              <View style={styles.selectRow}>
+                {MEMBERS_OPTIONS.map(item => (
+                  <TouchableOpacity 
+                    key={item} 
+                    style={[styles.selectButton, members === item && styles.selectedButton]} 
+                    onPress={() => {
+                      const newMembers = item;
+                      setMembers(newMembers);
+                      if (!circle) return;
+                      
+                      const originalFeatures = circle.features || [];
+                      const currentFeatures = features || [];
+                      const featuresChanged = 
+                        originalFeatures.length !== currentFeatures.length ||
+                        !originalFeatures.every(feature => currentFeatures.includes(feature)) ||
+                        !currentFeatures.every(feature => originalFeatures.includes(feature));
+                      
+                      const hasChanges = 
+                        name !== (circle.name || '') ||
+                        genre !== (circle.genre || '') ||
+                        featuresChanged ||
+                        frequency !== (circle.frequency || '') ||
+                        newMembers !== (circle.members || '') ||
+                        genderratio !== (circle.genderratio || '') ||
+                        circleImage !== null;
+                      
+                      setHasUnsavedChanges(hasChanges);
+                    }}
+                  >
+                    <Text style={[styles.selectButtonText, members === item && styles.selectedButtonText]}>{item}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>男女比</Text>
+              <View style={styles.selectRow}>
+                {GENDER_RATIO_OPTIONS.map(item => (
+                  <TouchableOpacity 
+                    key={item} 
+                    style={[styles.selectButton, genderratio === item && styles.selectedButton]} 
+                    onPress={() => {
+                      const newGenderratio = item;
+                      setGenderratio(newGenderratio);
+                      if (!circle) return;
+                      
+                      const originalFeatures = circle.features || [];
+                      const currentFeatures = features || [];
+                      const featuresChanged = 
+                        originalFeatures.length !== currentFeatures.length ||
+                        !originalFeatures.every(feature => currentFeatures.includes(feature)) ||
+                        !currentFeatures.every(feature => originalFeatures.includes(feature));
+                      
+                      const hasChanges = 
+                        name !== (circle.name || '') ||
+                        genre !== (circle.genre || '') ||
+                        featuresChanged ||
+                        frequency !== (circle.frequency || '') ||
+                        members !== (circle.members || '') ||
+                        newGenderratio !== (circle.genderratio || '') ||
+                        circleImage !== null;
+                      
+                      setHasUnsavedChanges(hasChanges);
+                    }}
+                  >
+                    <Text style={[styles.selectButtonText, genderratio === item && styles.selectedButtonText]}>{item}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
             {/* 入会募集状況 */}
-            <Text style={styles.label}>入会募集状況</Text>
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>入会募集状況</Text>
             <View style={styles.recruitingContainer}>
               <View style={styles.recruitingStatusContainer}>
                 {isRecruiting ? (
@@ -596,9 +650,16 @@ export default function CircleSettingsScreen({ route, navigation }) {
               </TouchableOpacity>
             </View>
             {/* SNSリンク（Instagram）、SNSリンク（X）、新歓LINEグループリンクを削除 */}
-            <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={loading}>
-              <Text style={styles.saveButtonText}>{loading ? '保存中...' : '保存する'}</Text>
-            </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.saveButton} 
+                onPress={handleSave} 
+                disabled={isSaving || loading}
+              >
+                <Text style={styles.saveButtonText}>
+                  {isSaving || loading ? '保存中...' : '保存する'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -607,31 +668,99 @@ export default function CircleSettingsScreen({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, color: '#333' },
-  label: { fontSize: 16, color: '#333', marginTop: 12, marginBottom: 4 },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, fontSize: 16, backgroundColor: '#fafafa', marginBottom: 4 },
-  disabledInput: { backgroundColor: '#f0f0f0', color: '#666', borderColor: '#ddd' },
-  optionButton: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 16, borderWidth: 1, borderColor: '#ccc', marginRight: 8, marginBottom: 6, backgroundColor: '#fff' },
-  optionButtonActive: { backgroundColor: '#007bff', borderColor: '#007bff' },
-  optionButtonText: { color: '#333', fontSize: 15 },
-  optionButtonTextActive: { color: '#fff', fontWeight: 'bold' },
-  saveButton: { backgroundColor: '#007bff', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 24 },
-  saveButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  circleImagePicker: { alignItems: 'center', marginBottom: 16 },
-  circleImageWrapper: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    overflow: 'hidden',
+  container: { 
+    flex: 1, 
+    backgroundColor: '#ffffff' 
   },
-  circleImage: { width: 100, height: 100, borderRadius: 50 },
-  defaultImageContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+  // メインコンテンツ
+  bodyContent: { 
+    paddingHorizontal: 16, 
+    paddingBottom: 32 
+  },
+  // フォームセクション
+  formGroup: { 
+    marginBottom: 24 
+  },
+  label: { 
+    fontSize: 14, 
+    fontWeight: '500',
+    color: '#18181b', 
+    marginBottom: 8 
+  },
+  input: { 
+    borderWidth: 1, 
+    borderColor: '#e4e4e7', 
+    borderRadius: 12, 
+    paddingHorizontal: 12,
+    paddingVertical: 12, 
+    fontSize: 16, 
+    fontWeight: '400',
+    backgroundColor: '#ffffff',
+    color: '#18181b',
+    minHeight: 48,
+  },
+  disabledInput: { 
+    backgroundColor: '#f4f4f5', 
+    color: '#71717a', 
+    borderColor: '#e4e4e7' 
+  },
+  // セレクトボタン関連
+  selectRow: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    marginTop: 4 
+  },
+  selectButton: { 
+    paddingVertical: 8, 
+    paddingHorizontal: 16, 
+    borderRadius: 20, 
+    borderWidth: 1, 
+    borderColor: '#e4e4e7', 
+    marginRight: 8, 
+    marginBottom: 8,
+    backgroundColor: '#ffffff',
+    minHeight: 40,
     justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f0f0f0',
+  },
+  selectedButton: { 
+    backgroundColor: '#1380ec', 
+    borderColor: '#1380ec' 
+  },
+  selectButtonText: { 
+    color: '#71717a', 
+    fontSize: 15,
+    fontWeight: '400',
+  },
+  selectedButtonText: { 
+    color: '#ffffff', 
+    fontWeight: '500' 
+  },
+  saveButton: { 
+    backgroundColor: '#1380ec', 
+    borderRadius: 12, 
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignItems: 'center', 
+    marginTop: 24 
+  },
+  saveButtonText: { 
+    color: '#ffffff', 
+    fontSize: 16, 
+    fontWeight: '600' 
+  },
+  imagePicker: { 
+    alignItems: 'center', 
+    marginTop: 8 
+  },
+  circleImage: { 
+    width: 100, 
+    height: 100, 
+    borderRadius: 50 
+  },
+  optional: {
+    color: '#71717a',
+    fontSize: 14,
+    fontWeight: '400',
   },
   // 入会募集状況関連のスタイル
   recruitingContainer: {
@@ -680,39 +809,5 @@ const styles = StyleSheet.create({
   },
   toggleCircleActive: {
     transform: [{ translateX: 28 }],
-  },
-  // サークル種別選択関連のスタイル
-  circleTypeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 8,
-  },
-  circleTypeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#fff',
-  },
-  circleTypeText: {
-    marginLeft: 8,
-    fontSize: 16,
-    color: '#333',
-  },
-  radioButton: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#007bff',
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radioButtonInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#007bff',
   },
 }); 

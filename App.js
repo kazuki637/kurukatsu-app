@@ -70,6 +70,7 @@ const HomeStack = createStackNavigator();
 const SearchStack = createStackNavigator();
 const MyPageStack = createStackNavigator();
 const CircleManagementStack = createStackNavigator();
+const SharedStack = createStackNavigator(); // 共通スクリーン用
 const Tab = createBottomTabNavigator();
 const RootStack = createStackNavigator(); // For modals
 
@@ -319,21 +320,10 @@ function HomeStackScreen() {
   return (
     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
       <HomeStack.Screen name="Home" component={HomeScreen} />
-      <HomeStack.Screen name="CircleDetail" component={CircleProfileScreen} />
-      <HomeStack.Screen name="CircleMember" component={CircleMemberScreen} />
-      <HomeStack.Screen name="CircleMemberSchedule" component={CircleMemberScheduleScreen} />
-      <HomeStack.Screen name="CircleMemberContact" component={CircleMemberContactScreen} />
-      <HomeStack.Screen name="CircleMemberMemberList" component={CircleMemberMemberListScreen} />
       <HomeStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} />
       <HomeStack.Screen name="SearchResults" component={SearchResultsScreen} />
       <HomeStack.Screen name="ArticleWebView" component={ArticleWebViewScreen} />
       <HomeStack.Screen name="ArticleList" component={ArticleListScreen} />
-      <HomeStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
-      <HomeStack.Screen name="BlockManagement" component={BlockManagementScreen} />
-      <HomeStack.Screen name="HelpScreen" component={HelpScreen} />
-      <HomeStack.Screen name="TermsOfServiceScreen" component={TermsOfServiceScreen} />
-      <HomeStack.Screen name="PrivacyPolicyScreen" component={PrivacyPolicyScreen} />
-      <HomeStack.Screen name="Settings" component={SettingScreen} />
     </HomeStack.Navigator>
   );
 }
@@ -351,7 +341,6 @@ function SearchStackScreen() {
       <SearchStack.Screen name="GenderRatioSelection" component={GenderRatioSelectionScreen} />
       <SearchStack.Screen name="ActivityDaySelection" component={ActivityDaySelectionScreen} />
       <SearchStack.Screen name="SearchResults" component={SearchResultsScreen} />
-      <SearchStack.Screen name="CircleDetail" component={CircleProfileScreen} />
     </SearchStack.Navigator>
   );
 }
@@ -394,13 +383,19 @@ function CircleManagementStackScreen() {
       <CircleManagementStack.Screen name="CircleContact" component={CircleContactScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleLeadershipTransfer" component={CircleLeadershipTransferScreen} options={{ headerShown: false, gestureEnabled: true }} />
 
-      <CircleManagementStack.Screen name="CircleMember" component={CircleMemberScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleMemberSchedule" component={CircleMemberScheduleScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleMemberContact" component={CircleMemberContactScreen} options={{ headerShown: false, gestureEnabled: true }} />
-      <CircleManagementStack.Screen name="CircleMemberMemberList" component={CircleMemberMemberListScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} options={{ headerShown: false, gestureEnabled: true }} />
-      <CircleManagementStack.Screen name="Settings" component={SettingScreen} options={{ headerShown: false, gestureEnabled: true }} />
     </CircleManagementStack.Navigator>
+  );
+}
+
+// Shared Stack (共通スクリーン用)
+function SharedStackScreen() {
+  return (
+    <SharedStack.Navigator screenOptions={{ headerShown: false }}>
+      <SharedStack.Screen name="CircleDetail" component={CircleProfileScreen} />
+    </SharedStack.Navigator>
   );
 }
 
@@ -550,6 +545,11 @@ function AppNavigator() {
             <RootStack.Screen 
               name="BlockManagement" 
               component={BlockManagementScreen} 
+              options={{ headerShown: false }} 
+            />
+            <RootStack.Screen 
+              name="共通" 
+              component={SharedStackScreen} 
               options={{ headerShown: false }} 
             />
           </>

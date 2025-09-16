@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Linking, ActivityIndicator, Alert, SafeAreaView, StatusBar, Dimensions, Modal, Animated } from 'react-native';
+import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as RNImage } from 'react-native';
 import { db, auth } from '../firebaseConfig';
@@ -39,22 +40,56 @@ export default function CircleProfileScreen({ route, navigation }) {
   const [actionMenuVisible, setActionMenuVisible] = useState(false);
   const [userBlockedCircleIds, setUserBlockedCircleIds] = useState([]);
   
-  // フェードイン用のアニメーション値
-  const headerImageOpacity = useRef(new Animated.Value(0)).current;
-  const circleLogoOpacity = useRef(new Animated.Value(0)).current;
-  const activityImageOpacity = useRef(new Animated.Value(0)).current;
-  const instagramLogoOpacity = useRef(new Animated.Value(0)).current;
-  const xLogoOpacity = useRef(new Animated.Value(0)).current;
-  const lineLogoOpacity = useRef(new Animated.Value(0)).current;
+  // 画面全体のフェードイン用のアニメーション値
+  const screenOpacity = useRef(new Animated.Value(0)).current;
   
-  // フェードインアニメーション関数
-  const fadeInImage = (opacityValue) => {
-    Animated.timing(opacityValue, {
+  // 画面全体のフェードインアニメーション関数
+  const fadeInScreen = () => {
+    Animated.timing(screenOpacity, {
       toValue: 1,
-      duration: 300,
+      duration: 500,
       useNativeDriver: true,
     }).start();
   };
+  
+  // 画像のプリロード関数
+  const preloadImages = async () => {
+    if (!circleData) return;
+    
+    const imagesToPreload = [];
+    
+    if (circleData.headerImageUrl) {
+      imagesToPreload.push(circleData.headerImageUrl);
+    }
+    if (circleData.imageUrl) {
+      imagesToPreload.push(circleData.imageUrl);
+    }
+    if (circleData.activityImages && circleData.activityImages.length > 0) {
+      imagesToPreload.push(circleData.activityImages[0]);
+    }
+    
+    try {
+      await Promise.all(
+        imagesToPreload.map(url => 
+          ExpoImage.prefetch(url, { 
+            cachePolicy: 'memory-disk',
+            priority: 'high'
+          })
+        )
+      );
+    } catch (error) {
+      console.log('Image preload failed:', error);
+    }
+  };
+
+  // データ読み込み完了時に画像をプリロードしてから画面をフェードイン
+  useEffect(() => {
+    if (circleData && !loading) {
+      preloadImages().then(() => {
+        fadeInScreen();
+      });
+    }
+  }, [circleData, loading]);
   
   // ブロック状態更新関数をグローバルに登録
   React.useEffect(() => {
@@ -523,11 +558,11 @@ export default function CircleProfileScreen({ route, navigation }) {
     <View style={styles.tabContent}>
       {/* サークル活動画像（1枚のみ、スクロール不可） */}
       {circleData.activityImages && circleData.activityImages.length > 0 && (
-        <Animated.Image
+        <ExpoImage
           source={{ uri: circleData.activityImages[0] }}
-          style={[styles.activityImage, { opacity: activityImageOpacity }]}
+          style={styles.activityImage}
+          cachePolicy="memory-disk"
           contentFit="cover"
-          onLoad={() => fadeInImage(activityImageOpacity)}
         />
       )}
 
@@ -695,10 +730,9 @@ export default function CircleProfileScreen({ route, navigation }) {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>新歓LINEグループ</Text>
           <TouchableOpacity style={styles.lineButton} onPress={() => Linking.openURL(circleData.shinkanLineGroupLink)}>
-            <Animated.Image 
+            <Image 
               source={require('../assets/SNS-icons/LINE_Brand_icon.png')} 
-              style={[styles.snsLogoImage, { opacity: lineLogoOpacity }]}
-              onLoad={() => fadeInImage(lineLogoOpacity)}
+              style={styles.snsLogoImage}
             />
             <Text style={styles.lineButtonText}>LINEグループを開く</Text>
           </TouchableOpacity>
@@ -751,28 +785,29 @@ export default function CircleProfileScreen({ route, navigation }) {
   // ローディング・エラー時のUIを共通化
   if (loading && !circleData) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="small" color="#999" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5' }}>
+        <ActivityIndicator size="large" color="#007bff" />
+        <Text style={{ marginTop: 16, fontSize: 16, color: '#666' }}>読み込み中...</Text>
       </View>
     );
   }
   if (error) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>サークルデータの取得に失敗しました</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5' }}>
+        <Text style={{ fontSize: 16, color: '#666' }}>サークルデータの取得に失敗しました</Text>
       </View>
     );
   }
   if (!circleData) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>サークルが見つかりませんでした</Text>
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5' }}>
+        <Text style={{ fontSize: 16, color: '#666' }}>サークルが見つかりませんでした</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <Animated.View style={[styles.container, { opacity: screenOpacity }]}>
               <CommonHeader 
         title={circleData && circleData.name ? circleData.name : 'サークル詳細'} 
         showBackButton 
@@ -796,23 +831,25 @@ export default function CircleProfileScreen({ route, navigation }) {
         {/* ヘッダー画像エリア */}
         {circleData.headerImageUrl && (
           <View style={styles.headerImageContainer}>
-            <Animated.Image 
+            <ExpoImage 
               source={{ uri: circleData.headerImageUrl }} 
-              style={[styles.headerImage, { opacity: headerImageOpacity }]}
-              onLoad={() => fadeInImage(headerImageOpacity)}
+              style={styles.headerImage}
+              cachePolicy="memory-disk"
+              contentFit="cover"
             />
           </View>
         )}
 
         {/* サークル基本情報 */}
         <View style={styles.circleInfoSection}>
-          <View style={styles.circleInfo}>
+            <View style={styles.circleInfo}>
               <View style={styles.logoContainer}>
                 {circleData.imageUrl ? (
-                  <Animated.Image 
+                  <ExpoImage 
                     source={{ uri: circleData.imageUrl }} 
-                    style={[styles.circleLogo, { opacity: circleLogoOpacity }]}
-                    onLoad={() => fadeInImage(circleLogoOpacity)}
+                    style={styles.circleLogo}
+                    cachePolicy="memory-disk"
+                    contentFit="cover"
                   />
                 ) : (
                   <View style={styles.logoPlaceholder}>
@@ -820,44 +857,43 @@ export default function CircleProfileScreen({ route, navigation }) {
                   </View>
                 )}
               </View>
-            <View style={styles.circleTextInfo}>
-              <View style={styles.circleNameRow}>
-                <Text style={styles.circleName}>{circleData.name}</Text>
-                {circleData.isOfficial && (
-                  <View style={styles.officialBadge}>
-                    <Ionicons name="checkmark-circle" size={16} color="#28a745" />
-                    <Text style={styles.officialText}>公式</Text>
-                  </View>
-                )}
-                  {/* SNSボタン（X, Instagram） */}
-                  {(circleData.xLink || circleData.snsLink) && (
-                    <View style={styles.snsIconRow}>
-                      {circleData.snsLink && (
-                        <TouchableOpacity onPress={() => Linking.openURL(circleData.snsLink)} style={styles.snsIconButton}>
-                          <Animated.Image 
-                            source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} 
-                            style={[styles.snsLogoImage, { opacity: instagramLogoOpacity }]}
-                            onLoad={() => fadeInImage(instagramLogoOpacity)}
-                          />
-                        </TouchableOpacity>
-                      )}
-                      {circleData.xLink && (
-                        <TouchableOpacity onPress={() => Linking.openURL(circleData.xLink)} style={styles.snsIconButton}>
-                          <Animated.Image 
-                            source={require('../assets/SNS-icons/X_logo-black.png')} 
-                            style={[styles.snsLogoImage, { opacity: xLogoOpacity }]}
-                            onLoad={() => fadeInImage(xLogoOpacity)}
-                          />
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  )}
+              
+              <View style={styles.circleTextInfo}>
+                {/* サークル名（独立した行） */}
+                <View style={styles.circleNameContainer}>
+                  <Text style={styles.circleName} numberOfLines={2} ellipsizeMode="tail">{circleData.name}</Text>
+                </View>
+                
+                {/* 大学名・ジャンル（サークル名の下） */}
+                <View style={styles.circleDetailsContainer}>
+                  <Text style={styles.universityName}>{circleData.universityName}</Text>
+                  <Text style={styles.genre}>{circleData.genre}</Text>
+                </View>
               </View>
-              <Text style={styles.universityName}>{circleData.universityName}</Text>
-              <Text style={styles.genre}>{circleData.genre}</Text>
             </View>
+            
+            {/* SNSボタン（サークル情報セクションの右下に絶対配置） */}
+            {(circleData.xLink || circleData.snsLink) && (
+              <View style={styles.snsIconContainer}>
+                {circleData.snsLink && (
+                  <TouchableOpacity onPress={() => Linking.openURL(circleData.snsLink)} style={styles.snsIconButton}>
+                    <Image 
+                      source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} 
+                      style={styles.snsLogoImage}
+                    />
+                  </TouchableOpacity>
+                )}
+                {circleData.xLink && (
+                  <TouchableOpacity onPress={() => Linking.openURL(circleData.xLink)} style={styles.snsIconButton}>
+                    <Image 
+                      source={require('../assets/SNS-icons/X_logo-black.png')} 
+                      style={styles.snsLogoImage}
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
           </View>
-        </View>
 
         {/* タブバー */}
         {renderTabBar()}
@@ -949,7 +985,7 @@ export default function CircleProfileScreen({ route, navigation }) {
           ) : null}
         </View>
       </SafeAreaView>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -974,6 +1010,7 @@ const styles = StyleSheet.create({
       width: '100%',
       aspectRatio: 16 / 9,
       contentFit: 'cover',
+      backgroundColor: '#f0f0f0',
     },
   headerImageContainer: {
     width: '100%',
@@ -990,13 +1027,16 @@ const styles = StyleSheet.create({
   
   circleInfoSection: {
     backgroundColor: '#fff',
-    padding: 20,
+    paddingVertical: 30,
+    paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    position: 'relative',
   },
   circleInfo: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    paddingTop: 5,
   },
   logoContainer: {
     width: 60,
@@ -1022,41 +1062,29 @@ const styles = StyleSheet.create({
   circleTextInfo: {
     marginLeft: 15,
     flex: 1,
+    paddingRight: 0,
   },
-  circleNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'space-between',
+  circleNameContainer: {
+    marginBottom: 8,
   },
   circleName: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
+    lineHeight: 30,
   },
-  officialBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#e0f2f7',
-    borderRadius: 10,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    marginLeft: 8,
-  },
-  officialText: {
-    fontSize: 12,
-    color: '#28a745',
-    fontWeight: 'bold',
+  circleDetailsContainer: {
+    gap: 4,
   },
   universityName: {
     fontSize: 16,
     color: '#666',
-    marginTop: 2,
+    lineHeight: 22,
   },
   genre: {
     fontSize: 14,
     color: '#666',
-    marginTop: 2,
+    lineHeight: 20,
   },
   tabBarContainer: {
     backgroundColor: '#fff',
@@ -1357,6 +1385,14 @@ const styles = StyleSheet.create({
     color: '#444',
     lineHeight: 22,
   },
+  snsIconContainer: {
+    position: 'absolute',
+    bottom: 15,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   snsIconRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1364,12 +1400,11 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   snsIconButton: {
-    marginLeft: 4,
     padding: 2,
   },
   snsLogoImage: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
     contentFit: 'contain',
   },
   snsLargeRow: {

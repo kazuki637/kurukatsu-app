@@ -227,71 +227,71 @@ const SearchResultsScreen = ({ route, navigation }) => {
   const renderItem = ({ item }) => {
     return (
     <TouchableOpacity 
-      style={styles.resultItem}
-      onPress={() => navigation.navigate('CircleDetail', { circleId: item.id })}
+      style={styles.resultItemWrapper}
+      onPress={() => navigation.navigate('共通', { screen: 'CircleDetail', params: { circleId: item.id } })}
     >
-      {/* 「・・・」ボタン（右上） */}
-      <TouchableOpacity
-        style={styles.actionButton}
-        onPress={(e) => {
-          e.stopPropagation(); // サークルアイテムのタップを防ぐ
-          showActionSheetForCircle(item);
-        }}
-      >
-        <Ionicons name="ellipsis-horizontal" size={24} color="#666" />
-      </TouchableOpacity>
+      {/* ヘッダー画像（カードの外側に配置） */}
+      {item.headerImageUrl && (
+        <Image source={{ uri: item.headerImageUrl }} style={styles.headerImageCard} contentFit="cover" />
+      )}
+      
+      <View style={[
+        styles.resultItem,
+        !item.headerImageUrl && styles.resultItemWithoutHeader
+      ]}>
+        {/* 「・・・」ボタン（右上） */}
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={(e) => {
+            e.stopPropagation(); // サークルアイテムのタップを防ぐ
+            showActionSheetForCircle(item);
+          }}
+        >
+          <Ionicons name="ellipsis-horizontal" size={24} color="#666" />
+        </TouchableOpacity>
 
-      <View style={styles.headerContainer}>
-        {item.imageUrl ? (
-          <Image source={{ uri: item.imageUrl }} style={styles.accountImage} />
-        ) : (
-          <View style={[styles.accountImage, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
-            <Ionicons name="people-outline" size={40} color="#aaa" />
+        <View style={styles.headerContainer}>
+          {item.imageUrl ? (
+            <Image source={{ uri: item.imageUrl }} style={styles.accountImage} />
+          ) : (
+            <View style={[styles.accountImage, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
+              <Ionicons name="people-outline" size={40} color="#aaa" />
+            </View>
+          )}
+          <View style={styles.headerTextContainer}>
+            <Text style={styles.resultTitle} numberOfLines={1} ellipsizeMode="tail">{item.name}</Text>
+            <Text style={styles.resultDetail} numberOfLines={1} ellipsizeMode="tail">{item.universityName} - {item.genre}</Text>
+          </View>
+          
+        </View>
+
+        {item.thumbnailImage && (
+          <Image 
+            source={{ uri: item.thumbnailImage }}
+            style={styles.thumbnailImage}
+            placeholder={{ blurhash: 'LKN]y_?b%M_3%Mxu%Mxu%Mxu%Mxu' }} contentFit="cover" transition={1000}
+          />
+        )}
+
+        
+        {/* 活動場所と募集中表示 */}
+        {(item.welcome?.isRecruiting === true || item.activityLocation) && (
+          <View style={styles.infoContainer}>
+            {item.welcome?.isRecruiting === true && (
+              <View style={styles.infoItem}>
+                <Ionicons name="time" size={16} color="#666" />
+                <Text style={styles.infoText}>募集中</Text>
+              </View>
+            )}
+            {item.activityLocation && (
+              <View style={styles.infoItem}>
+                <Ionicons name="location" size={16} color="#666" />
+                <Text style={styles.infoText}>{item.activityLocation}</Text>
+              </View>
+            )}
           </View>
         )}
-        <View style={styles.headerTextContainer}>
-          <Text style={styles.resultTitle}>{item.name}</Text>
-          <Text style={styles.resultDetail}>{item.universityName} - {item.genre}</Text>
-        </View>
-        
       </View>
-
-      {/* ヘッダー画像（サークル詳細画面のheaderImageUrl） */}
-      {item.headerImageUrl && (
-                      <Image source={{ uri: item.headerImageUrl }} style={styles.headerImageCard} contentFit="cover" />
-      )}
-
-      {item.thumbnailImage && (
-        <Image 
-          source={{ uri: item.thumbnailImage }}
-          style={styles.thumbnailImage}
-          placeholder={{ blurhash: 'LKN]y_?b%M_3%Mxu%Mxu%Mxu%Mxu' }} contentFit="cover" transition={1000}
-        />
-      )}
-
-      {item.description ? (
-        <View style={styles.descriptionContainer}>
-          <Text style={styles.descriptionText} numberOfLines={3}>{item.description}</Text>
-        </View>
-      ) : null}
-      
-      {/* 活動場所と募集中表示 */}
-      {(item.welcome?.isRecruiting === true || item.activityLocation) && (
-        <View style={styles.infoContainer}>
-          {item.welcome?.isRecruiting === true && (
-            <View style={styles.infoItem}>
-              <Ionicons name="time" size={16} color="#666" />
-              <Text style={styles.infoText}>募集中</Text>
-            </View>
-          )}
-          {item.activityLocation && (
-            <View style={styles.infoItem}>
-              <Ionicons name="location" size={16} color="#666" />
-              <Text style={styles.infoText}>{item.activityLocation}</Text>
-            </View>
-          )}
-        </View>
-      )}
     </TouchableOpacity>
   );
 };
@@ -427,13 +427,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 10,
   },
+  resultItemWrapper: {
+    marginBottom: 10,
+  },
   resultItem: {
     backgroundColor: '#fff',
     padding: 15,
-    marginBottom: 10,
-    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#eee',
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+  },
+  resultItemWithoutHeader: {
+    borderTopWidth: 1,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
   },
   headerContainer: {
     flexDirection: 'row',
@@ -448,6 +457,7 @@ const styles = StyleSheet.create({
   },
   headerTextContainer: {
     flex: 1,
+    marginRight: 50, // 「・・・」ボタンのスペースを確保
   },
   resultTitle: {
     fontSize: 18,
@@ -489,8 +499,11 @@ const styles = StyleSheet.create({
   headerImageCard: {
     width: '100%',
     aspectRatio: 16 / 9,
-    borderRadius: 8,
-    marginBottom: 10,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderBottomWidth: 0,
   },
   // フィルター関連のスタイル
   filterContainer: {

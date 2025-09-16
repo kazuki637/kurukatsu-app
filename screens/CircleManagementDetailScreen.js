@@ -377,12 +377,12 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
                           <Text style={styles.managementGridItemText}>{btn.label}</Text>
                           <View style={styles.buttonIconContainer}>
                             <Image source={btn.iconSource} style={styles.buttonIcon} />
-                            {btn.hasNotification && (
-                              <View style={styles.notificationBadge}>
-                                <Text style={styles.notificationBadgeText}>{btn.notificationCount}</Text>
-                              </View>
-                            )}
                           </View>
+                          {btn.hasNotification && (
+                            <View style={styles.notificationBadge}>
+                              <Text style={styles.notificationBadgeText}>{btn.notificationCount}</Text>
+                            </View>
+                          )}
                         </View>
                       </LinearGradient>
                     </TouchableOpacity>
@@ -600,9 +600,9 @@ const styles = StyleSheet.create({
   },
   notificationBadge: {
     position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: '#ff4757',
+    top: 8,
+    right: 8,
+    backgroundColor: '#DC2626',
     borderRadius: 10,
     minWidth: 18,
     height: 18,

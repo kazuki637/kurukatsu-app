@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, ActivityIndicator, FlatList } from 'react-native';
 import CommonHeader from '../components/CommonHeader';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '../firebaseConfig';
@@ -333,64 +333,51 @@ const HomeScreen = ({ navigation }) => {
               <Text style={styles.sectionTitle}>
                 {userUniversity ? `${userUniversity}の人気サークル` : '人気のサークル'}
               </Text>
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.popularCirclesScrollContainer}
-                style={styles.popularCirclesScrollView}
-              >
-                {popularCircles
-                  .filter(circle => {
-                    const hasHeaderImage = circle.headerImageUrl;
-                    const isBlocked = userBlockedCircleIds.includes(circle.id);
-                    const shouldShow = hasHeaderImage && !isBlocked;
-                    return shouldShow;
-                  }) // ヘッダー画像があるサークルかつブロックしていないサークルのみ表示
-                  .map((circle, index) => (
+              <FlatList
+                data={popularCircles.filter(circle => {
+                  const hasHeaderImage = circle.headerImageUrl;
+                  const isBlocked = userBlockedCircleIds.includes(circle.id);
+                  const shouldShow = hasHeaderImage && !isBlocked;
+                  return shouldShow;
+                })}
+                renderItem={({ item: circle }) => (
                   <TouchableOpacity 
-                    key={circle.id} 
-                    style={styles.popularCircleCard}
-                    onPress={() => navigation.navigate('CircleDetail', { circleId: circle.id })}
+                    style={styles.popularCircleWrapper}
+                    onPress={() => navigation.navigate('共通', { screen: 'CircleDetail', params: { circleId: circle.id } })}
                   >
-                    {/* サークルアイコンと基本情報 */}
-                    <View style={styles.circleHeaderContainer}>
-                      {circle.imageUrl ? (
-                        <Image source={{ uri: circle.imageUrl }} style={styles.circleIcon} />
-                      ) : (
-                        <View style={[styles.circleIcon, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
-                          <Ionicons name="people-outline" size={30} color="#aaa" />
-                        </View>
-                      )}
-                      <View style={styles.circleHeaderTextContainer}>
-                        <Text style={styles.circleTitle} numberOfLines={2}>{circle.name}</Text>
-                        <Text style={styles.circleDetail}>{circle.universityName} - {circle.genre}</Text>
-                      </View>
-                    </View>
-
                     {/* ヘッダー画像 */}
                     {circle.headerImageUrl && (
                       <Image source={{ uri: circle.headerImageUrl }} style={styles.circleHeaderImage} />
                     )}
-
-                    {/* 説明文 */}
-                    {circle.description && (
-                      <View style={styles.circleDescriptionContainer}>
-                        <Text style={styles.circleDescriptionText} numberOfLines={2}>{circle.description}</Text>
-                      </View>
-                    )}
-
-                    {/* 募集中表示 */}
-                    {circle.welcome?.isRecruiting === true && (
-                      <View style={styles.circleInfoContainer}>
-                        <View style={styles.circleInfoItem}>
-                          <Ionicons name="time" size={14} color="#666" />
-                          <Text style={styles.circleInfoText}>募集中</Text>
+                    
+                    <View style={[styles.popularCircleCard, !circle.headerImageUrl && styles.popularCircleCardWithoutHeader]}>
+                      {/* サークルアイコンと基本情報 */}
+                      <View style={styles.circleHeaderContainer}>
+                        {circle.imageUrl ? (
+                          <Image source={{ uri: circle.imageUrl }} style={styles.circleIcon} />
+                        ) : (
+                          <View style={[styles.circleIcon, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
+                            <Ionicons name="people-outline" size={30} color="#aaa" />
+                          </View>
+                        )}
+                        <View style={styles.circleHeaderTextContainer}>
+                          <Text style={styles.circleTitle} numberOfLines={2}>{circle.name}</Text>
+                          <Text style={styles.circleDetail}>{circle.universityName} - {circle.genre}</Text>
                         </View>
                       </View>
-                    )}
+                    </View>
                   </TouchableOpacity>
-                ))}
-              </ScrollView>
+                )}
+                keyExtractor={(item) => item.id}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.popularCirclesScrollContainer}
+                style={styles.popularCirclesScrollView}
+                snapToInterval={365} // カード幅 + マージン
+                snapToAlignment="start"
+                decelerationRate="fast"
+                pagingEnabled={false}
+              />
             </View>
           )}
 
@@ -398,64 +385,51 @@ const HomeScreen = ({ navigation }) => {
           {newCircles.length > 0 && (
             <View style={styles.sectionContainer}>
               <Text style={styles.sectionTitle}>新着のサークル</Text>
-              <ScrollView 
-                horizontal 
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.popularCirclesScrollContainer}
-                style={styles.popularCirclesScrollView}
-              >
-                {newCircles
-                  .filter(circle => {
-                    const hasHeaderImage = circle.headerImageUrl;
-                    const isBlocked = userBlockedCircleIds.includes(circle.id);
-                    const shouldShow = hasHeaderImage && !isBlocked;
-                    return shouldShow;
-                  }) // ヘッダー画像があるサークルかつブロックしていないサークルのみ表示
-                  .map((circle, index) => (
+              <FlatList
+                data={newCircles.filter(circle => {
+                  const hasHeaderImage = circle.headerImageUrl;
+                  const isBlocked = userBlockedCircleIds.includes(circle.id);
+                  const shouldShow = hasHeaderImage && !isBlocked;
+                  return shouldShow;
+                })}
+                renderItem={({ item: circle }) => (
                   <TouchableOpacity 
-                    key={circle.id} 
-                    style={styles.popularCircleCard}
-                    onPress={() => navigation.navigate('CircleDetail', { circleId: circle.id })}
+                    style={styles.popularCircleWrapper}
+                    onPress={() => navigation.navigate('共通', { screen: 'CircleDetail', params: { circleId: circle.id } })}
                   >
-                    {/* サークルアイコンと基本情報 */}
-                    <View style={styles.circleHeaderContainer}>
-                      {circle.imageUrl ? (
-                        <Image source={{ uri: circle.imageUrl }} style={styles.circleIcon} />
-                      ) : (
-                        <View style={[styles.circleIcon, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
-                          <Ionicons name="people-outline" size={30} color="#aaa" />
-                        </View>
-                      )}
-                      <View style={styles.circleHeaderTextContainer}>
-                        <Text style={styles.circleTitle} numberOfLines={2}>{circle.name}</Text>
-                        <Text style={styles.circleDetail}>{circle.universityName} - {circle.genre}</Text>
-                      </View>
-                    </View>
-
                     {/* ヘッダー画像 */}
                     {circle.headerImageUrl && (
                       <Image source={{ uri: circle.headerImageUrl }} style={styles.circleHeaderImage} />
                     )}
-
-                    {/* 説明文 */}
-                    {circle.description && (
-                      <View style={styles.circleDescriptionContainer}>
-                        <Text style={styles.circleDescriptionText} numberOfLines={2}>{circle.description}</Text>
-                      </View>
-                    )}
-
-                    {/* 募集中表示 */}
-                    {circle.welcome?.isRecruiting === true && (
-                      <View style={styles.circleInfoContainer}>
-                        <View style={styles.circleInfoItem}>
-                          <Ionicons name="time" size={14} color="#666" />
-                          <Text style={styles.circleInfoText}>募集中</Text>
+                    
+                    <View style={[styles.popularCircleCard, !circle.headerImageUrl && styles.popularCircleCardWithoutHeader]}>
+                      {/* サークルアイコンと基本情報 */}
+                      <View style={styles.circleHeaderContainer}>
+                        {circle.imageUrl ? (
+                          <Image source={{ uri: circle.imageUrl }} style={styles.circleIcon} />
+                        ) : (
+                          <View style={[styles.circleIcon, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
+                            <Ionicons name="people-outline" size={30} color="#aaa" />
+                          </View>
+                        )}
+                        <View style={styles.circleHeaderTextContainer}>
+                          <Text style={styles.circleTitle} numberOfLines={2}>{circle.name}</Text>
+                          <Text style={styles.circleDetail}>{circle.universityName} - {circle.genre}</Text>
                         </View>
                       </View>
-                    )}
+                    </View>
                   </TouchableOpacity>
-                ))}
-              </ScrollView>
+                )}
+                keyExtractor={(item) => item.id}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.popularCirclesScrollContainer}
+                style={styles.popularCirclesScrollView}
+                snapToInterval={365} // カード幅 + マージン
+                snapToAlignment="start"
+                decelerationRate="fast"
+                pagingEnabled={false}
+              />
             </View>
           )}
         </ScrollView>
@@ -670,15 +644,25 @@ const styles = StyleSheet.create({
     paddingLeft: 20,
     paddingRight: 20,
   },
-  popularCircleCard: {
+  popularCircleWrapper: {
     width: 350,
     marginRight: 15,
+    marginBottom: 10,
+  },
+  popularCircleCard: {
     backgroundColor: '#fff',
     padding: 15,
-    marginBottom: 10,
-    borderRadius: 8,
+    paddingBottom: 10,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
     borderWidth: 1,
     borderColor: '#eee',
+    borderTopWidth: 0,
+  },
+  popularCircleCardWithoutHeader: {
+    borderTopWidth: 1,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
   },
 
 
@@ -754,8 +738,12 @@ const styles = StyleSheet.create({
   circleHeaderImage: {
     width: '100%',
     aspectRatio: 16 / 9,
-    borderRadius: 8,
-    marginBottom: 10,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+    borderWidth: 1,
+    borderColor: '#eee',
+    borderBottomWidth: 0,
+    marginBottom: 0,
   },
   circleDescriptionContainer: {
     marginBottom: 5,

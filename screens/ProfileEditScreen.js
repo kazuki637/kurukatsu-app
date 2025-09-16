@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Alert, Switch, Platform, ScrollView, StatusBar, Animated } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Alert, Switch, Platform, ScrollView, StatusBar, Animated, Dimensions } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import universitiesData from '../universities.json';
 import { compressProfileImage } from '../utils/imageCompression';
 import { deleteExistingProfileImages } from '../utils/imageCrop';
+
+const { width } = Dimensions.get('window');
 
 
 const GRADES = ['大学1年', '大学2年', '大学3年', '大学4年', '大学院1年', '大学院2年', 'その他'];
@@ -555,70 +557,79 @@ export default function ProfileEditScreen(props) {
         <ScrollView 
           contentContainerStyle={styles.bodyContent} 
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-            <View style={{ height: 16 }} />
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>プロフィール画像<Text style={styles.optional}>(任意)</Text></Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start' }}>
-                <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
-                  <Animated.View style={{ opacity: profileImageOpacity }}>
-                    {(profileImage && profileImage.trim() !== '' && !imageError) || (profileImageUrl && profileImageUrl.trim() !== '' && !imageError) ? (
-                      <Image
-                        source={{ uri: (profileImage && profileImage.trim() !== '') ? profileImage : profileImageUrl }}
-                        style={styles.profileImage}
-                        onLoad={() => setImageLoading(false)}
-                        onError={() => {
-                          setImageLoading(false);
-                          setImageError(true);
-                        }}
-                        fadeDuration={300}
-                      />
-                    ) : (
-                      <View style={[styles.profileImage, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
-                        <Ionicons name="person-outline" size={60} color="#aaa" />
-                      </View>
-                    )}
-                  </Animated.View>
+          <View style={{ height: 16 }} />
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>プロフィール画像<Text style={styles.optional}>(任意)</Text></Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start' }}>
+              <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
+                <Animated.View style={{ opacity: profileImageOpacity }}>
+                  {(profileImage && profileImage.trim() !== '' && !imageError) || (profileImageUrl && profileImageUrl.trim() !== '' && !imageError) ? (
+                    <Image
+                      source={{ uri: (profileImage && profileImage.trim() !== '') ? profileImage : profileImageUrl }}
+                      style={styles.profileImage}
+                      onLoad={() => setImageLoading(false)}
+                      onError={() => {
+                        setImageLoading(false);
+                        setImageError(true);
+                      }}
+                      fadeDuration={300}
+                    />
+                  ) : (
+                    <View style={[styles.profileImage, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
+                      <Ionicons name="person-outline" size={60} color="#aaa" />
+                    </View>
+                  )}
+                </Animated.View>
+              </TouchableOpacity>
+              {((profileImage && profileImage.trim() !== '') || (profileImageUrl && profileImageUrl.trim() !== '')) && !imageError && profileImage !== '' && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setProfileImage('');
+                    setProfileImageUrl('');
+                    setImageError(false);
+                    // 画像の読み込み状態をリセット
+                    setImageLoading(true);
+                    profileImageOpacity.setValue(0);
+                    // 状態変更を即座に検知
+                    if (!originalData) return;
+                    
+                    const hasChanges = 
+                      name !== originalData.name ||
+                      university !== originalData.university ||
+                      grade !== originalData.grade ||
+                      gender !== originalData.gender ||
+                      birthday.getTime() !== originalData.birthday.getTime() ||
+                      true; // 画像が削除された場合は常に変更あり
+                    
+                    setHasUnsavedChanges(hasChanges);
+                  }}
+                  style={{ marginLeft: 12, padding: 8, backgroundColor: '#fee', borderRadius: 24 }}
+                >
+                  <Ionicons name="trash-outline" size={24} color="#e74c3c" />
                 </TouchableOpacity>
-                {((profileImage && profileImage.trim() !== '') || (profileImageUrl && profileImageUrl.trim() !== '')) && !imageError && profileImage !== '' && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      setProfileImage('');
-                      setProfileImageUrl('');
-                      setImageError(false);
-                      // 画像の読み込み状態をリセット
-                      setImageLoading(true);
-                      profileImageOpacity.setValue(0);
-                      // 状態変更を即座に検知
-                      if (!originalData) return;
-                      
-                      const hasChanges = 
-                        name !== originalData.name ||
-                        university !== originalData.university ||
-                        grade !== originalData.grade ||
-                        gender !== originalData.gender ||
-                        birthday.getTime() !== originalData.birthday.getTime() ||
-                        true; // 画像が削除された場合は常に変更あり
-                      
-                      setHasUnsavedChanges(hasChanges);
-                    }}
-                    style={{ marginLeft: 12, padding: 8, backgroundColor: '#fee', borderRadius: 24 }}
-                  >
-                    <Ionicons name="trash-outline" size={24} color="#e74c3c" />
-                  </TouchableOpacity>
-                )}
-              </View>
+              )}
             </View>
+          </View>
+          {/* フォームフィールド */}
+          <View style={styles.formSection}>
             <View style={styles.formGroup}>
-              <Text style={styles.label}>氏名<Text style={styles.required}>*</Text></Text>
-              <TextInput style={styles.input} value={name} onChangeText={(text) => {
-                setName(text);
-                checkForChanges();
-              }} placeholder="氏名" />
+              <Text style={styles.label}>氏名</Text>
+              <TextInput 
+                style={styles.input} 
+                value={name} 
+                onChangeText={(text) => {
+                  setName(text);
+                  checkForChanges();
+                }} 
+                placeholder="氏名を入力してください"
+                placeholderTextColor="#a1a1aa"
+              />
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>大学名<Text style={styles.required}>*</Text></Text>
+              <Text style={styles.label}>大学名</Text>
               <View style={styles.universityInputContainer}>
                 <TextInput 
                   style={styles.input} 
@@ -627,12 +638,13 @@ export default function ProfileEditScreen(props) {
                     handleUniversityChange(text);
                     checkForChanges();
                   }}
-                  placeholder="大学名" 
+                  placeholder="大学名を入力してください"
+                  placeholderTextColor="#a1a1aa"
                 />
               </View>
             </View>
             
-            {/* 大学名候補を大学名入力欄と学年選択の間に表示 */}
+            {/* 大学名候補 */}
             {showSuggestions && (
               <View style={styles.suggestionsContainer}>
                 <ScrollView 
@@ -655,62 +667,75 @@ export default function ProfileEditScreen(props) {
                 </ScrollView>
               </View>
             )}
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>学年</Text>
+                <View style={styles.selectRow}>
+                  {GRADES.map(g => (
+                    <TouchableOpacity 
+                      key={g} 
+                      style={[styles.selectButton, grade === g && styles.selectedButton]} 
+                      onPress={() => {
+                        const newGrade = g;
+                        setGrade(newGrade);
+                        if (!originalData) return;
+                        
+                        const hasChanges = 
+                          name !== originalData.name ||
+                          university !== originalData.university ||
+                          newGrade !== originalData.grade ||
+                          gender !== originalData.gender ||
+                          birthday.getTime() !== originalData.birthday.getTime() ||
+                          profileImage !== null ||
+                          (profileImage === '' && originalData.profileImageUrl);
+                        
+                        setHasUnsavedChanges(hasChanges);
+                      }}
+                    >
+                      <Text style={[styles.selectButtonText, grade === g && styles.selectedButtonText]}>{g}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
             <View style={styles.formGroup}>
-              <Text style={styles.label}>学年<Text style={styles.required}>*</Text></Text>
-              <View style={styles.selectRow}>
-                {GRADES.map(g => (
-                  <TouchableOpacity key={g} style={[styles.selectButton, grade === g && styles.selectedButton]} onPress={() => {
-                    const newGrade = g;
-                    setGrade(newGrade);
-                    // 状態変更を即座に検知
-                    if (!originalData) return;
-                    
-                    const hasChanges = 
-                      name !== originalData.name ||
-                      university !== originalData.university ||
-                      newGrade !== originalData.grade ||
-                      gender !== originalData.gender ||
-                      birthday.getTime() !== originalData.birthday.getTime() ||
-                      profileImage !== null ||
-                      (profileImage === '' && originalData.profileImageUrl);
-                    
-                    setHasUnsavedChanges(hasChanges);
-                  }}>
-                    <Text style={[styles.selectButtonText, grade === g && styles.selectedButtonText]}>{g}</Text>
-                  </TouchableOpacity>
-                ))}
+              <Text style={styles.label}>性別</Text>
+              <View style={styles.selectContainer}>
+                <ScrollView 
+                  horizontal 
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.selectScrollContent}
+                >
+                  {GENDERS.map(g => (
+                    <TouchableOpacity 
+                      key={g} 
+                      style={[styles.selectButton, gender === g && styles.selectedButton]} 
+                      onPress={() => {
+                        const newGender = g;
+                        setGender(newGender);
+                        if (!originalData) return;
+                        
+                        const hasChanges = 
+                          name !== originalData.name ||
+                          university !== originalData.university ||
+                          grade !== originalData.grade ||
+                          newGender !== originalData.gender ||
+                          birthday.getTime() !== originalData.birthday.getTime() ||
+                          profileImage !== null ||
+                          (profileImage === '' && originalData.profileImageUrl);
+                        
+                        setHasUnsavedChanges(hasChanges);
+                      }}
+                    >
+                      <Text style={[styles.selectButtonText, gender === g && styles.selectedButtonText]}>{g}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
               </View>
             </View>
             <View style={styles.formGroup}>
-              <Text style={styles.label}>性別<Text style={styles.required}>*</Text></Text>
-              <View style={styles.selectRow}>
-                {GENDERS.map(g => (
-                  <TouchableOpacity key={g} style={[styles.selectButton, gender === g && styles.selectedButton]} onPress={() => {
-                    const newGender = g;
-                    setGender(newGender);
-                    // 状態変更を即座に検知
-                    if (!originalData) return;
-                    
-                    const hasChanges = 
-                      name !== originalData.name ||
-                      university !== originalData.university ||
-                      grade !== originalData.grade ||
-                      newGender !== originalData.gender ||
-                      birthday.getTime() !== originalData.birthday.getTime() ||
-                      profileImage !== null ||
-                      (profileImage === '' && originalData.profileImageUrl);
-                    
-                    setHasUnsavedChanges(hasChanges);
-                  }}>
-                    <Text style={[styles.selectButtonText, gender === g && styles.selectedButtonText]}>{g}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>生年月日<Text style={styles.required}>*</Text></Text>
+              <Text style={styles.label}>生年月日</Text>
               <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.datePickerButton}>
-                <Text style={styles.datePickerText}>{birthday ? birthday.toLocaleDateString('ja-JP') : '生年月日を選択'}</Text>
+                <Text style={styles.datePickerText}>{birthday ? birthday.toLocaleDateString('ja-JP') : '生年月日を選択してください'}</Text>
+                <Ionicons name="chevron-down" size={20} color="#a1a1aa" />
               </TouchableOpacity>
               {showDatePicker && (
                 <View style={styles.datePickerContainer}>
@@ -724,7 +749,6 @@ export default function ProfileEditScreen(props) {
                       if (selectedDate) {
                         const newBirthday = selectedDate;
                         setBirthday(newBirthday);
-                        // 状態変更を即座に検知
                         if (!originalData) return;
                         
                         const hasChanges = 
@@ -745,83 +769,38 @@ export default function ProfileEditScreen(props) {
                 </View>
               )}
             </View>
+          </View>
             
-            {/* 学生証認証 - 一時的に非表示 */}
-            {/* 
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>学生証認証<Text style={styles.optional}>(スキップ可)</Text></Text>
-              <View style={styles.studentIdContainer}>
-                {studentIdUrl ? (
-                  <View style={styles.verifiedContainer}>
-                    <Ionicons name="checkmark-circle" size={24} color="#28a745" />
-                    <Text style={styles.verifiedText}>認証済み</Text>
-                  </View>
-                ) : studentIdImage ? (
-                  <View style={styles.studentIdPreviewContainer}>
-                    <Image source={{ uri: studentIdImage }} style={styles.studentIdImage} />
-                    
-                    <View style={styles.confirmationBox}>
-                      <Text style={styles.confirmationTitle}>アップロード前の最終確認</Text>
-                      <View style={styles.confirmationList}>
-                        <Text style={styles.confirmationListItem}>・氏名、大学名、生年月日が鮮明に写っている</Text>
-                        <Text style={styles.confirmationListItem}>・画像に加工や修正、隠蔽がされていない</Text>
-                        <Text style={styles.confirmationListItem}>・入力したプロフィール情報と記載内容が一致している</Text>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.finalConfirmationRow}
-                        onPress={() => setIsIdConfirmed(!isIdConfirmed)}
-                      >
-                        <Ionicons
-                          name={isIdConfirmed ? 'checkbox' : 'square-outline'}
-                          size={24}
-                          color={isIdConfirmed ? '#007bff' : '#ccc'}
-                        />
-                        <Text style={styles.finalConfirmationText}>上記全ての項目を確認し、同意します</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    <View style={styles.studentIdPreviewButtons}>
-                      <TouchableOpacity
-                        onPress={() => {
-                          setStudentIdImage(null);
-                          setIsIdConfirmed(false); // キャンセル時にリセット
-                        }}
-                        style={styles.cancelStudentIdButton}
-                      >
-                        <Text style={styles.cancelStudentIdButtonText}>キャンセル</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={handleStudentIdUpload}
-                        style={[styles.uploadStudentIdButton, (!isIdConfirmed || loading) && styles.disabledButton]}
-                        disabled={!isIdConfirmed || loading}
-                      >
-                        <Text style={styles.uploadStudentIdButtonText}>
-                          {loading ? 'アップロード中...' : 'アップロード'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    onPress={handleStudentIdCapture}
-                    style={styles.captureStudentIdButton}
-                  >
-                    <Ionicons name="camera" size={24} color="#007bff" />
-                    <Text style={styles.captureStudentIdButtonText}>学生証を認証</Text>
-                  </TouchableOpacity>
-                )}
+          {/* 学生証認証セクション - コメントアウト状態を維持 */}
+          {/* 
+          <View style={styles.verificationSection}>
+            <Text style={styles.sectionTitle}>認証</Text>
+            <View style={styles.verificationCard}>
+              <View style={styles.verificationIcon}>
+                <Ionicons name="card-outline" size={24} color="#71717a" />
               </View>
+              <View style={styles.verificationContent}>
+                <Text style={styles.verificationTitle}>学生証</Text>
+                <Text style={styles.verificationDescription}>認証のために学生証をアップロードしてください</Text>
+              </View>
+              <TouchableOpacity style={styles.uploadButton}>
+                <Text style={styles.uploadButtonText}>アップロード</Text>
+              </TouchableOpacity>
             </View>
-            */}
-                      <TouchableOpacity 
-                        style={styles.saveButton} 
-                        onPress={handleSave} 
-                        disabled={isSaving || loading}
-                      >
-                        <Text style={styles.saveButtonText}>
-                          保存する
-                        </Text>
-                      </TouchableOpacity>
+          </View>
+          */}
+          
+          {/* 保存ボタン */}
+          <TouchableOpacity 
+            style={styles.saveButton} 
+            onPress={handleSave} 
+            disabled={isSaving || loading}
+          >
+            <Text style={styles.saveButtonText}>
+              {isSaving || loading ? '保存中...' : '保存する'}
+            </Text>
+          </TouchableOpacity>
+          
           <View style={{ height: 32 }} />
         </ScrollView>
         
@@ -833,41 +812,122 @@ export default function ProfileEditScreen(props) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  bodyContent: { padding: 20, paddingBottom: 40 },
-  content: { padding: 20 },
-  sectionTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, color: '#333' },
-  formGroup: { marginBottom: 18 },
-  formGroupRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
-  label: { fontSize: 16, color: '#333', marginBottom: 6 },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, fontSize: 16, backgroundColor: '#fafafa' },
-  switchContainer: { alignItems: 'center', marginLeft: 12 },
-  switchLabel: { fontSize: 14, color: '#333', marginBottom: 2 },
-  selectRow: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 4 },
-  selectButton: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 16, borderWidth: 1, borderColor: '#ccc', marginRight: 8, marginBottom: 6, backgroundColor: '#fff' },
-  selectedButton: { backgroundColor: '#007bff', borderColor: '#007bff' },
-  selectButtonText: { color: '#333', fontSize: 15 },
-  selectedButtonText: { color: '#fff', fontWeight: 'bold' },
-  datePickerButton: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, backgroundColor: '#fafafa', marginTop: 4 },
-  datePickerText: { fontSize: 16, color: '#333' },
-  datePickerContainer: { alignItems: 'center', marginTop: 8 },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#ffffff' 
+  },
+  // メインコンテンツ
+  bodyContent: { 
+    paddingHorizontal: 16, 
+    paddingBottom: 32 
+  },
   imagePicker: { alignItems: 'center', marginTop: 8 },
   profileImage: { width: 100, height: 100, borderRadius: 50 },
-  saveButton: { backgroundColor: '#007bff', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 24 },
-  saveButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  // フォームセクション
+  formSection: {
+    marginBottom: 24,
+  },
+  formGroup: { 
+    marginBottom: 24 
+  },
+  label: { 
+    fontSize: 14, 
+    fontWeight: '500',
+    color: '#18181b', 
+    marginBottom: 8 
+  },
+  input: { 
+    borderWidth: 1, 
+    borderColor: '#e4e4e7', 
+    borderRadius: 12, 
+    paddingHorizontal: 12,
+    paddingVertical: 12, 
+    fontSize: 16, 
+    fontWeight: '400',
+    backgroundColor: '#ffffff',
+    color: '#18181b',
+    minHeight: 48,
+  },
+  // セレクトボタン関連
+  selectRow: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    marginTop: 4 
+  },
+  selectContainer: {
+    marginTop: 4,
+  },
+  selectScrollContent: {
+    paddingRight: 16,
+  },
+  selectButton: { 
+    paddingVertical: 8, 
+    paddingHorizontal: 16, 
+    borderRadius: 20, 
+    borderWidth: 1, 
+    borderColor: '#e4e4e7', 
+    marginRight: 8, 
+    marginBottom: 8,
+    backgroundColor: '#ffffff',
+    minHeight: 40,
+    justifyContent: 'center',
+  },
+  selectedButton: { 
+    backgroundColor: '#1380ec', 
+    borderColor: '#1380ec' 
+  },
+  selectButtonText: { 
+    color: '#71717a', 
+    fontSize: 15,
+    fontWeight: '400',
+  },
+  selectedButtonText: { 
+    color: '#ffffff', 
+    fontWeight: '500' 
+  },
+  // 日付ピッカー関連
+  datePickerButton: { 
+    borderWidth: 1, 
+    borderColor: '#e4e4e7', 
+    borderRadius: 12, 
+    paddingHorizontal: 12,
+    paddingVertical: 12, 
+    backgroundColor: '#ffffff', 
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    minHeight: 48,
+  },
+  datePickerText: { 
+    fontSize: 16, 
+    fontWeight: '400',
+    color: '#18181b' 
+  },
+  datePickerContainer: { 
+    alignItems: 'center', 
+    marginTop: 8 
+  },
   // オートコンプリート関連のスタイル
   universityInputContainer: { 
     position: 'relative',
     zIndex: 1,
   },
   suggestionsContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
+    borderColor: '#e4e4e7',
+    borderRadius: 12,
     maxHeight: 200,
-    marginBottom: 18,
+    marginBottom: 24,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   suggestionsScrollView: {
     maxHeight: 200,
@@ -876,17 +936,73 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    backgroundColor: '#fff',
+    borderBottomColor: '#f4f4f5',
+    backgroundColor: '#ffffff',
   },
   suggestionText: {
     fontSize: 15,
-    color: '#333',
+    color: '#18181b',
+    fontWeight: '400',
   },
-  // 学生証関連のスタイル
+  // 学生証認証セクション（コメントアウト状態維持）
+  verificationSection: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#18181b',
+    marginBottom: 16,
+  },
+  verificationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e4e4e7',
+    borderRadius: 12,
+    padding: 16,
+  },
+  verificationIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#f4f4f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  verificationContent: {
+    flex: 1,
+  },
+  verificationTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#18181b',
+    marginBottom: 4,
+  },
+  verificationDescription: {
+    fontSize: 14,
+    fontWeight: '400',
+    color: '#71717a',
+  },
+  uploadButton: {
+    backgroundColor: '#f4f4f5',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    minWidth: 84,
+    alignItems: 'center',
+  },
+  uploadButtonText: {
+    color: '#18181b',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  // 学生証関連のスタイル（既存のコードを保持）
   studentIdContainer: { marginTop: 4 },
   studentIdImageContainer: { position: 'relative' },
-      studentIdImage: { width: '100%', aspectRatio: 1.6, borderRadius: 8, contentFit: 'cover' },
+  studentIdImage: { width: '100%', aspectRatio: 1.6, borderRadius: 8, contentFit: 'cover' },
   deleteStudentIdButton: { 
     position: 'absolute', 
     top: 8, 
@@ -903,7 +1019,7 @@ const styles = StyleSheet.create({
   },
   uploadStudentIdButton: { 
     flex: 1, 
-    backgroundColor: '#007bff', 
+    backgroundColor: '#1380ec', 
     padding: 12, 
     borderRadius: 8, 
     alignItems: 'center', 
@@ -923,22 +1039,22 @@ const styles = StyleSheet.create({
     marginTop: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    backgroundColor: '#f9f9f9',
+    borderColor: '#e4e4e7',
+    borderRadius: 12,
+    backgroundColor: '#f9fafb',
   },
   confirmationTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginBottom: 12,
-    color: '#333',
+    color: '#18181b',
   },
   confirmationList: {
     marginBottom: 16,
   },
   confirmationListItem: {
     fontSize: 14,
-    color: '#555',
+    color: '#71717a',
     marginBottom: 8,
   },
   finalConfirmationRow: {
@@ -949,28 +1065,28 @@ const styles = StyleSheet.create({
   finalConfirmationText: {
     marginLeft: 8,
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '500',
+    color: '#18181b',
     flex: 1,
   },
   disabledButton: {
-    backgroundColor: '#a0c8f0', // 無効時の色
+    backgroundColor: '#94a3b8',
   },
   captureStudentIdButton: { 
     flexDirection: 'row', 
     alignItems: 'center', 
     justifyContent: 'center', 
     borderWidth: 2, 
-    borderColor: '#007bff', 
+    borderColor: '#1380ec', 
     borderStyle: 'dashed', 
-    borderRadius: 8, 
+    borderRadius: 12, 
     padding: 20, 
-    backgroundColor: '#f8f9fa' 
+    backgroundColor: '#f8fafc' 
   },
   captureStudentIdButtonText: { 
-    color: '#007bff', 
+    color: '#1380ec', 
     fontSize: 16, 
-    fontWeight: 'bold', 
+    fontWeight: '500', 
     marginLeft: 8 
   },
   verifiedContainer: {
@@ -978,23 +1094,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#28a745',
-    borderRadius: 8,
+    borderColor: '#22c55e',
+    borderRadius: 12,
     padding: 20,
-    backgroundColor: '#f0fff4'
+    backgroundColor: '#f0fdf4'
   },
   verifiedText: {
-    color: '#28a745',
+    color: '#22c55e',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '500',
     marginLeft: 8
   },
   required: {
-    color: '#e74c3c',
-    fontWeight: 'bold',
+    color: '#ef4444',
+    fontWeight: '500',
   },
   optional: {
-    color: '#666',
+    color: '#71717a',
     fontSize: 14,
+    fontWeight: '400',
+  },
+  saveButton: { 
+    backgroundColor: '#1380ec', 
+    borderRadius: 12, 
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignItems: 'center', 
+  },
+  saveButtonText: { 
+    color: '#ffffff', 
+    fontSize: 16, 
+    fontWeight: '600' 
   },
 });

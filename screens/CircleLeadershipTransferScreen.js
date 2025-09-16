@@ -243,19 +243,8 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
               <Image source={{ uri: member.profileImageUrl }} style={styles.memberIcon} />
             ) : (
               <View style={styles.memberIconPlaceholder}>
-                <Ionicons name="person-outline" size={24} color="#ccc" />
+                <Ionicons name="person-outline" size={24} color="#9ca3af" />
               </View>
-            )}
-            {isSelected && (
-              <Animated.View
-                style={[
-                  styles.glowEffect,
-                  {
-                    opacity: glowAnim,
-                    transform: [{ scale: glowAnim }]
-                  }
-                ]}
-              />
             )}
           </View>
           <View style={styles.memberInfo}>
@@ -263,15 +252,12 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
               {member.name || member.nickname || 'Unknown'}
               {isCurrentUser && ' (あなた)'}
             </Text>
-            <Text style={styles.memberInfo}>
-              {member.university || ''} {member.grade || ''}
-            </Text>
-            <Text style={styles.memberRole}>
-              {member.role === 'leader' ? '代表者' : member.role === 'admin' ? '管理者' : 'メンバー'}
+            <Text style={styles.memberSubtitle}>
+              {member.role === 'leader' ? '代表者' : member.role === 'admin' ? '管理者' : 'サークルのメンバー'}
             </Text>
           </View>
           {isSelected && (
-            <Ionicons name="checkmark-circle" size={24} color="#007bff" />
+            <Ionicons name="checkmark-circle" size={24} color="#299cfa" />
           )}
         </TouchableOpacity>
       </Animated.View>
@@ -304,7 +290,7 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
   return (
     <View style={styles.container}>
       <CommonHeader 
-        title="代表者を引き継ぐ" 
+        title="代表者権限の引き継ぎ" 
         showBackButton 
         onBack={() => navigation.goBack()}
         rightButton={
@@ -317,20 +303,23 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
         <Animated.View style={[styles.mainContent, { opacity: 1 }]}>
           {/* 現在の代表者表示 */}
           <View style={styles.currentLeaderSection}>
+            <Text style={styles.sectionHeader}>現在の代表者</Text>
             <View style={styles.currentLeaderContainer}>
               <View style={styles.currentLeaderIconContainer}>
                 {currentUserData?.profileImageUrl ? (
                   <Image source={{ uri: currentUserData.profileImageUrl }} style={styles.currentLeaderIcon} />
                 ) : (
                   <View style={styles.currentLeaderIconPlaceholder}>
-                    <Ionicons name="person-outline" size={32} color="#007bff" />
+                    <Ionicons name="person-outline" size={32} color="#6b7280" />
                   </View>
                 )}
               </View>
               <View style={styles.currentLeaderInfo}>
-                <Text style={styles.currentLeaderLabel}>現在の代表者</Text>
                 <Text style={styles.currentLeaderName}>
                   {currentUserData?.name || currentUserData?.nickname || user?.email || 'Unknown'}
+                </Text>
+                <Text style={styles.currentLeaderSubtitle}>
+                  {currentUserData?.university || '大学生活を楽しもう'}
                 </Text>
               </View>
             </View>
@@ -338,17 +327,14 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
 
           {/* メンバーリスト */}
           <View style={styles.membersSection}>
-            <Text style={styles.instructionText}>
-              引き継ぎ先を選んでください
-            </Text>
-            <Text style={styles.sectionTitle}>メンバー</Text>
+            <Text style={styles.sectionHeader}>新しい代表者を選択</Text>
             
             {/* 検索バー */}
             <View style={styles.searchBarContainer}>
-              <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+              <Ionicons name="search" size={20} color="#9ca3af" style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="名前・大学・学年で検索"
+                placeholder="メンバーを検索"
                 value={searchText}
                 onChangeText={setSearchText}
                 clearButtonMode="while-editing"
@@ -363,7 +349,7 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
               </Text>
             )}
             
-            <ScrollView style={styles.membersList} showsVerticalScrollIndicator={false}>
+            <ScrollView style={styles.membersListContainer} showsVerticalScrollIndicator={false}>
               {sortedMembers.map(renderMemberItem)}
             </ScrollView>
           </View>
@@ -378,21 +364,9 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
               onPress={() => setShowConfirmModal(true)}
               disabled={!selectedMember || transferring}
             >
-              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                <LinearGradient
-                  colors={selectedMember ? ['#007bff', '#0056b3'] : ['#ccc', '#999']}
-                  style={styles.transferButtonGradient}
-                >
-                  <Ionicons 
-                    name="swap-horizontal" 
-                    size={24} 
-                    color="#fff" 
-                  />
-                  <Text style={styles.transferButtonText}>
-                    {transferring ? '引き継ぎ中...' : 'このメンバーに引き継ぐ'}
-                  </Text>
-                </LinearGradient>
-              </Animated.View>
+              <Text style={styles.transferButtonText}>
+                {transferring ? '引き継ぎ中...' : '次へ'}
+              </Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
@@ -493,7 +467,7 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f9fafb',
   },
   content: {
     flex: 1,
@@ -506,135 +480,107 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
+    color: '#6b7280',
   },
   mainContent: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+  },
+  sectionHeader: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 12,
   },
   currentLeaderSection: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    marginBottom: 16,
   },
   currentLeaderContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    padding: 16,
+    gap: 16,
   },
   currentLeaderIconContainer: {
     position: 'relative',
-    marginRight: 16,
   },
   currentLeaderIcon: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
   },
   currentLeaderIconPlaceholder: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#e3f2fd',
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  leaderBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
   },
   currentLeaderInfo: {
     flex: 1,
   },
-  currentLeaderLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
   currentLeaderName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  instructionText: {
     fontSize: 16,
-    color: '#007bff',
-    textAlign: 'center',
     fontWeight: '500',
-    marginBottom: 16,
+    color: '#111827',
+    marginBottom: 2,
+  },
+  currentLeaderSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
   },
   membersSection: {
     flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
     marginBottom: 16,
   },
   searchBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderRadius: 8,
-    marginBottom: 16,
-    paddingHorizontal: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#d1d5db',
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
   searchIcon: {
-    marginRight: 10,
+    marginRight: 12,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 12,
     fontSize: 16,
+    color: '#111827',
   },
   hitCountText: {
     marginBottom: 10,
     fontSize: 14,
-    color: '#666',
+    color: '#6b7280',
   },
   hitCountNumber: {
     fontWeight: 'bold',
-    color: '#007bff',
+    color: '#299cfa',
   },
-  membersList: {
-    flex: 1,
+  membersListContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 0,
+    borderWidth: 0,
+    borderColor: 'transparent',
+    overflow: 'hidden',
+    marginHorizontal: -16,
   },
   memberItem: {
-    marginBottom: 12,
-    borderRadius: 12,
-    overflow: 'hidden',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f3f4f6',
   },
   selectedMemberItem: {
-    backgroundColor: '#e3f2fd',
-    borderWidth: 2,
-    borderColor: '#007bff',
+    backgroundColor: '#eef7ff',
   },
   currentUserItem: {
     opacity: 0.5,
@@ -643,10 +589,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
+    gap: 16,
   },
   memberIconContainer: {
     position: 'relative',
-    marginRight: 12,
   },
   memberIcon: {
     width: 48,
@@ -657,20 +603,9 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f3f4f6',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  glowEffect: {
-    position: 'absolute',
-    top: -4,
-    left: -4,
-    right: -4,
-    bottom: -4,
-    borderRadius: 28,
-    borderWidth: 2,
-    borderColor: '#007bff',
-    backgroundColor: 'transparent',
   },
   memberInfo: {
     flex: 1,
@@ -678,46 +613,37 @@ const styles = StyleSheet.create({
   memberName: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#333',
+    color: '#111827',
     marginBottom: 2,
   },
-  memberInfo: {
-    fontSize: 15,
-    color: '#666',
-    marginBottom: 2,
-  },
-  memberRole: {
+  memberSubtitle: {
     fontSize: 14,
-    color: '#007bff',
-    fontWeight: 'bold',
+    color: '#6b7280',
   },
   buttonSection: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   transferButton: {
+    backgroundColor: '#299cfa',
     borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  transferButtonDisabled: {
-    opacity: 0.6,
-  },
-  transferButtonGradient: {
-    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  transferButtonDisabled: {
+    backgroundColor: '#d1d5db',
   },
   transferButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
-    marginLeft: 8,
   },
   modalOverlay: {
     flex: 1,
@@ -736,18 +662,18 @@ const styles = StyleSheet.create({
   helpModalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#111827',
     marginBottom: 16,
     textAlign: 'center',
   },
   helpModalText: {
     fontSize: 14,
-    color: '#666',
+    color: '#6b7280',
     lineHeight: 20,
     marginBottom: 20,
   },
   helpModalButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#299cfa',
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
@@ -767,19 +693,19 @@ const styles = StyleSheet.create({
   confirmModalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#111827',
     marginBottom: 16,
     textAlign: 'center',
   },
   confirmModalText: {
     fontSize: 16,
-    color: '#333',
+    color: '#111827',
     textAlign: 'center',
     marginBottom: 8,
   },
   confirmModalWarning: {
     fontSize: 14,
-    color: '#dc3545',
+    color: '#dc2626',
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -789,20 +715,20 @@ const styles = StyleSheet.create({
   },
   confirmModalButtonCancel: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f9fafb',
     borderRadius: 8,
     paddingVertical: 12,
     marginRight: 8,
     alignItems: 'center',
   },
   confirmModalButtonCancelText: {
-    color: '#666',
+    color: '#6b7280',
     fontSize: 16,
     fontWeight: '500',
   },
   confirmModalButtonConfirm: {
     flex: 1,
-    backgroundColor: '#dc3545',
+    backgroundColor: '#dc2626',
     borderRadius: 8,
     paddingVertical: 12,
     marginLeft: 8,
@@ -827,24 +753,24 @@ const styles = StyleSheet.create({
   completionModalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#111827',
     marginBottom: 12,
     textAlign: 'center',
   },
   completionModalText: {
     fontSize: 16,
-    color: '#333',
+    color: '#111827',
     textAlign: 'center',
     marginBottom: 8,
   },
   completionModalSubText: {
     fontSize: 14,
-    color: '#666',
+    color: '#6b7280',
     textAlign: 'center',
     marginBottom: 20,
   },
   completionModalButton: {
-    backgroundColor: '#28a745',
+    backgroundColor: '#16a34a',
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 32,

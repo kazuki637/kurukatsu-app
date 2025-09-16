@@ -13,7 +13,7 @@ const ArticleWebViewScreen = ({ route, navigation }) => {
     return (
       <View style={styles.container}>
         <CommonHeader 
-          title="記事表示" 
+          title="記事詳細" 
           showBackButton={true}
           onBack={() => navigation.goBack()}
         />
@@ -51,7 +51,7 @@ const ArticleWebViewScreen = ({ route, navigation }) => {
   return (
     <View style={styles.container}>
       <CommonHeader 
-        title={title || "記事表示"} 
+        title="記事詳細" 
         showBackButton={true}
         onBack={() => navigation.goBack()}
       />

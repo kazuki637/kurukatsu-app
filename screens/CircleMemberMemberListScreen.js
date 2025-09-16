@@ -159,7 +159,13 @@ export default function CircleMemberMemberListScreen({ route, navigation }) {
       
       setLeaveModalVisible(false);
       Alert.alert('脱退完了', 'サークルを脱退しました', [
-        { text: 'OK', onPress: () => navigation.goBack() }
+        { text: 'OK', onPress: () => {
+          // MyPageStackをリセットしてMyPageに遷移
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'MyPage' }],
+          });
+        }}
       ]);
     } catch (e) {
       console.error('Error leaving circle:', e);
@@ -177,22 +183,15 @@ export default function CircleMemberMemberListScreen({ route, navigation }) {
       <SafeAreaView style={styles.container}>
         <View style={styles.tabContent}>
           <View style={styles.searchBarContainer}>
-            <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+            <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
             <TextInput
               style={styles.searchInput}
-              placeholder="名前・大学・学年で検索"
+              placeholder="氏名、大学、学年で検索"
               value={memberSearchText}
               onChangeText={setMemberSearchText}
               clearButtonMode="while-editing"
             />
           </View>
-          {memberSearchText.length > 0 && (
-            <Text style={styles.hitCountText}>
-              検索結果
-              <Text style={styles.hitCountNumber}>{filteredMembers.length}</Text>
-              件
-            </Text>
-          )}
           {membersLoading ? (
             <ActivityIndicator size="small" color="#999" style={{ marginTop: 40 }} />
           ) : (
@@ -201,42 +200,60 @@ export default function CircleMemberMemberListScreen({ route, navigation }) {
               keyExtractor={item => item.id}
               renderItem={({ item }) => {
                 const hasImage = item.profileImageUrl && item.profileImageUrl.trim() !== '' && !imageErrorMap[item.id];
-                return (
-                  <View style={styles.memberItem}>
-                    {hasImage ? (
-                      <Image
-                        source={{ uri: item.profileImageUrl }}
-                        style={styles.memberAvatar}
-                        onError={() => setImageErrorMap(prev => ({ ...prev, [item.id]: true }))}
-                      />
-                    ) : (
-                      <View style={[styles.memberAvatar, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
-                        <Ionicons name="person-outline" size={40} color="#aaa" />
-                      </View>
-                    )}
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.memberName}>{item.name || '氏名未設定'}</Text>
-                      <Text style={styles.memberInfo}>{item.university || ''} {item.grade || ''}</Text>
-                      <Text style={styles.memberRole}>{getRoleDisplayName(item.role)}</Text>
-                    </View>
-                    {(() => {
-                      const currentUser = auth.currentUser;
-                      return currentUser && item.id === currentUser.uid;
-                    })() && (
-                      <TouchableOpacity
-                        style={styles.memberLeaveButton}
-                        onPress={() => setLeaveModalVisible(true)}
-                      >
-                        <Text style={styles.memberLeaveButtonText}>脱退する</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                );
+                const isLeader = item.role === 'leader';
+                const isAdmin = item.role === 'admin';
+                const isMember = item.role === 'member';
+                
+                 return (
+                   <View style={styles.memberItem}>
+                     {hasImage ? (
+                       <Image
+                         source={{ uri: item.profileImageUrl }}
+                         style={styles.memberAvatar}
+                         onError={() => setImageErrorMap(prev => ({ ...prev, [item.id]: true }))}
+                       />
+                     ) : (
+                       <View style={styles.memberAvatarPlaceholder}>
+                         <Ionicons name="person" size={28} color="#9CA3AF" />
+                       </View>
+                     )}
+                     <View style={styles.memberInfoContainer}>
+                       <Text style={styles.memberName}>{item.name || '氏名未設定'}</Text>
+                       <Text style={styles.memberDetails}>{item.university || ''} {item.grade || ''}</Text>
+                     </View>
+                     <View style={[
+                       styles.roleBadge,
+                       isLeader && styles.roleBadgeLeader,
+                       isAdmin && styles.roleBadgeAdmin,
+                       isMember && styles.roleBadgeMember
+                     ]}>
+                       <Text style={[
+                         styles.roleBadgeText,
+                         isLeader && styles.roleBadgeTextLeader,
+                         isAdmin && styles.roleBadgeTextAdmin,
+                         isMember && styles.roleBadgeTextMember
+                       ]}>
+                         {getRoleDisplayName(item.role)}
+                       </Text>
+                     </View>
+                   </View>
+                 );
               }}
-              ListEmptyComponent={<Text style={{ textAlign: 'center', color: '#666', marginTop: 40 }}>メンバーがいません</Text>}
-              contentContainerStyle={{ padding: 20 }}
+              ListEmptyComponent={<Text style={styles.emptyText}>メンバーがいません</Text>}
+              contentContainerStyle={styles.listContainer}
             />
           )}
+        </View>
+        
+        {/* 脱退ボタン（フッター） */}
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={styles.leaveButton}
+            onPress={() => setLeaveModalVisible(true)}
+          >
+            <Ionicons name="log-out-outline" size={20} color="#FFFFFF" />
+            <Text style={styles.leaveButtonText}>サークルを脱退する</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
 
@@ -244,30 +261,30 @@ export default function CircleMemberMemberListScreen({ route, navigation }) {
       <Modal
         visible={leaveModalVisible}
         transparent={true}
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setLeaveModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>確認</Text>
+            <View style={styles.modalIconContainer}>
+              <Ionicons name="log-out-outline" size={40} color="#DC2626" />
+            </View>
+            <Text style={styles.modalTitle}>サークルを脱退しますか？</Text>
             <Text style={styles.modalSubtitle}>
-              本当にサークルを脱退しますか？
-            </Text>
-            <Text style={styles.modalWarning}>
-              あなたはサークルメンバーではなくなり、{'\n'}サークル情報にアクセスできなくなります
+              この操作は元に戻せません。本当にこのサークルを脱退しますか？
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={styles.cancelButton}
+                style={styles.modalCancelButton}
                 onPress={() => setLeaveModalVisible(false)}
               >
-                <Text style={styles.cancelButtonText}>キャンセル</Text>
+                <Text style={styles.modalCancelButtonText}>キャンセル</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.leaveButton}
+                style={styles.modalLeaveButton}
                 onPress={handleLeave}
               >
-                <Text style={styles.leaveButtonText}>脱退する</Text>
+                <Text style={styles.modalLeaveButtonText}>脱退する</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -280,49 +297,55 @@ export default function CircleMemberMemberListScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F9FAFB',
   },
   tabContent: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F9FAFB',
   },
-  // メンバー関連のスタイル
+  // 検索バーのスタイル
   searchBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    margin: 15,
-    paddingHorizontal: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    backgroundColor: '#F3F4F6',
+    borderRadius: 25,
+    margin: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
   searchIcon: {
-    marginRight: 10,
+    marginRight: 12,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#333',
-  },
-  hitCountText: {
-    marginHorizontal: 15,
-    marginBottom: 10,
+    paddingVertical: 0,
     fontSize: 14,
-    color: '#666',
+    color: '#111827',
   },
-  hitCountNumber: {
-    fontWeight: 'bold',
-    color: '#007bff',
+  // リストのスタイル
+  listContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 100,
   },
+  emptyText: {
+    textAlign: 'center',
+    color: '#6B7280',
+    marginTop: 40,
+    fontSize: 16,
+  },
+  // メンバーアイテムのスタイル
   memberItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 12,
-    marginBottom: 14,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   memberAvatar: {
     width: 56,
@@ -330,102 +353,147 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     marginRight: 16,
   },
+  memberAvatarPlaceholder: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  memberInfoContainer: {
+    flex: 1,
+  },
   memberName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#111827',
     marginBottom: 2,
   },
-  memberInfo: {
-    fontSize: 15,
-    color: '#666',
-    marginBottom: 2,
-  },
-  memberRole: {
+  memberDetails: {
     fontSize: 14,
-    color: '#007bff',
-    fontWeight: 'bold',
+    color: '#6B7280',
   },
-  memberLeaveButton: {
-    backgroundColor: '#f44336',
-    borderRadius: 6,
-    paddingVertical: 8,
+  // 役割バッジのスタイル
+  roleBadge: {
     paddingHorizontal: 12,
-    marginLeft: 16,
+    paddingVertical: 4,
+    borderRadius: 20,
   },
-  memberLeaveButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
+  roleBadgeLeader: {
+    backgroundColor: '#DBEAFE',
   },
+  roleBadgeAdmin: {
+    backgroundColor: '#E5E7EB',
+  },
+  roleBadgeMember: {
+    backgroundColor: '#E5E7EB',
+  },
+  roleBadgeText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  roleBadgeTextLeader: {
+    color: '#2563EB',
+  },
+  roleBadgeTextAdmin: {
+    color: '#374151',
+  },
+  roleBadgeTextMember: {
+    color: '#6B7280',
+  },
+  // フッターのスタイル
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    padding: 16,
+  },
+  leaveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#DC2626',
+    borderRadius: 25,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    gap: 8,
+  },
+  leaveButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  // モーダルのスタイル
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 24,
-    width: '80%',
-    maxWidth: 300,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 12,
+    width: '90%',
+    maxWidth: 320,
+    alignItems: 'center',
+  },
+  modalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FEE2E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    color: '#111827',
     textAlign: 'center',
     marginBottom: 8,
-    color: '#333',
   },
   modalSubtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  modalWarning: {
     fontSize: 14,
-    color: '#f44336',
+    color: '#6B7280',
     textAlign: 'center',
-    marginBottom: 24,
     lineHeight: 20,
+    marginBottom: 24,
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 12,
+    width: '100%',
   },
-  cancelButton: {
+  modalCancelButton: {
     flex: 1,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 25,
     paddingVertical: 12,
-    paddingHorizontal: 16,
     alignItems: 'center',
-    marginRight: 8,
   },
-  cancelButtonText: {
+  modalCancelButtonText: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#666',
+    fontWeight: '700',
+    color: '#374151',
   },
-  leaveButton: {
+  modalLeaveButton: {
     flex: 1,
-    backgroundColor: '#f44336',
-    borderRadius: 8,
+    backgroundColor: '#DC2626',
+    borderRadius: 25,
     paddingVertical: 12,
-    paddingHorizontal: 16,
     alignItems: 'center',
-    marginLeft: 8,
   },
-  leaveButtonText: {
+  modalLeaveButtonText: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });
