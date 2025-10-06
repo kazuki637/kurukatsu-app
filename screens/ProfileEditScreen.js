@@ -8,6 +8,7 @@ import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, deleteObject, getMetadata } from 'firebase/storage';
 import { useNavigation, useRoute, CommonActions, useFocusEffect } from '@react-navigation/native';
 import CommonHeader from '../components/CommonHeader';
+import KurukatsuButton from '../components/KurukatsuButton';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import universitiesData from '../universities.json';
 import { compressProfileImage } from '../utils/imageCompression';
@@ -22,7 +23,6 @@ const GENDERS = ['男性', '女性', 'その他', '回答しない'];
 export default function ProfileEditScreen(props) {
   const navigation = useNavigation();
   const route = useRoute();
-  const forceToHome = props.forceToHome || false;
   const user = auth.currentUser;
   const [name, setName] = useState(''); // 氏名（非公開）
   const [university, setUniversity] = useState('');
@@ -34,7 +34,6 @@ export default function ProfileEditScreen(props) {
   const [profileImageUrl, setProfileImageUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(true);
   
   // 学生証関連の状態
   const [studentIdImage, setStudentIdImage] = useState(null);
@@ -49,32 +48,8 @@ export default function ProfileEditScreen(props) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [originalData, setOriginalData] = useState(null);
+  const [saveCompleted, setSaveCompleted] = useState(false); // 保存完了フラグ
   
-  // アニメーション用のstate
-  const profileImageOpacity = useRef(new Animated.Value(0)).current;
-
-  // フェードインアニメーション
-  useEffect(() => {
-    const hasImage = (profileImage && profileImage.trim() !== '') || (profileImageUrl && profileImageUrl.trim() !== '');
-    
-    if (hasImage) {
-      // 画像がある場合：画像の読み込み完了時にフェードイン
-      if (!imageLoading && !imageError) {
-        Animated.timing(profileImageOpacity, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }).start();
-      }
-    } else {
-      // 画像がない場合：デフォルトアイコンを即座にフェードイン
-      Animated.timing(profileImageOpacity, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [imageLoading, profileImage, profileImageUrl, imageError]);
 
   // 大学名の候補をフィルタリングする関数
   const filterUniversities = (input) => {
@@ -130,15 +105,7 @@ export default function ProfileEditScreen(props) {
           setGender(d.gender || '');
           setBirthday(d.birthday ? new Date(d.birthday) : new Date(2000, 0, 1));
           setProfileImageUrl(d.profileImageUrl || '');
-          // 画像の読み込み状態をリセット
-          if (d.profileImageUrl && d.profileImageUrl.trim() !== '') {
-            setImageLoading(true);
-          } else {
-            // 画像がない場合は即座に読み込み完了状態に設定
-            setImageLoading(false);
-          }
           setImageError(false);
-          profileImageOpacity.setValue(0);
 
           // 学生証URLの有効性チェック
           if (d.studentIdUrl) {
@@ -301,10 +268,7 @@ export default function ProfileEditScreen(props) {
           onCropComplete: (croppedUri) => {
             setProfileImage(croppedUri);
             setHasUnsavedChanges(true);
-            // 画像の読み込み状態をリセット
-            setImageLoading(true);
             setImageError(false);
-            profileImageOpacity.setValue(0);
           }
         });
       }
@@ -392,12 +356,18 @@ export default function ProfileEditScreen(props) {
   };
 
   const handleSave = async () => {
+    // 既に保存処理中または保存完了済みの場合は何もしない（連続押下防止）
+    if (isSaving || saveCompleted) {
+      return;
+    }
+    
     if (!name.trim() || !university.trim() || !grade || !gender || !birthday) {
       Alert.alert('エラー', '全ての必須項目を入力してください。');
       return;
     }
+    
     setIsSaving(true);
-    setLoading(true);
+    setSaveCompleted(true); // 保存開始フラグを設定
     try {
       let imageUrl = profileImageUrl;
       
@@ -428,8 +398,8 @@ export default function ProfileEditScreen(props) {
         } catch (error) {
           console.error('プロフィール編集画面: 画像アップロードエラー:', error);
           Alert.alert('エラー', 'プロフィール画像のアップロードに失敗しました');
-          setLoading(false);
           setIsSaving(false);
+          setSaveCompleted(false);
           return;
         }
       } else if (profileImage === '' && originalData && originalData.profileImageUrl) {
@@ -503,44 +473,21 @@ export default function ProfileEditScreen(props) {
       }
       
       setHasUnsavedChanges(false);
-      setIsSaving(false);
       
-      // 新規登録からの場合や強制ホーム遷移の場合のみアラートを表示
-      if (route.params?.fromSignup || forceToHome) {
-        Alert.alert('保存完了', 'プロフィールを保存しました。');
-        // 少し遅延を入れてから画面遷移（アラートの表示を待つ）
-        setTimeout(() => {
-          if (route.params?.fromSignup) {
-            // 新規登録からの場合はメイン画面に遷移
-            navigation.dispatch(
-              CommonActions.reset({
-                index: 0,
-                routes: [{ name: 'Main' }],
-              })
-            );
-          } else if (forceToHome) {
-            // 強制ホーム遷移の場合
-            navigation.dispatch(
-              CommonActions.reset({
-                index: 0,
-                routes: [{ name: 'Main' }],
-              })
-            );
-          }
-        }, 100);
-      } else {
-        // 通常の編集の場合は即座に戻る
-        // プロフィール更新完了をイベントで通知
-        if (global.onProfileUpdated) {
-          global.onProfileUpdated();
-        }
-        navigation.goBack();
+      // プロフィール更新完了をイベントで通知
+      if (global.onProfileUpdated) {
+        global.onProfileUpdated();
       }
+      
+      // 前の画面に戻る
+      navigation.goBack();
+      
     } catch (error) {
       console.error('Error saving profile:', error);
       Alert.alert('エラー', 'プロフィールの保存に失敗しました。');
+      setSaveCompleted(false); // エラー時はリセット
     } finally {
-      setLoading(false);
+      // 成功・失敗に関わらず状態をリセット
       setIsSaving(false);
     }
   };
@@ -551,7 +498,7 @@ export default function ProfileEditScreen(props) {
         title="プロフィール編集" 
         rightButtonLabel="保存" 
         onRightButtonPress={handleSave}
-        rightButtonDisabled={isSaving || loading}
+        rightButtonDisabled={isSaving || saveCompleted}
       />
       <SafeAreaView style={{ flex: 1 }} edges={['left', 'right']}>
         <ScrollView 
@@ -564,24 +511,21 @@ export default function ProfileEditScreen(props) {
             <Text style={styles.label}>プロフィール画像<Text style={styles.optional}>(任意)</Text></Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start' }}>
               <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
-                <Animated.View style={{ opacity: profileImageOpacity }}>
-                  {(profileImage && profileImage.trim() !== '' && !imageError) || (profileImageUrl && profileImageUrl.trim() !== '' && !imageError) ? (
-                    <Image
-                      source={{ uri: (profileImage && profileImage.trim() !== '') ? profileImage : profileImageUrl }}
-                      style={styles.profileImage}
-                      onLoad={() => setImageLoading(false)}
-                      onError={() => {
-                        setImageLoading(false);
-                        setImageError(true);
-                      }}
-                      fadeDuration={300}
-                    />
-                  ) : (
-                    <View style={[styles.profileImage, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
-                      <Ionicons name="person-outline" size={60} color="#aaa" />
-                    </View>
-                  )}
-                </Animated.View>
+                {(profileImage && !imageError) || (profileImageUrl && !imageError) ? (
+                  <Image
+                    source={{ 
+                      uri: profileImage || profileImageUrl,
+                      cache: 'force-cache'
+                    }}
+                    style={styles.profileImage}
+                    onError={() => setImageError(true)}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={[styles.profileImage, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
+                    <Ionicons name="person-outline" size={60} color="#aaa" />
+                  </View>
+                )}
               </TouchableOpacity>
               {((profileImage && profileImage.trim() !== '') || (profileImageUrl && profileImageUrl.trim() !== '')) && !imageError && profileImage !== '' && (
                 <TouchableOpacity
@@ -589,9 +533,6 @@ export default function ProfileEditScreen(props) {
                     setProfileImage('');
                     setProfileImageUrl('');
                     setImageError(false);
-                    // 画像の読み込み状態をリセット
-                    setImageLoading(true);
-                    profileImageOpacity.setValue(0);
                     // 状態変更を即座に検知
                     if (!originalData) return;
                     
@@ -698,37 +639,31 @@ export default function ProfileEditScreen(props) {
               </View>
             <View style={styles.formGroup}>
               <Text style={styles.label}>性別</Text>
-              <View style={styles.selectContainer}>
-                <ScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.selectScrollContent}
-                >
-                  {GENDERS.map(g => (
-                    <TouchableOpacity 
-                      key={g} 
-                      style={[styles.selectButton, gender === g && styles.selectedButton]} 
-                      onPress={() => {
-                        const newGender = g;
-                        setGender(newGender);
-                        if (!originalData) return;
-                        
-                        const hasChanges = 
-                          name !== originalData.name ||
-                          university !== originalData.university ||
-                          grade !== originalData.grade ||
-                          newGender !== originalData.gender ||
-                          birthday.getTime() !== originalData.birthday.getTime() ||
-                          profileImage !== null ||
-                          (profileImage === '' && originalData.profileImageUrl);
-                        
-                        setHasUnsavedChanges(hasChanges);
-                      }}
-                    >
-                      <Text style={[styles.selectButtonText, gender === g && styles.selectedButtonText]}>{g}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+              <View style={styles.selectRow}>
+                {GENDERS.map(g => (
+                  <TouchableOpacity 
+                    key={g} 
+                    style={[styles.selectButton, gender === g && styles.selectedButton]} 
+                    onPress={() => {
+                      const newGender = g;
+                      setGender(newGender);
+                      if (!originalData) return;
+                      
+                      const hasChanges = 
+                        name !== originalData.name ||
+                        university !== originalData.university ||
+                        grade !== originalData.grade ||
+                        newGender !== originalData.gender ||
+                        birthday.getTime() !== originalData.birthday.getTime() ||
+                        profileImage !== null ||
+                        (profileImage === '' && originalData.profileImageUrl);
+                      
+                      setHasUnsavedChanges(hasChanges);
+                    }}
+                  >
+                    <Text style={[styles.selectButtonText, gender === g && styles.selectedButtonText]}>{g}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             </View>
             <View style={styles.formGroup}>
@@ -791,17 +726,17 @@ export default function ProfileEditScreen(props) {
           */}
           
           {/* 保存ボタン */}
-          <TouchableOpacity 
-            style={styles.saveButton} 
-            onPress={handleSave} 
-            disabled={isSaving || loading}
-          >
-            <Text style={styles.saveButtonText}>
-              {isSaving || loading ? '保存中...' : '保存する'}
-            </Text>
-          </TouchableOpacity>
+          <KurukatsuButton
+            title="保存する"
+            onPress={handleSave}
+            disabled={isSaving || saveCompleted}
+            size="medium"
+            variant="primary"
+            hapticFeedback={true}
+            style={styles.saveButtonContainer}
+          />
           
-          <View style={{ height: 32 }} />
+          <View style={{ height: 16 }} />
         </ScrollView>
         
 
@@ -828,7 +763,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   formGroup: { 
-    marginBottom: 24 
+    marginBottom: 16 
   },
   label: { 
     fontSize: 14, 
@@ -853,12 +788,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row', 
     flexWrap: 'wrap', 
     marginTop: 4 
-  },
-  selectContainer: {
-    marginTop: 4,
-  },
-  selectScrollContent: {
-    paddingRight: 16,
   },
   selectButton: { 
     paddingVertical: 8, 
@@ -1114,16 +1043,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '400',
   },
-  saveButton: { 
-    backgroundColor: '#1380ec', 
-    borderRadius: 12, 
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    alignItems: 'center', 
-  },
-  saveButtonText: { 
-    color: '#ffffff', 
-    fontSize: 16, 
-    fontWeight: '600' 
+  saveButtonContainer: {
+    marginTop: 4,
   },
 });

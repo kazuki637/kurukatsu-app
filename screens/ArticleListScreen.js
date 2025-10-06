@@ -87,7 +87,6 @@ const ArticleListScreen = ({ navigation }) => {
           source={{ uri: article.thumbnailUrl }} 
           style={styles.articleCardImage}
           resizeMode="cover"
-          fadeDuration={300}
         />
       ) : (
         <View style={[styles.articleCardImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>

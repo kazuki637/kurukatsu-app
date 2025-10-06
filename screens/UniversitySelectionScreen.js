@@ -1,9 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, FlatList, ActivityIndicator, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import CommonHeader from '../components/CommonHeader';
 
 import universitiesData from '../universities.json';
+
+// 最適化されたリストアイテムコンポーネント
+const UniversityListItem = React.memo(({ item, isSelected, onToggle }) => (
+  <TouchableOpacity
+    style={styles.listItem}
+    onPress={() => onToggle(item)}
+  >
+    <Text style={styles.listItemText}>{item}</Text>
+    <View style={styles.checkmarkContainer}>
+      {isSelected && (
+        <Ionicons name="checkmark" size={24} color="#1380ec" />
+      )}
+    </View>
+  </TouchableOpacity>
+));
 
 const UniversitySelectionScreen = ({ route, navigation }) => {
   const { currentSelection, onComplete } = route.params || {};
@@ -14,10 +29,9 @@ const UniversitySelectionScreen = ({ route, navigation }) => {
   const [loadingUniversities, setLoadingUniversities] = useState(true);
 
   useEffect(() => {
-    const fetchUniversities = async () => {
+    const fetchUniversities = () => {
       setLoadingUniversities(true);
       const uniqueUniversities = Array.from(new Set(universitiesData));
-      await new Promise(resolve => setTimeout(resolve, 500));
       setAllUniversities(uniqueUniversities);
       setFilteredUniversities(uniqueUniversities);
       setLoadingUniversities(false);
@@ -37,13 +51,16 @@ const UniversitySelectionScreen = ({ route, navigation }) => {
     }
   }, [searchText, allUniversities]);
 
-  const handleToggleUniversity = (universityName) => {
+  const handleToggleUniversity = useCallback((universityName) => {
     setSelectedUniversities(prev =>
       prev.includes(universityName)
         ? prev.filter(uni => uni !== universityName)
         : [...prev, universityName]
     );
-  };
+  }, []);
+
+  // 選択状態をSetに変換して高速化
+  const selectedSet = useMemo(() => new Set(selectedUniversities), [selectedUniversities]);
 
   // 戻る時にonCompleteを呼ぶ
   useEffect(() => {
@@ -58,7 +75,7 @@ const UniversitySelectionScreen = ({ route, navigation }) => {
       <CommonHeader title="大学選択" showBackButton onBack={() => navigation.goBack()} />
       <SafeAreaView style={styles.contentSafeArea}>
         <View style={styles.searchBarContainer}>
-          <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+          <Ionicons name="search" size={20} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="大学名を入力"
@@ -72,18 +89,24 @@ const UniversitySelectionScreen = ({ route, navigation }) => {
         ) : (
           <FlatList
             data={filteredUniversities}
-            keyExtractor={(item, index) => item + index}
+            keyExtractor={(item) => item}
             renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.listItem}
-                onPress={() => handleToggleUniversity(item)}
-              >
-                <Text style={styles.listItemText}>{item}</Text>
-                {selectedUniversities.includes(item) && (
-                  <Ionicons name="checkmark" size={24} color="#007bff" />
-                )}
-              </TouchableOpacity>
+              <UniversityListItem
+                item={item}
+                isSelected={selectedSet.has(item)}
+                onToggle={handleToggleUniversity}
+              />
             )}
+            getItemLayout={(data, index) => ({
+              length: 72, // paddingVertical(16*2) + marginBottom(8) + アイテム高さ
+              offset: 72 * index,
+              index,
+            })}
+            removeClippedSubviews={true}
+            initialNumToRender={20}
+            maxToRenderPerBatch={10}
+            updateCellsBatchingPeriod={50}
+            windowSize={10}
             ListEmptyComponent={() => (
               <Text style={styles.emptyListText}>該当する大学がありません。</Text>
             )}
@@ -97,33 +120,43 @@ const UniversitySelectionScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
-    backgroundColor: '#eef2f5',
+    backgroundColor: '#f0f2f5',
   },
   contentSafeArea: {
     flex: 1,
-    backgroundColor: '#eef2f5',
+    backgroundColor: '#f0f2f5',
   },
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#f0f2f5',
   },
   searchBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    margin: 15,
-    paddingHorizontal: 10,
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    margin: 16,
+    paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#d1d5db',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   searchIcon: {
-    marginRight: 10,
+    marginRight: 12,
+    color: '#6b7280',
   },
   searchInput: {
     flex: 1,
-    height: 40,
+    height: 48,
     fontSize: 16,
+    color: '#1f2937',
   },
   loadingIndicator: {
     marginTop: 20,
@@ -133,20 +166,40 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    height: 60, // 固定の高さ
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingVertical: 16,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   listItemText: {
     fontSize: 16,
-    color: '#333',
+    color: '#374151',
+    fontWeight: '500',
+    flex: 1, // テキストが残りのスペースを使用
+  },
+  checkmarkContainer: {
+    width: 30, // 固定幅でチェックマーク領域を確保
+    height: 24, // 固定高さ
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyListText: {
     textAlign: 'center',
-    marginTop: 20,
+    marginTop: 32,
     fontSize: 16,
-    color: '#666',
+    color: '#6b7280',
+    marginHorizontal: 16,
   },
 });
 

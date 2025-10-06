@@ -7,6 +7,7 @@ import { auth } from '../firebaseConfig';
 import CommonHeader from '../components/CommonHeader';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getUserNotificationTokens, sendPushNotification } from '../utils/notificationUtils';
+import KurukatsuButton from '../components/KurukatsuButton';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -25,6 +26,7 @@ export default function CircleContactScreen({ route, navigation }) {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const maxBodyLength = 1000;
   const [imageErrorMap, setImageErrorMap] = useState({});
+  const [isSending, setIsSending] = useState(false); // 送信中フラグ
 
   // 宛先未選択（自分だけしか選択されてない状態）かどうかを判定
   const isOnlySelfSelected = () => {
@@ -35,7 +37,7 @@ export default function CircleContactScreen({ route, navigation }) {
 
   // 送信ボタンが無効かどうかを判定
   const isSendButtonDisabled = () => {
-    return isLoadingMembers || isOnlySelfSelected();
+    return isLoadingMembers || isOnlySelfSelected() || !title.trim() || !body.trim() || isSending;
   };
 
   // メンバー数更新関数をグローバルに登録
@@ -141,18 +143,12 @@ export default function CircleContactScreen({ route, navigation }) {
 
   // 送信
   const handleSend = async () => {
-    if (!title.trim() || !body.trim() || selectedUids.length === 0) {
-      Alert.alert('エラー', '全項目を入力し、宛先を選択してください');
-      return;
-    }
     if (isOnlySelfSelected()) {
       Alert.alert('エラー', '宛先を選択してください（自分以外のメンバーを選択してください）');
       return;
     }
-    if (messageType === 'attendance' && !deadline) {
-      Alert.alert('エラー', '回答期限を設定してください');
-      return;
-    }
+    
+    setIsSending(true);
     try {
       const sender = auth.currentUser;
       if (!sender) {
@@ -228,6 +224,7 @@ export default function CircleContactScreen({ route, navigation }) {
       setBody('');
       setSelectedUids([]);
       setSelectAll(false);
+      setIsSending(false);
       Alert.alert(
         '送信完了',
         'メッセージを送信しました',
@@ -241,6 +238,7 @@ export default function CircleContactScreen({ route, navigation }) {
       );
     } catch (e) {
       console.error('Error sending message:', e);
+      setIsSending(false);
       Alert.alert('エラー', 'メッセージの送信に失敗しました');
     }
   };
@@ -338,18 +336,15 @@ export default function CircleContactScreen({ route, navigation }) {
           )}
 
           {/* 送信ボタン */}
-          <TouchableOpacity 
-            style={{ 
-              backgroundColor: isSendButtonDisabled() ? '#ccc' : '#007bff', 
-              borderRadius: 8, 
-              padding: 16, 
-              alignItems: 'center' 
-            }} 
+          <KurukatsuButton
+            title={isSending ? "送信中..." : "送信"}
             onPress={handleSend}
             disabled={isSendButtonDisabled()}
-          >
-            <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>送信</Text>
-          </TouchableOpacity>
+            size="medium"
+            variant="primary"
+            hapticFeedback={true}
+            loading={isSending}
+          />
         </ScrollView>
 
         {/* 宛先選択モーダル */}

@@ -75,19 +75,19 @@ export default function CircleMemberScreen({ route, navigation }) {
       {
         label: 'カレンダー',
         icon: 'calendar-outline',
-        onPress: () => navigation.navigate('CircleMemberSchedule', { circleId })
+        onPress: () => navigation.navigate('共通', { screen: 'CircleMemberSchedule', params: { circleId } })
       },
       {
         label: '連絡',
         icon: 'mail-outline',
-        onPress: () => navigation.navigate('CircleMemberContact', { circleId }),
+        onPress: () => navigation.navigate('共通', { screen: 'CircleMemberContact', params: { circleId } }),
         hasNotification: unreadMessageCount > 0,
         notificationCount: unreadMessageCount
       },
       {
         label: 'メンバー',
         icon: 'people-outline',
-        onPress: () => navigation.navigate('CircleMemberMemberList', { circleId })
+        onPress: () => navigation.navigate('共通', { screen: 'CircleMemberMemberList', params: { circleId } })
       }
     ];
   };
@@ -108,13 +108,16 @@ export default function CircleMemberScreen({ route, navigation }) {
             <View style={styles.circleImageLargeContainer}>
               <View style={styles.circleImageWrapper}>
                 {circleData.imageUrl && !imageError ? (
-                            <Image
-                    source={{ uri: circleData.imageUrl }} 
+                  <Image
+                    source={{ 
+                      uri: circleData.imageUrl,
+                      cache: 'force-cache'
+                    }} 
                     style={styles.circleImageLarge}
                     onError={() => setImageError(true)}
                     resizeMode="cover"
-                            />
-                          ) : (
+                  />
+                ) : (
                   <View style={[styles.circleImageLarge, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
                     <Ionicons name="people-outline" size={64} color="#aaa" />
                             </View>

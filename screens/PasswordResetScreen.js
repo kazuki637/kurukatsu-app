@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, TouchableWithoutFeedback, Keyboard, ScrollView } from 'react-native';
 import { auth } from '../firebaseConfig';
 import { sendPasswordResetEmail } from 'firebase/auth';
+import KurukatsuButton from '../components/KurukatsuButton';
 
 const PasswordResetScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -51,41 +52,50 @@ const PasswordResetScreen = ({ navigation }) => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>パスワードリセット</Text>
-        <Text style={styles.description}>
-          登録済みのメールアドレスを入力してください。{'\n'}
-          パスワードリセット用のリンクを送信いたします。
-        </Text>
         
-        <TextInput
-          style={styles.input}
-          placeholder="メールアドレス"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          returnKeyType="done"
-          onSubmitEditing={Keyboard.dismiss}
-        />
-        
-        <TouchableOpacity
-          style={styles.resetButton}
-          onPress={handlePasswordReset}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.resetButtonText}>リセットメールを送信</Text>
-          )}
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>ログイン画面に戻る</Text>
-        </TouchableOpacity>
+        <View style={styles.cardContainer}>
+          <Text style={styles.welcomeTitle}>パスワードをリセット</Text>
+          <Text style={styles.welcomeSubtitle}>
+            登録済みのメールアドレスを入力してください
+          </Text>
+          
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="メールアドレス"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              returnKeyType="done"
+              onSubmitEditing={handlePasswordReset}
+            />
+          </View>
+          
+          <KurukatsuButton
+            title={loading ? '' : 'リセットメールを送信'}
+            onPress={handlePasswordReset}
+            disabled={loading}
+            loading={loading}
+            size="medium"
+            variant="primary"
+            hapticFeedback={true}
+            style={styles.resetButtonContainer}
+          >
+            {loading && (
+              <ActivityIndicator size="small" color="#fff" />
+            )}
+          </KurukatsuButton>
+          
+          <KurukatsuButton
+            title="ログイン画面に戻る"
+            onPress={() => navigation.goBack()}
+            size="medium"
+            variant="secondary"
+            hapticFeedback={true}
+            style={styles.backButtonContainer}
+          />
+        </View>
       </ScrollView>
     </TouchableWithoutFeedback>
   );
@@ -94,60 +104,62 @@ const PasswordResetScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f0f2f5',
   },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
   },
-  title: {
-    fontSize: 28,
+  cardContainer: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 32,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  welcomeTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#333',
+    color: '#1f2937',
     textAlign: 'center',
+    marginBottom: 8,
   },
-  description: {
+  welcomeSubtitle: {
     fontSize: 16,
-    color: '#666',
+    color: '#6b7280',
     textAlign: 'center',
-    marginBottom: 30,
-    lineHeight: 24,
-    paddingHorizontal: 20,
+    marginBottom: 32,
+    lineHeight: 22,
+  },
+  inputContainer: {
+    marginBottom: 24,
   },
   input: {
-    width: '90%',
-    height: 50,
-    borderColor: '#ddd',
+    width: '100%',
+    height: 48,
+    borderColor: '#d1d5db',
     borderWidth: 1,
     borderRadius: 8,
-    marginBottom: 20,
-    paddingHorizontal: 15,
-    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    backgroundColor: '#f9fafb',
     fontSize: 16,
+    color: '#1f2937',
   },
-  resetButton: {
-    width: '90%',
-    height: 50,
-    backgroundColor: '#007bff',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
+  resetButtonContainer: {
+    marginBottom: 24,
   },
-  resetButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  backButton: {
-    paddingVertical: 10,
-  },
-  backButtonText: {
-    color: '#007bff',
-    fontSize: 18,
+  backButtonContainer: {
+    width: '100%',
   },
 });
 

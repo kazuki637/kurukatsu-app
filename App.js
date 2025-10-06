@@ -7,10 +7,13 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from './firebaseConfig';
+import CustomTabBar from './components/CustomTabBar';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
+import * as SplashScreen from 'expo-splash-screen';
+import { initializeImagePreloading, preloadUserImages } from './utils/imagePreloader';
 
 import { Platform } from 'react-native';
 import OnboardingScreen from './screens/OnboardingScreen';
@@ -62,7 +65,6 @@ import ImageCropScreen from './screens/ImageCropScreen';
 import StudentIdCameraScreen from './screens/StudentIdCameraScreen';
 import ArticleWebViewScreen from './screens/ArticleWebViewScreen';
 import ArticleListScreen from './screens/ArticleListScreen';
-import EmailVerificationScreen from './screens/EmailVerificationScreen';
 
 
 const AuthStack = createStackNavigator();
@@ -95,9 +97,12 @@ const handleDirectNavigation = (data) => {
       });
     } else if (data.type === 'contact') {
       // サークル連絡通知の場合：直接CircleMember画面に遷移
-      navigationRef.navigate('CircleMember', {
-        circleId: data.circleId,
-        initialTab: 1 // 連絡タブのインデックス
+      navigationRef.navigate('共通', {
+        screen: 'CircleMember',
+        params: {
+          circleId: data.circleId,
+          initialTab: 1 // 連絡タブのインデックス
+        }
       });
     }
   } catch (error) {
@@ -309,8 +314,6 @@ function AuthStackScreen() {
       <AuthStack.Screen name="Login" component={LoginScreen} />
       <AuthStack.Screen name="Signup" component={SignupScreen} />
       <AuthStack.Screen name="PasswordReset" component={PasswordResetScreen} />
-      <AuthStack.Screen name="EmailVerification" component={EmailVerificationScreen} />
-      <AuthStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
     </AuthStack.Navigator>
   );
 }
@@ -320,8 +323,6 @@ function HomeStackScreen() {
   return (
     <HomeStack.Navigator screenOptions={{ headerShown: false }}>
       <HomeStack.Screen name="Home" component={HomeScreen} />
-      <HomeStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} />
-      <HomeStack.Screen name="SearchResults" component={SearchResultsScreen} />
       <HomeStack.Screen name="ArticleWebView" component={ArticleWebViewScreen} />
       <HomeStack.Screen name="ArticleList" component={ArticleListScreen} />
     </HomeStack.Navigator>
@@ -350,15 +351,7 @@ function MyPageStackScreen() {
   return (
     <MyPageStack.Navigator screenOptions={{ headerShown: false }}>
       <MyPageStack.Screen name="MyPage" component={MyPageScreen} />
-      <MyPageStack.Screen name="CircleDetail" component={CircleProfileScreen} />
-      <MyPageStack.Screen name="CircleMember" component={CircleMemberScreen} />
-      <MyPageStack.Screen name="CircleMemberSchedule" component={CircleMemberScheduleScreen} />
-      <MyPageStack.Screen name="CircleMemberContact" component={CircleMemberContactScreen} />
-      <MyPageStack.Screen name="CircleMemberMemberList" component={CircleMemberMemberListScreen} />
-      <MyPageStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} />
-      <MyPageStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
       <MyPageStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
-      <MyPageStack.Screen name="BlockManagement" component={BlockManagementScreen} />
       <MyPageStack.Screen name="HelpScreen" component={HelpScreen} />
       <MyPageStack.Screen name="TermsOfServiceScreen" component={TermsOfServiceScreen} />
       <MyPageStack.Screen name="PrivacyPolicyScreen" component={PrivacyPolicyScreen} />
@@ -373,7 +366,6 @@ function CircleManagementStackScreen() {
   return (
     <CircleManagementStack.Navigator screenOptions={{ headerShown: false, gestureEnabled: true }}>
       <CircleManagementStack.Screen name="CircleManagementScreen" component={CircleManagementScreen} options={{ headerShown: false, gestureEnabled: true }} />
-      <CircleManagementStack.Screen name="CircleRegistration" component={CircleRegistrationScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleManagementDetail" component={CircleManagementDetailScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleProfileEdit" component={CircleProfileEditScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleSettings" component={CircleSettingsScreen} options={{ headerShown: false, gestureEnabled: true }} />
@@ -382,10 +374,6 @@ function CircleManagementStackScreen() {
       <CircleManagementStack.Screen name="AddSchedule" component={AddScheduleScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleContact" component={CircleContactScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleLeadershipTransfer" component={CircleLeadershipTransferScreen} options={{ headerShown: false, gestureEnabled: true }} />
-
-      <CircleManagementStack.Screen name="CircleMemberSchedule" component={CircleMemberScheduleScreen} options={{ headerShown: false, gestureEnabled: true }} />
-      <CircleManagementStack.Screen name="CircleMemberContact" component={CircleMemberContactScreen} options={{ headerShown: false, gestureEnabled: true }} />
-      <CircleManagementStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} options={{ headerShown: false, gestureEnabled: true }} />
     </CircleManagementStack.Navigator>
   );
 }
@@ -395,6 +383,15 @@ function SharedStackScreen() {
   return (
     <SharedStack.Navigator screenOptions={{ headerShown: false }}>
       <SharedStack.Screen name="CircleDetail" component={CircleProfileScreen} />
+      <SharedStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} />
+      <SharedStack.Screen name="CircleMember" component={CircleMemberScreen} />
+      <SharedStack.Screen name="CircleMemberSchedule" component={CircleMemberScheduleScreen} />
+      <SharedStack.Screen name="CircleMemberContact" component={CircleMemberContactScreen} />
+      <SharedStack.Screen name="CircleMemberMemberList" component={CircleMemberMemberListScreen} />
+      <SharedStack.Screen name="Report" component={ReportScreen} />
+      <SharedStack.Screen name="BlockManagement" component={BlockManagementScreen} />
+      <SharedStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
+      <SharedStack.Screen name="SearchResults" component={SearchResultsScreen} />
     </SharedStack.Navigator>
   );
 }
@@ -404,25 +401,9 @@ function MainTabNavigator() {
 
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
+      tabBar={props => <CustomTabBar {...props} />}
+      screenOptions={{
         headerShown: false,
-        tabBarIcon: ({ focused, color, size }) => {
-          let iconName;
-
-          if (route.name === 'ホーム') {
-            iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === '検索') {
-            iconName = focused ? 'search' : 'search-outline';
-          } else if (route.name === 'マイページ') {
-            iconName = focused ? 'person' : 'person-outline';
-          } else if (route.name === 'サークル運営') {
-            iconName = focused ? 'people' : 'people-outline';
-          }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
-        },
-        tabBarActiveTintColor: '#007bff',
-        tabBarInactiveTintColor: 'gray',
         // パフォーマンス最適化
         lazy: true,
         lazyPlaceholder: () => null,
@@ -430,7 +411,7 @@ function MainTabNavigator() {
         animationEnabled: true,
         gestureEnabled: true,
         gestureDirection: 'horizontal',
-      })}
+      }}
     >
       <Tab.Screen name="ホーム" component={HomeStackScreen} />
       <Tab.Screen name="検索" component={SearchStackScreen} />
@@ -440,33 +421,60 @@ function MainTabNavigator() {
   );
 }
 
-// モーダルとしてProfileEditScreenを表示するコンポーネント
-function ProfileEditScreenModal() {
-  return (
-    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#fff', zIndex: 999, flex: 1 }}>
-      <ProfileEditScreen forceToHome={true} />
-    </View>
-  );
-}
 
 
 
 
+
+// スプラッシュ画面を保持してプリロードを実行
+SplashScreen.preventAutoHideAsync();
 
 // Root Stack Navigator (for modals and initial auth flow)
 function AppNavigator() {
   const [user, setUser] = useState(null);
   const [initializing, setInitializing] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(null);
+  const [isPreloadComplete, setIsPreloadComplete] = useState(false);
 
   useEffect(() => {
 
 
     const initialize = async () => {
-      const seen = await AsyncStorage.getItem('seenOnboarding');
-      setShowOnboarding(seen !== 'true');
+      try {
+        console.log('🚀 スプラッシュ画面でのプリロード開始');
+        
+        // 1. オンボーディング設定を取得
+        const seen = await AsyncStorage.getItem('seenOnboarding');
+        setShowOnboarding(seen !== 'true');
 
-
+        // 2. 画像プリロードを実行（スプラッシュ画面表示中）
+        await initializeImagePreloading();
+        
+        // 3. 認証状態を確認してからユーザー画像をプリロード
+        console.log('🔍 認証状態確認:', auth.currentUser ? 'ログイン済み' : '未ログイン');
+        if (auth.currentUser) {
+          console.log('👤 既存ユーザー検出、画像プリロード開始');
+          await preloadUserImages();
+        } else {
+          console.log('⚠️ 未認証のため、ユーザー画像プリロードをスキップ');
+        }
+        
+        console.log('✅ スプラッシュ画面でのプリロード完了');
+        setIsPreloadComplete(true);
+        
+        // 4. 最小表示時間を確保（UX向上）
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // 5. スプラッシュ画面を非表示
+        await SplashScreen.hideAsync();
+        console.log('📱 スプラッシュ画面非表示完了');
+        
+      } catch (error) {
+        console.warn('スプラッシュプリロードエラー:', error);
+        setIsPreloadComplete(true);
+        // エラー時もスプラッシュ画面を非表示
+        await SplashScreen.hideAsync();
+      }
     };
     
     initialize();
@@ -474,6 +482,14 @@ function AppNavigator() {
     const subscriber = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (initializing) setInitializing(false);
+
+      // ログイン時のユーザー画像プリロード（重要）
+      if (currentUser) {
+        console.log('🔄 認証完了、ユーザー画像プリロード実行');
+        preloadUserImages().catch(error => {
+          console.warn('認証後ユーザー画像プリロードエラー:', error);
+        });
+      }
       
       // ユーザーログイン時に通知トークンを取得・保存
       if (currentUser) {
@@ -494,7 +510,7 @@ function AppNavigator() {
     };
   }, []);
 
-  if (initializing || showOnboarding === null) return null;
+  if (initializing || showOnboarding === null || !isPreloadComplete) return null;
 
   return (
     <RootStack.Navigator>
@@ -509,59 +525,35 @@ function AppNavigator() {
           }} />}
         </RootStack.Screen>
       ) : user ? (
-        // メール認証状態をチェック
-        user.emailVerified ? (
-          <>
-            <RootStack.Screen 
-              name="Main" 
-              component={MainTabNavigatorWithProfileCheck} 
-              options={{ headerShown: false }} 
-            />
-            <RootStack.Screen 
-              name="ImageCrop" 
-              component={ImageCropScreen} 
-              options={{ headerShown: false }} 
-            />
-            <RootStack.Screen 
-              name="StudentIdCamera" 
-              component={StudentIdCameraScreen} 
-              options={{ headerShown: false }} 
-            />
-            <RootStack.Screen 
-              name="ProfileEdit" 
-              component={ProfileEditScreen} 
-              options={{ headerShown: false }} 
-            />
-            <RootStack.Screen 
-              name="CircleMember" 
-              component={CircleMemberScreen} 
-              options={{ headerShown: false }} 
-            />
-            <RootStack.Screen 
-              name="Report" 
-              component={ReportScreen} 
-              options={{ headerShown: false }} 
-            />
-            <RootStack.Screen 
-              name="BlockManagement" 
-              component={BlockManagementScreen} 
-              options={{ headerShown: false }} 
-            />
-            <RootStack.Screen 
-              name="共通" 
-              component={SharedStackScreen} 
-              options={{ headerShown: false }} 
-            />
-          </>
-        ) : (
-          // メール認証待ちの場合は認証画面を表示
+        // 認証されたユーザーは直接メインアプリに遷移
+        <>
           <RootStack.Screen 
-            name="EmailVerification" 
+            name="Main" 
+            component={MainTabNavigatorWithProfileCheck} 
             options={{ headerShown: false }} 
-          >
-            {props => <EmailVerificationScreen {...props} email={user.email} userId={user.uid} fromSignup={false} />}
-          </RootStack.Screen>
-        )
+          />
+          <RootStack.Screen 
+            name="ImageCrop" 
+            component={ImageCropScreen} 
+            options={{ headerShown: false }} 
+          />
+          <RootStack.Screen 
+            name="StudentIdCamera" 
+            component={StudentIdCameraScreen} 
+            options={{ headerShown: false }} 
+          />
+          <RootStack.Screen 
+            name="共通" 
+            component={SharedStackScreen} 
+            options={{ headerShown: false }} 
+          />
+          <RootStack.Screen 
+            name="CircleRegistration" 
+            component={CircleRegistrationScreen} 
+            options={{ headerShown: false }} 
+          />
+        </>
+      
       ) : (
         <RootStack.Screen 
           name="Auth" 
@@ -574,61 +566,9 @@ function AppNavigator() {
 }
 
 function MainTabNavigatorWithProfileCheck() {
-  const [profileChecked, setProfileChecked] = React.useState(false);
-  const [needsProfile, setNeedsProfile] = React.useState(false);
-  const [user, setUser] = React.useState(() => {
-    const currentUser = auth.currentUser;
-    return currentUser;
-  });
-  const [isInitialCheck, setIsInitialCheck] = React.useState(true);
-
-  React.useEffect(() => {
-    const checkProfile = async () => {
-      if (!user) {
-        setNeedsProfile(false);
-        setProfileChecked(true);
-        setIsInitialCheck(false);
-        return;
-      }
-      
-      // 初回のみプロフィールチェックを実行
-      if (!isInitialCheck) {
-        return;
-      }
-      
-      try {
-        const userDocRef = doc(db, 'users', user.uid);
-        const docSnap = await getDoc(userDocRef);
-        // プロフィール未設定（name, university, grade, gender, birthdayのいずれか未入力）なら強制
-        if (!docSnap.exists()) {
-          setNeedsProfile(true);
-        } else {
-          const d = docSnap.data();
-          if (!d.name || !d.university || !d.grade || !d.gender || !d.birthday) {
-            setNeedsProfile(true);
-          } else {
-            setNeedsProfile(false);
-          }
-        }
-      } catch (e) {
-        setNeedsProfile(true);
-      } finally {
-        setProfileChecked(true);
-        setIsInitialCheck(false);
-      }
-    };
-    checkProfile();
-  }, [user, isInitialCheck]);
-
-  // プロフィールチェック中でもメイン画面を表示
-  return (
-    <>
-      <MainTabNavigator />
-      {needsProfile && profileChecked && (
-        <ProfileEditScreenModal />
-      )}
-    </>
-  );
+  // 新規登録画面でプロフィール情報を設定するため、ProfileEditScreenの強制表示は不要
+  // 直接メインタブナビゲーターを表示
+  return <MainTabNavigator />;
 }
 
 export default function App() {
@@ -648,26 +588,23 @@ export default function App() {
       console.log('通知がタップされました:', response);
       const data = response.notification.request.content.data;
       
-      // 連絡通知の場合、CircleMessageDetailScreenに遷移
-      if (data.type === 'contact' && navigationRef) {
-        // 適切なナビゲーターに遷移
-        try {
-          navigationRef.navigate('Main', {
-            screen: 'Home',
-            params: {
+        // 連絡通知の場合、CircleMessageDetailScreenに遷移
+        if (data.type === 'contact' && navigationRef) {
+          // 適切なナビゲーターに遷移
+          try {
+            navigationRef.navigate('共通', {
               screen: 'CircleMessageDetail',
               params: {
                 circleId: data.circleId,
                 messageId: data.messageId,
               }
-            }
-          });
-        } catch (error) {
-          console.error('通知タップ時の画面遷移エラー:', error);
-          // エラーが発生した場合はホーム画面に遷移
-          navigationRef.navigate('Main');
+            });
+          } catch (error) {
+            console.error('通知タップ時の画面遷移エラー:', error);
+            // エラーが発生した場合はホーム画面に遷移
+            navigationRef.navigate('Main');
+          }
         }
-      }
     });
 
     return () => {

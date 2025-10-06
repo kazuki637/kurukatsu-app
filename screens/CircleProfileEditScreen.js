@@ -77,27 +77,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   const [xLink, setXLink] = useState('');
   const [shinkanLineGroupLink, setShinkanLineGroupLink] = useState('');
   // 新歓スケジュール用state
-  const [welcomeSchedule, setWelcomeSchedule] = useState('');
   const [activityLocation, setActivityLocation] = useState(''); // 活動場所
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // 未保存の変更があるかどうか
   const [members, setMembers] = useState([]); // メンバーデータ
   
-  // フェードイン用のアニメーション値
-  const headerImageOpacity = useRef(new Animated.Value(0)).current;
-  const circleLogoOpacity = useRef(new Animated.Value(0)).current;
-  const activityImageOpacity = useRef(new Animated.Value(0)).current;
-  const instagramLogoOpacity = useRef(new Animated.Value(0)).current;
-  const xLogoOpacity = useRef(new Animated.Value(0)).current;
-  const lineLogoOpacity = useRef(new Animated.Value(0)).current;
-  
-  // フェードインアニメーション関数
-  const fadeInImage = (opacityValue) => {
-    Animated.timing(opacityValue, {
-      toValue: 1,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  };
 
   // 初期値セット
   useEffect(() => {
@@ -108,11 +91,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     }
   }, [circleData]);
 
-  useEffect(() => {
-    if (circleData && circleData.welcome && typeof circleData.welcome.schedule === 'string') {
-      setWelcomeSchedule(circleData.welcome.schedule);
-    }
-  }, [circleData]);
 
   useEffect(() => {
     if (circleData) {
@@ -479,7 +457,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       }
       await updateDoc(doc(db, 'circles', circleId), { headerImageUrl: '' });
       Alert.alert('削除完了', 'ヘッダー画像を削除しました');
-      reload && reload(); // 追加: 変更を即時反映
     } catch (e) {
       Alert.alert('エラー', 'ヘッダー画像の削除に失敗しました');
     }
@@ -555,7 +532,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       setEventTitle('');
       setEventDetail('');
       setEventImage(null);
-      reload && reload(); // 追加: 変更を即時反映
     } catch (e) {
       Alert.alert('エラー', 'イベントの追加に失敗しました');
     } finally {
@@ -647,7 +623,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       setEditEventTitle('');
       setEditEventDetail('');
       setEditEventImage(null);
-      reload && reload();
     } catch (e) {
       Alert.alert('エラー', 'イベントの更新に失敗しました');
     } finally {
@@ -669,7 +644,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       });
       setEditingEventIndex(null);
       Alert.alert('削除完了', 'イベントを削除しました');
-      reload && reload(); // 追加: 変更を即時反映
     } catch (e) {
       Alert.alert('エラー', 'イベントの削除に失敗しました');
     }
@@ -713,7 +687,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         leaderMessage: leaderMessage,
       });
       Alert.alert('保存完了', '代表者メッセージを更新しました');
-      reload && reload();
     } catch (e) {
       Alert.alert('エラー', '代表者情報の保存に失敗しました');
     } finally {
@@ -772,7 +745,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             const newImages = [...activityImages, downloadUrl];
             await updateDoc(doc(db, 'circles', circleId), { activityImages: newImages });
             setActivityImages(newImages);
-            reload && reload();
             
             console.log('活動写真アップロード完了');
           } catch (e) {
@@ -839,7 +811,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             newImages[idx] = downloadUrl;
             await updateDoc(doc(db, 'circles', circleId), { activityImages: newImages });
             setActivityImages(newImages);
-            reload && reload();
             
             console.log('活動写真差し替えアップロード完了');
           } catch (e) {
@@ -862,7 +833,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       recommendationsInput !== (circleData.recommendations?.join(', ') || '') ||
       leaderMessage !== (circleData.leaderMessage || '') ||
       welcomeConditions !== (circleData.welcome?.conditions || '') ||
-      welcomeSchedule !== (circleData.welcome?.schedule || '') ||
       snsLink !== (circleData.snsLink || '') ||
       xLink !== (circleData.xLink || '') ||
       shinkanLineGroupLink !== (circleData.shinkanLineGroupLink || '') ||
@@ -882,14 +852,24 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         description,
         recommendations: recommendationsInput.split(',').map(s => s.trim()).filter(Boolean),
         leaderMessage,
-        welcome: { ...(circleData.welcome || {}), conditions: welcomeConditions, schedule: welcomeSchedule, isRecruiting },
+        welcome: { ...(circleData.welcome || {}), conditions: welcomeConditions, isRecruiting },
         snsLink,
         xLink,
         shinkanLineGroupLink,
         activityLocation,
       });
       setHasUnsavedChanges(false);
-      Alert.alert('保存完了', 'プロフィール情報を保存しました');
+      Alert.alert(
+        '保存完了', 
+        'プロフィール情報を保存しました',
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.goBack(),
+          },
+        ],
+        { cancelable: false }
+      );
     } catch (e) {
       Alert.alert('エラー', '保存に失敗しました');
     }
@@ -902,11 +882,14 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         {activityImages && activityImages.length > 0 ? (
           <View style={{position: 'relative', width: '100%', aspectRatio: 16/9, alignSelf: 'center'}}>
             <TouchableOpacity onPress={() => handleReplaceActivityImage(0)} activeOpacity={0.7} style={{width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center'}}>
-              <Animated.Image 
-                source={{ uri: activityImages[0] }} 
-                style={[{width: '100%', aspectRatio: 16/9, borderRadius: 0, backgroundColor: '#eee', marginBottom: 20}, { opacity: activityImageOpacity }]}
-                onLoad={() => fadeInImage(activityImageOpacity)}
-              />
+                <Image 
+                  source={{ 
+                    uri: activityImages[0],
+                    cache: 'force-cache'
+                  }} 
+                  style={{width: '100%', aspectRatio: 16/9, borderRadius: 0, backgroundColor: '#eee', marginBottom: 20}}
+                  resizeMode="cover"
+                />
             </TouchableOpacity>
             {/* ゴミ箱ボタン */}
             <TouchableOpacity
@@ -1052,10 +1035,9 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>SNS</Text>
         <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 8}}>
-          <Animated.Image 
+          <Image 
             source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} 
-            style={[styles.snsLargeLogo, { opacity: instagramLogoOpacity }]}
-            onLoad={() => fadeInImage(instagramLogoOpacity)}
+            style={styles.snsLargeLogo}
           />
           <TextInput
             value={snsLink}
@@ -1070,10 +1052,9 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           />
         </View>
         <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 8}}>
-          <Animated.Image 
+          <Image 
             source={require('../assets/SNS-icons/X_logo-black.png')} 
-            style={[styles.snsLargeLogo, { opacity: xLogoOpacity }]}
-            onLoad={() => fadeInImage(xLogoOpacity)}
+            style={styles.snsLargeLogo}
           />
           <TextInput
             value={xLink}
@@ -1225,12 +1206,16 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         <Text style={styles.sectionTitle}>入会募集状況</Text>
         {isRecruiting ? (
           <View style={styles.recruitingStatusContainer}>
-            <Ionicons name="checkmark-circle" size={24} color="#28a745" />
+            <View style={[styles.recruitingIconContainer, { backgroundColor: '#d1fae5' }]}>
+              <Ionicons name="checkmark" size={24} color="#10b981" />
+            </View>
             <Text style={styles.recruitingStatusText}>入会募集中</Text>
           </View>
         ) : (
           <View style={styles.recruitingStatusContainer}>
-            <Ionicons name="close-circle" size={24} color="#e74c3c" />
+            <View style={[styles.recruitingIconContainer, { backgroundColor: '#fee2e2' }]}>
+              <Ionicons name="close" size={24} color="#ef4444" />
+            </View>
             <Text style={styles.recruitingStatusText}>現在入会の募集はありません</Text>
           </View>
         )}
@@ -1252,10 +1237,9 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>新歓LINEグループ</Text>
         <View style={{flexDirection: 'row', alignItems: 'center'}}>
-          <Animated.Image 
+          <Image 
             source={require('../assets/SNS-icons/LINE_Brand_icon.png')} 
-            style={[styles.snsLargeLogo, { opacity: lineLogoOpacity }]}
-            onLoad={() => fadeInImage(lineLogoOpacity)}
+            style={styles.snsLargeLogo}
           />
           <TextInput
             value={shinkanLineGroupLink}
@@ -1269,19 +1253,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             autoCorrect={false}
           />
         </View>
-      </View>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>新歓スケジュール</Text>
-        <TextInput
-          value={welcomeSchedule}
-          onChangeText={(text) => {
-            setWelcomeSchedule(text);
-            checkForChanges();
-          }}
-          multiline
-          placeholder={"2025/4/25 新歓BBQ"}
-          style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 60, fontSize: 16, marginBottom: 8}}
-        />
       </View>
     </View>
   );
@@ -1367,10 +1338,13 @@ export default function CircleProfileEditScreen({ route, navigation }) {
               </View>
             ) : circleData.headerImageUrl ? (
               <>
-                <Animated.Image 
-                  source={{ uri: circleData.headerImageUrl }} 
-                  style={[styles.headerImage, { opacity: headerImageOpacity }]}
-                  onLoad={() => fadeInImage(headerImageOpacity)}
+                <Image 
+                  source={{ 
+                    uri: circleData.headerImageUrl,
+                    cache: 'force-cache'
+                  }} 
+                  style={styles.headerImage}
+                  resizeMode="cover"
                 />
                 {/* ゴミ箱ボタン */}
                 <TouchableOpacity
@@ -1392,10 +1366,13 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             <View style={styles.circleInfo}>
               <View style={styles.logoContainer}>
                 {circleData.imageUrl ? (
-                  <Animated.Image 
-                    source={{ uri: circleData.imageUrl }} 
-                    style={[styles.circleLogo, { opacity: circleLogoOpacity }]}
-                    onLoad={() => fadeInImage(circleLogoOpacity)}
+                  <Image 
+                    source={{ 
+                      uri: circleData.imageUrl,
+                      cache: 'force-cache'
+                    }} 
+                    style={styles.circleLogo}
+                    resizeMode="cover"
                   />
                 ) : (
                   <View style={styles.logoPlaceholder}>
@@ -1404,46 +1381,41 @@ export default function CircleProfileEditScreen({ route, navigation }) {
                 )}
               </View>
               <View style={styles.circleTextInfo}>
-                <View style={styles.circleNameRow}>
-                  <Text style={styles.circleName}>{circleData.name}</Text>
-                  {circleData.isOfficial && (
-                    <View style={styles.officialBadge}>
-                      <Ionicons name="checkmark-circle" size={16} color="#28a745" />
-                      <Text style={styles.officialText}>公式</Text>
-                    </View>
-                  )}
-                  {/* SNSボタン（X, Instagram） */}
-                  {(circleData.xLink || circleData.snsLink) && (
-                    <View style={styles.snsIconRow}>
-                      {circleData.snsLink && (
-                        <TouchableOpacity onPress={() => Linking.openURL(circleData.snsLink)} style={styles.snsIconButton}>
-                          <Animated.Image 
-                            source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} 
-                            style={[styles.snsLogoImage, { opacity: instagramLogoOpacity }]}
-                            onLoad={() => fadeInImage(instagramLogoOpacity)}
-                          />
-                        </TouchableOpacity>
-                      )}
-                      {circleData.xLink && (
-                        <TouchableOpacity onPress={() => Linking.openURL(circleData.xLink)} style={styles.snsIconButton}>
-                          <Animated.Image 
-                            source={require('../assets/SNS-icons/X_logo-black.png')} 
-                            style={[styles.snsLogoImage, { opacity: xLogoOpacity }]}
-                            onLoad={() => fadeInImage(xLogoOpacity)}
-                          />
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  )}
+                {/* サークル名（独立した行） */}
+                <View style={styles.circleNameContainer}>
+                  <Text style={styles.circleName} numberOfLines={2} ellipsizeMode="tail">{circleData.name}</Text>
                 </View>
-                <Text style={styles.universityName}>{circleData.universityName}</Text>
-                <Text style={styles.genre}>{circleData.genre}</Text>
+                
+                {/* 大学名・ジャンル（サークル名の下） */}
+                <View style={styles.circleDetailsContainer}>
+                  <Text style={styles.universityName}>{circleData.universityName}</Text>
+                  <Text style={styles.genre}>{circleData.genre}</Text>
+                </View>
               </View>
             </View>
+            
+            {/* SNSボタン（サークル情報セクションの右下に絶対配置） */}
+            {(circleData.xLink || circleData.snsLink) && (
+              <View style={styles.snsIconContainer}>
+                {circleData.snsLink && (
+                  <TouchableOpacity onPress={() => Linking.openURL(circleData.snsLink)} style={styles.snsIconButton}>
+                    <Image 
+                      source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} 
+                      style={styles.snsLogoImage}
+                    />
+                  </TouchableOpacity>
+                )}
+                {circleData.xLink && (
+                  <TouchableOpacity onPress={() => Linking.openURL(circleData.xLink)} style={styles.snsIconButton}>
+                    <Image 
+                      source={require('../assets/SNS-icons/X_logo-black.png')} 
+                      style={styles.snsLogoImage}
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
           </View>
-
-          {/* サークル紹介 */}
-          {/* このセクションを削除 */}
 
           {/* タブバー */}
           {renderTabBar()}
@@ -1465,7 +1437,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#f0f2f5',
   },
   scrollView: {
     flex: 1,
@@ -1474,7 +1446,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#f0f2f5',
   },
   scrollViewContent: {
     paddingBottom: 20,
@@ -1497,14 +1469,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
   },
   circleInfoSection: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    backgroundColor: '#ffffff',
+    paddingVertical: 24,
+    paddingHorizontal: 20,
   },
   circleInfo: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    paddingTop: 5,
   },
   logoContainer: {
     width: 60,
@@ -1530,6 +1502,13 @@ const styles = StyleSheet.create({
   circleTextInfo: {
     marginLeft: 15,
     flex: 1,
+    paddingRight: 0,
+  },
+  circleNameContainer: {
+    marginBottom: 8,
+  },
+  circleDetailsContainer: {
+    gap: 4,
   },
   circleNameRow: {
     flexDirection: 'row',
@@ -1540,7 +1519,8 @@ const styles = StyleSheet.create({
   circleName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1f2937',
+    lineHeight: 30,
   },
   officialBadge: {
     flexDirection: 'row',
@@ -1558,18 +1538,18 @@ const styles = StyleSheet.create({
   },
   universityName: {
     fontSize: 16,
-    color: '#666',
-    marginTop: 2,
+    color: '#6b7280',
+    lineHeight: 22,
   },
   genre: {
     fontSize: 14,
-    color: '#666',
-    marginTop: 2,
+    color: '#6b7280',
+    lineHeight: 20,
   },
   tabBarContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#e5e7eb',
     width: '100%',
   },
   tabBar: {
@@ -1589,10 +1569,10 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: 16,
-    color: '#666',
+    color: '#6b7280',
   },
   activeTabLabel: {
-    color: '#007bff',
+    color: '#2563eb',
     fontWeight: 'bold',
   },
   activeIndicator: {
@@ -1601,11 +1581,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 2,
-    backgroundColor: '#007bff',
+    backgroundColor: '#2563eb',
   },
   tabContentContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#ffffff',
   },
   tabContent: {
     padding: 20,
@@ -1614,16 +1594,16 @@ const styles = StyleSheet.create({
     marginBottom: 25,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 15,
+    color: '#1f2937',
+    marginBottom: 16,
   },
   description: {
     fontSize: 16,
     textAlign: 'left',
     lineHeight: 24,
-    color: '#666',
+    color: '#374151',
   },
   infoGrid: {
     flexDirection: 'row',
@@ -1631,24 +1611,24 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   infoItem: {
-    width: '30%', // Adjust as needed
+    width: '30%',
     alignItems: 'center',
-    backgroundColor: '#f8fafd',
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: '#cce5ed',
+    borderColor: '#e2e8f0',
     borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
   },
   infoLabel: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 5,
+    color: '#6b7280',
+    marginBottom: 6,
   },
   infoValue: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1f2937',
   },
   featuresContainer: {
     marginTop: 10,
@@ -1659,16 +1639,39 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   featureTag: {
-    backgroundColor: '#e0f2f7',
-    borderRadius: 15,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+    backgroundColor: '#dbeafe',
+    borderRadius: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: '#cce5ed',
+    borderColor: '#bfdbfe',
   },
   featureText: {
     fontSize: 13,
-    color: '#333',
+    color: '#2563eb',
+    fontWeight: '600',
+  },
+  snsIconContainer: {
+    position: 'absolute',
+    bottom: 15,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  snsIconRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+    gap: 4,
+  },
+  snsIconButton: {
+    padding: 2,
+  },
+  snsLogoImage: {
+    width: 36,
+    height: 36,
+    contentFit: 'contain',
   },
   snsButton: {
     flexDirection: 'row',
@@ -2028,6 +2031,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 12,
+  },
+  recruitingIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
   },
   toggleButton: {
     width: 51,

@@ -9,6 +9,7 @@ import { useRef } from 'react';
 import { useEffect } from 'react';
 import { auth } from '../firebaseConfig';
 import { collection, setDoc, doc, serverTimestamp, getDocs, getDoc, addDoc, deleteDoc } from 'firebase/firestore';
+import KurukatsuButton from '../components/KurukatsuButton';
 // import { updateUnreadCounts } from '../hooks/useNotificationBadge'; // リアルタイムリスナーが自動更新するため不要
 import { startTransition } from 'react';
 
@@ -25,18 +26,22 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
   // 既読・未読リスト・人数のstate
   const [readUsers, setReadUsers] = useState([]);
   const [unreadUsers, setUnreadUsers] = useState([]);
+  const [loadingReadStatus, setLoadingReadStatus] = useState(true);
   
   // 出席確認のstate
   const [attendanceStatus, setAttendanceStatus] = useState(null); // 'attending', 'absent', 'pending', null
   const [attendanceCounts, setAttendanceCounts] = useState({ attending: 0, absent: 0, pending: 0 });
+  const [loadingAttendanceStatus, setLoadingAttendanceStatus] = useState(true);
   
   // 回答状況確認用のstate
   const [attendanceUsers, setAttendanceUsers] = useState({ attending: [], absent: [], pending: [] });
   const [attendanceModalType, setAttendanceModalType] = useState('attending'); // 'attending', 'absent', 'pending'
+  
+  // 削除機能のstate
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
 
-  // 送信者情報のstate
-  const [senderInfo, setSenderInfo] = useState(null);
-  const [loadingSender, setLoadingSender] = useState(true);
+  // 送信者情報はCircleMemberContactScreenから受け取る
 
   // 回答期限が過ぎているかどうかを判定
   const isDeadlinePassed = () => {
@@ -56,6 +61,7 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
     if (!message.circleId || !message.id || message.type !== 'attendance') return;
     
     try {
+      setLoadingAttendanceStatus(true);
       const messageId = message.messageId || message.id;
       const attendanceRef = collection(db, 'circles', message.circleId, 'messages', messageId, 'attendance');
       const attendanceSnap = await getDocs(attendanceRef);
@@ -116,6 +122,8 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
       });
     } catch (error) {
       console.error('Error fetching attendance data:', error);
+    } finally {
+      setLoadingAttendanceStatus(false);
     }
   };
 
@@ -319,41 +327,11 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
     return { readUsers, unreadUsers };
   };
 
-  // 送信者情報を取得する関数
-  const getSenderInfo = async (senderUid) => {
-    try {
-      const userDoc = await getDoc(doc(db, 'users', senderUid));
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        return {
-          name: userData.name || userData.nickname || '不明',
-          profileImageUrl: userData.profileImageUrl || null
-        };
-      }
-    } catch (error) {
-      console.error('Error fetching sender info:', error);
-    }
-    
-    return { name: '不明', profileImageUrl: null };
+  // 送信者情報を取得（CircleMemberContactScreenから受け取ったsenderInfoを使用）
+  const senderInfo = message.senderInfo || {
+    name: message.senderName || '不明',
+    profileImageUrl: message.senderProfileImageUrl || null
   };
-
-  // 送信者情報を取得
-  useEffect(() => {
-    const fetchSenderInfo = async () => {
-      if (message.senderUid) {
-        const info = await getSenderInfo(message.senderUid);
-        setSenderInfo(info);
-      } else {
-        // フォールバック: 保存された情報を使用（既存データとの互換性）
-        setSenderInfo({
-          name: message.senderName || '不明',
-          profileImageUrl: message.senderProfileImageUrl || null
-        });
-      }
-      setLoadingSender(false);
-    };
-    fetchSenderInfo();
-  }, [message.senderUid]);
 
   useEffect(() => {
     const registerAndFetch = async () => {
@@ -426,6 +404,8 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
         }
       } catch (e) {
         console.error('Error in registerAndFetch:', e);
+      } finally {
+        setLoadingReadStatus(false);
       }
     };
     registerAndFetch();
@@ -442,6 +422,43 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
       setUserCount(unreadUsers.length);
     }
     modalizeRef.current?.open();
+  };
+
+  // メッセージ削除機能（モーダル表示）
+  const handleDeleteMessage = () => {
+    setDeleteModalVisible(true);
+  };
+
+  // 実際の削除処理
+  const handleConfirmDelete = async () => {
+    try {
+      setIsDeleting(true);
+      setDeleteModalVisible(false);
+      
+      // ユーザーのcircleMessagesから該当メッセージを削除
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        const userMessageRef = doc(db, 'users', currentUser.uid, 'circleMessages', message.id);
+        await deleteDoc(userMessageRef);
+      }
+      
+      // 削除成功後、前の画面に戻る（削除完了フラグ付き）
+      navigation.goBack();
+      
+      // 削除完了を前の画面に通知
+      if (navigation.getParent) {
+        navigation.getParent().setParams({ 
+          messageDeleted: true,
+          deletedMessageId: message.id 
+        });
+      }
+      
+    } catch (error) {
+      console.error('メッセージ削除エラー:', error);
+      Alert.alert('エラー', 'メッセージの削除に失敗しました。');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   // 回答状況確認ボタン押下時の処理
@@ -482,7 +499,7 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
         showBackButton={true}
         onBack={() => navigation.goBack()}
       />
-      <ScrollView contentContainerStyle={{ padding: 24 }}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* 送信日時（最上部） */}
         <Text style={{ color: '#888', fontSize: 12, alignSelf: 'flex-start', marginBottom: 12 }}>
           {message.sentAt && message.sentAt.toDate ? message.sentAt.toDate().toLocaleString('ja-JP') : ''}
@@ -497,11 +514,7 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
         </View>
         {/* 送信者アイコン＋氏名 */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20 }}>
-          {loadingSender ? (
-            <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#e0e0e0', marginRight: 10, justifyContent: 'center', alignItems: 'center' }}>
-              <ActivityIndicator size="small" color="#999" />
-            </View>
-          ) : senderInfo?.profileImageUrl ? (
+          {senderInfo?.profileImageUrl ? (
             <Image source={{ uri: senderInfo.profileImageUrl }} style={{ width: 36, height: 36, borderRadius: 18, marginRight: 10 }} />
           ) : (
             <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#e0e0e0', marginRight: 10, justifyContent: 'center', alignItems: 'center' }}>
@@ -530,9 +543,9 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
             <View style={{ height: 1, backgroundColor: '#e0e0e0', width: '100%', marginBottom: 20 }} />
             {/* 出席・欠席・保留ボタン */}
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20, paddingHorizontal: 20 }}>
-              <TouchableOpacity 
-                onPress={() => handleAttendance('attending')} 
-                disabled={isDeadlinePassed()}
+                <TouchableOpacity 
+                  onPress={() => handleAttendance('attending')} 
+                  disabled={isDeadlinePassed() || loadingAttendanceStatus}
                 style={{ 
                   backgroundColor: attendanceStatus === 'attending' ? '#007bff' : '#f0f0f0', 
                   borderRadius: 12, 
@@ -542,7 +555,7 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
                   height: 80,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  opacity: isDeadlinePassed() ? 0.5 : 1
+                  opacity: (isDeadlinePassed() || loadingAttendanceStatus) ? 0.5 : 1
                 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -560,18 +573,22 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
                     出席
                   </Text>
                 </View>
-                <Text style={{ 
-                  color: attendanceStatus === 'attending' ? '#fff' : '#666', 
-                  fontWeight: 'bold', 
-                  fontSize: 12,
-                  marginTop: 4
-                }}>
-                  ({attendanceCounts.attending})
-                </Text>
+                {loadingAttendanceStatus ? (
+                  <ActivityIndicator size="small" color={attendanceStatus === 'attending' ? '#fff' : '#999'} style={{ marginTop: 4 }} />
+                ) : (
+                  <Text style={{ 
+                    color: attendanceStatus === 'attending' ? '#fff' : '#666', 
+                    fontWeight: 'bold', 
+                    fontSize: 12,
+                    marginTop: 4
+                  }}>
+                    ({attendanceCounts.attending})
+                  </Text>
+                )}
               </TouchableOpacity>
-              <TouchableOpacity 
-                onPress={() => handleAttendance('absent')} 
-                disabled={isDeadlinePassed()}
+                <TouchableOpacity 
+                  onPress={() => handleAttendance('absent')} 
+                  disabled={isDeadlinePassed() || loadingAttendanceStatus}
                 style={{ 
                   backgroundColor: attendanceStatus === 'absent' ? '#dc3545' : '#f0f0f0', 
                   borderRadius: 12, 
@@ -581,7 +598,7 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
                   height: 80,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  opacity: isDeadlinePassed() ? 0.5 : 1
+                  opacity: (isDeadlinePassed() || loadingAttendanceStatus) ? 0.5 : 1
                 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -599,18 +616,22 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
                     欠席
                   </Text>
                 </View>
-                <Text style={{ 
-                  color: attendanceStatus === 'absent' ? '#fff' : '#666', 
-                  fontWeight: 'bold', 
-                  fontSize: 12,
-                  marginTop: 4
-                }}>
-                  ({attendanceCounts.absent})
-                </Text>
+                {loadingAttendanceStatus ? (
+                  <ActivityIndicator size="small" color={attendanceStatus === 'absent' ? '#fff' : '#999'} style={{ marginTop: 4 }} />
+                ) : (
+                  <Text style={{ 
+                    color: attendanceStatus === 'absent' ? '#fff' : '#666', 
+                    fontWeight: 'bold', 
+                    fontSize: 12,
+                    marginTop: 4
+                  }}>
+                    ({attendanceCounts.absent})
+                  </Text>
+                )}
               </TouchableOpacity>
-              <TouchableOpacity 
-                onPress={() => handleAttendance('pending')} 
-                disabled={isDeadlinePassed()}
+                <TouchableOpacity 
+                  onPress={() => handleAttendance('pending')} 
+                  disabled={isDeadlinePassed() || loadingAttendanceStatus}
                 style={{ 
                   backgroundColor: attendanceStatus === 'pending' ? '#ffc107' : '#f0f0f0', 
                   borderRadius: 12, 
@@ -620,7 +641,7 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
                   height: 80,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  opacity: isDeadlinePassed() ? 0.5 : 1
+                  opacity: (isDeadlinePassed() || loadingAttendanceStatus) ? 0.5 : 1
                 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -638,14 +659,18 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
                     保留
                   </Text>
                 </View>
-                <Text style={{ 
-                  color: attendanceStatus === 'pending' ? '#fff' : '#666', 
-                  fontWeight: 'bold', 
-                  fontSize: 12,
-                  marginTop: 4
-                }}>
-                  ({attendanceCounts.pending})
-                </Text>
+                {loadingAttendanceStatus ? (
+                  <ActivityIndicator size="small" color={attendanceStatus === 'pending' ? '#fff' : '#999'} style={{ marginTop: 4 }} />
+                ) : (
+                  <Text style={{ 
+                    color: attendanceStatus === 'pending' ? '#fff' : '#666', 
+                    fontWeight: 'bold', 
+                    fontSize: 12,
+                    marginTop: 4
+                  }}>
+                    ({attendanceCounts.pending})
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
             
@@ -653,13 +678,15 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
             <View style={{ alignItems: 'center', marginBottom: 20 }}>
               <TouchableOpacity 
                 onPress={handleShowAllAttendanceSheet} 
+                disabled={loadingAttendanceStatus}
                 style={{ 
                   backgroundColor: '#f0f0f0', 
                   borderRadius: 8, 
                   paddingVertical: 12, 
                   paddingHorizontal: 20,
                   flexDirection: 'row',
-                  alignItems: 'center'
+                  alignItems: 'center',
+                  opacity: loadingAttendanceStatus ? 0.5 : 1
                 }}
               >
                 <Ionicons name="people" size={20} color="#666" style={{ marginRight: 8 }} />
@@ -673,16 +700,107 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
         <View style={{ height: 1, backgroundColor: '#e0e0e0', width: '100%', marginBottom: 30 }} />
         {/* 既読・未読ボタン */}
         <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 18 }}>
-          <TouchableOpacity onPress={() => handleShowSheet('read')} style={{ backgroundColor: '#f0f0f0', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 24, marginRight: 12, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ color: '#666', fontWeight: 'bold', fontSize: 16 }}>既読</Text>
-            <Text style={{ color: '#666', fontWeight: 'bold', fontSize: 16, marginLeft: 4 }}>({readUsers.length})</Text>
+          <TouchableOpacity 
+            onPress={() => handleShowSheet('read')} 
+            disabled={loadingReadStatus}
+            style={{ 
+              backgroundColor: loadingReadStatus ? '#e0e0e0' : '#f0f0f0', 
+              borderRadius: 8, 
+              paddingVertical: 10, 
+              paddingHorizontal: 24, 
+              marginRight: 12, 
+              flex: 1, 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              opacity: loadingReadStatus ? 0.6 : 1
+            }}
+          >
+            <Text style={{ color: loadingReadStatus ? '#999' : '#666', fontWeight: 'bold', fontSize: 16 }}>既読</Text>
+            {loadingReadStatus ? (
+              <ActivityIndicator size="small" color="#999" style={{ marginLeft: 4 }} />
+            ) : (
+              <Text style={{ color: '#666', fontWeight: 'bold', fontSize: 16, marginLeft: 4 }}>({readUsers.length})</Text>
+            )}
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => handleShowSheet('unread')} style={{ backgroundColor: '#f0f0f0', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 24, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ color: '#666', fontWeight: 'bold', fontSize: 16 }}>未読</Text>
-            <Text style={{ color: '#666', fontWeight: 'bold', fontSize: 16, marginLeft: 4 }}>({unreadUsers.length})</Text>
+          <TouchableOpacity 
+            onPress={() => handleShowSheet('unread')} 
+            disabled={loadingReadStatus}
+            style={{ 
+              backgroundColor: loadingReadStatus ? '#e0e0e0' : '#f0f0f0', 
+              borderRadius: 8, 
+              paddingVertical: 10, 
+              paddingHorizontal: 24, 
+              flex: 1, 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              opacity: loadingReadStatus ? 0.6 : 1
+            }}
+          >
+            <Text style={{ color: loadingReadStatus ? '#999' : '#666', fontWeight: 'bold', fontSize: 16 }}>未読</Text>
+            {loadingReadStatus ? (
+              <ActivityIndicator size="small" color="#999" style={{ marginLeft: 4 }} />
+            ) : (
+              <Text style={{ color: '#666', fontWeight: 'bold', fontSize: 16, marginLeft: 4 }}>({unreadUsers.length})</Text>
+            )}
           </TouchableOpacity>
         </View>
+        
+        {/* 削除ボタン */}
+        <KurukatsuButton
+          title="削除する"
+          onPress={handleDeleteMessage}
+          variant="primary"
+          size="medium"
+          backgroundColor="#DC2626"
+          shadowColor="#B91C1C"
+          disabled={isDeleting}
+          style={styles.deleteButtonContainer}
+        />
       </ScrollView>
+
+      {/* 削除確認モーダル */}
+      <Modal
+        visible={deleteModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setDeleteModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalIconContainer}>
+              <Ionicons name="trash-outline" size={40} color="#DC2626" />
+            </View>
+            <Text style={styles.modalTitle}>連絡を削除しますか？</Text>
+            <Text style={styles.modalSubtitle}>
+              この操作は元に戻せません。本当にこの連絡を削除しますか？
+            </Text>
+            <View style={styles.modalButtons}>
+              <KurukatsuButton
+                title="キャンセル"
+                onPress={() => setDeleteModalVisible(false)}
+                size="medium"
+                variant="secondary"
+                hapticFeedback={true}
+                style={styles.modalCancelButtonContainer}
+              />
+              <KurukatsuButton
+                title="削除する"
+                onPress={handleConfirmDelete}
+                size="medium"
+                variant="primary"
+                backgroundColor="#DC2626"
+                shadowColor="#B91C1C"
+                hapticFeedback={true}
+                disabled={isDeleting}
+                style={styles.modalDeleteButtonContainer}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* 既読・未読ユーザー一覧ボトムシート */}
       <Modalize
         ref={modalizeRef}
@@ -779,5 +897,64 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  scrollContent: {
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 32,
+  },
+  // モーダルのスタイル
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 24,
+    width: '90%',
+    maxWidth: 320,
+    alignItems: 'center',
+  },
+  modalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FEE2E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  modalCancelButtonContainer: {
+    flex: 1,
+    marginRight: 8,
+  },
+  modalDeleteButtonContainer: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  deleteButtonContainer: {
+    marginTop: 24,
   },
 }); 

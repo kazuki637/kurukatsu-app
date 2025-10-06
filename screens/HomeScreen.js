@@ -260,6 +260,7 @@ const HomeScreen = ({ navigation }) => {
               <TouchableOpacity 
                 style={styles.moreButton}
                 onPress={() => navigation.navigate('ArticleList')}
+                activeOpacity={1}
               >
                 <Text style={styles.moreButtonText}>もっと見る</Text>
                 <Ionicons name="chevron-forward" size={14} color="#007bff" />
@@ -290,13 +291,13 @@ const HomeScreen = ({ navigation }) => {
                         url: article.url, 
                         title: article.title 
                       })}
+                      activeOpacity={1}
                     >
                       {article.thumbnailUrl ? (
                         <Image 
                           source={{ uri: article.thumbnailUrl }} 
                           style={styles.infoCardImage}
                           resizeMode="cover"
-                          fadeDuration={300}
                         />
                       ) : (
                         <View style={[styles.infoCardImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
@@ -329,7 +330,7 @@ const HomeScreen = ({ navigation }) => {
 
           {/* 人気のサークル */}
           {popularCircles.length > 0 && (
-            <View style={styles.sectionContainer}>
+            <View style={styles.popularSectionContainer}>
               <Text style={styles.sectionTitle}>
                 {userUniversity ? `${userUniversity}の人気サークル` : '人気のサークル'}
               </Text>
@@ -344,6 +345,7 @@ const HomeScreen = ({ navigation }) => {
                   <TouchableOpacity 
                     style={styles.popularCircleWrapper}
                     onPress={() => navigation.navigate('共通', { screen: 'CircleDetail', params: { circleId: circle.id } })}
+                    activeOpacity={1}
                   >
                     {/* ヘッダー画像 */}
                     {circle.headerImageUrl && (
@@ -396,6 +398,7 @@ const HomeScreen = ({ navigation }) => {
                   <TouchableOpacity 
                     style={styles.popularCircleWrapper}
                     onPress={() => navigation.navigate('共通', { screen: 'CircleDetail', params: { circleId: circle.id } })}
+                    activeOpacity={1}
                   >
                     {/* ヘッダー画像 */}
                     {circle.headerImageUrl && (
@@ -441,11 +444,11 @@ const HomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f0f2f5',
   },
   contentSafeArea: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f0f2f5',
   },
   scrollView: {
     flex: 1,
@@ -568,6 +571,11 @@ const styles = StyleSheet.create({
   sectionContainer: {
     paddingHorizontal: 20,
     marginBottom: 20,
+  },
+  // 人気サークルセクション専用（新着サークルとの間隔を狭める）
+  popularSectionContainer: {
+    paddingHorizontal: 20,
+    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 18,

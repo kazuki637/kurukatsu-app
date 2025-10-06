@@ -3,11 +3,13 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityInd
 import { auth } from '../firebaseConfig';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import KurukatsuButton from '../components/KurukatsuButton';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [navigating, setNavigating] = useState(false);
 
   const handleLogin = async () => {
     setLoading(true);
@@ -15,18 +17,7 @@ const LoginScreen = ({ navigation }) => {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
       
-      // メール認証状態をチェック
-      if (!user.emailVerified) {
-        // メール認証が必要な場合は直接認証画面に遷移
-        navigation.navigate('EmailVerification', { 
-          email: user.email,
-          userId: user.uid,
-          fromSignup: false
-        });
-        return;
-      }
-      
-      // 認証済みの場合、App.jsのonAuthStateChangedが自動的に適切な画面に遷移する
+      // ログイン成功時、App.jsのonAuthStateChangedが自動的に適切な画面に遷移する
       
     } catch (error) {
       let errorMessage = 'ログインに失敗しました。';
@@ -69,74 +60,123 @@ const LoginScreen = ({ navigation }) => {
     Linking.openURL('https://kazuki637.github.io/kurukatsu-docs/privacy.html');
   };
 
+  const handleSignupNavigation = () => {
+    if (navigating) return; // 既に遷移中の場合は何もしない
+    
+    setNavigating(true);
+    navigation.navigate('Signup');
+    
+    // 遷移完了後にstateをリセット（フォーカス時にリセット）
+    const unsubscribe = navigation.addListener('focus', () => {
+      setNavigating(false);
+      unsubscribe();
+    });
+  };
+
+  const resetOnboarding = async () => {
+    try {
+      await AsyncStorage.removeItem('seenOnboarding');
+      Alert.alert(
+        'オンボーディングをリセットしました',
+        '次回アプリを起動した際にオンボーディング画面が表示されます。',
+        [{ text: 'OK' }]
+      );
+    } catch (error) {
+      console.error('オンボーディングのリセットに失敗:', error);
+      Alert.alert('エラー', 'オンボーディングのリセットに失敗しました。');
+    }
+  };
+
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <ScrollView 
-        style={styles.container}
-        contentContainerStyle={styles.scrollContainer}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <Image 
-          source={require('../assets/icon.png')} 
-          style={styles.appIcon}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="メールアドレス"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          returnKeyType="next"
-          blurOnSubmit={false}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="パスワード"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          returnKeyType="done"
-          onSubmitEditing={Keyboard.dismiss}
-        />
+      <View style={styles.container}>
+        <View style={styles.headerSection}>
+          <Image 
+            source={require('../assets/icon.png')} 
+            style={styles.appIcon}
+          />
+        </View>
         
-        {/* パスワードリセットリンク */}
-        <TouchableOpacity
-          style={styles.forgotPasswordButton}
-          onPress={() => navigation.navigate('PasswordReset')}
-        >
-          <Text style={styles.forgotPasswordText}>パスワードをお忘れですか？</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={styles.loginButton}
-          onPress={handleLogin}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Text style={styles.loginButtonText}>ログイン</Text>
-          )}
-        </TouchableOpacity>
+        <View style={styles.cardContainer}>
+          <Text style={styles.welcomeTitle}>ようこそ</Text>
+          <Text style={styles.welcomeSubtitle}>アカウントにログインしてください</Text>
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder="メールアドレス"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              returnKeyType="next"
+              blurOnSubmit={false}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="パスワード"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
+            />
+          </View>
+          
+          {/* パスワードリセットリンク */}
+          <TouchableOpacity
+            style={styles.forgotPasswordButton}
+            onPress={() => navigation.navigate('PasswordReset')}
+          >
+            <Text style={styles.forgotPasswordText}>パスワードをお忘れですか？</Text>
+          </TouchableOpacity>
+          
+          <KurukatsuButton
+            title={loading ? '' : 'ログイン'}
+            onPress={handleLogin}
+            disabled={loading}
+            loading={loading}
+            size="medium"
+            variant="primary"
+            hapticFeedback={true}
+            style={styles.loginButtonContainer}
+          >
+            {loading && (
+              <ActivityIndicator size="small" color="#fff" />
+            )}
+          </KurukatsuButton>
+          
+          
+          <KurukatsuButton
+            title="新しいアカウントを作成"
+            onPress={handleSignupNavigation}
+            size="medium"
+            variant="secondary"
+            hapticFeedback={true}
+            disabled={navigating}
+            style={styles.signupButtonContainer}
+          />
+        </View>
         
         <View style={styles.termsContainer}>
           <Text style={styles.termsText}>
-            続行することでクルカツの
+            続行することで
             <Text style={styles.linkText} onPress={openTermsOfService}>利用規約</Text>
-            に同意し、クルカツの{'\n'}
+            と
             <Text style={styles.linkText} onPress={openPrivacyPolicy}>プライバシーポリシー</Text>
-            を読んだものとみなされます。
+            に{'\n'}同意したことになります。
           </Text>
         </View>
-        <TouchableOpacity
-          style={styles.signupButton}
-          onPress={() => navigation.navigate('Signup')}
-        >
-          <Text style={styles.signupButtonText}>新規登録はこちら</Text>
-        </TouchableOpacity>
-      </ScrollView>
+        
+        {/* 開発用オンボーディングリセットボタン */}
+        {__DEV__ && (
+          <TouchableOpacity
+            style={styles.devResetButton}
+            onPress={resetOnboarding}
+          >
+            <Text style={styles.devResetButtonText}>開発用: オンボーディングリセット</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </TouchableWithoutFeedback>
   );
 };
@@ -144,83 +184,105 @@ const LoginScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  scrollContainer: {
-    flexGrow: 1,
+    backgroundColor: '#f0f2f5',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
+  },
+  headerSection: {
+    alignItems: 'center',
+    marginBottom: 24,
   },
   appIcon: {
-    width: 100,
-    height: 100,
-    marginBottom: 40,
-    marginTop: 20,
-    borderRadius: 20,
+    width: 80,
+    height: 80,
+    borderRadius: 16,
   },
-  title: {
-    fontSize: 28,
+  cardContainer: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 32,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  welcomeTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 30,
-    color: '#333',
+    color: '#1f2937',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  welcomeSubtitle: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  inputContainer: {
+    marginBottom: 16,
   },
   input: {
-    width: '90%',
-    height: 50,
-    borderColor: '#ddd',
+    width: '100%',
+    height: 48,
+    borderColor: '#d1d5db',
     borderWidth: 1,
     borderRadius: 8,
-    marginBottom: 15,
-    paddingHorizontal: 15,
-    backgroundColor: '#fff',
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    backgroundColor: '#f9fafb',
     fontSize: 16,
+    color: '#1f2937',
   },
-  loginButton: {
-    width: '90%',
-    height: 50,
-    backgroundColor: '#007bff',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 15,
-  },
-  loginButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+  loginButtonContainer: {
+    marginTop: 8,
   },
   forgotPasswordButton: {
-    marginBottom: 15,
-    alignSelf: 'flex-start',
-    marginLeft: '5%',
+    alignSelf: 'flex-end',
+    marginBottom: 8,
+    marginTop: -16,
   },
   forgotPasswordText: {
-    color: '#007bff',
-    fontSize: 16,
+    color: '#2563eb',
+    fontSize: 14,
+    fontWeight: '500',
   },
-  signupButton: {
-    marginTop: 10,
-    paddingVertical: 10,
+  signupButtonContainer: {
+    marginTop: 16,
   },
-  signupButtonText: {
-    color: '#007bff',
-    fontSize: 18,
+  termsContainer: {
+    marginTop: 32,
+    paddingHorizontal: 16,
   },
   termsText: {
-    color: '#666',
+    color: '#6b7280',
     fontSize: 12,
     textAlign: 'center',
-    marginTop: 0,
-    marginBottom: 20,
-    paddingHorizontal: 20,
-    lineHeight: 16,
+    lineHeight: 18,
   },
   linkText: {
-    color: '#007bff',
+    color: '#2563eb',
     fontSize: 12,
     textDecorationLine: 'underline',
+  },
+  devResetButton: {
+    marginTop: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#ef4444',
+    borderRadius: 6,
+  },
+  devResetButtonText: {
+    color: '#ffffff',
+    fontSize: 12,
+    textAlign: 'center',
   },
 
 });

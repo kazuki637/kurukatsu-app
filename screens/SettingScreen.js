@@ -50,7 +50,7 @@ export default function SettingScreen({ navigation }) {
       {
         label: 'ブロックリスト',
         icon: 'lock-closed-outline',
-        onPress: () => navigation.navigate('BlockManagement')
+        onPress: () => navigation.navigate('共通', { screen: 'BlockManagement' })
       }
     ];
   };
@@ -77,7 +77,7 @@ export default function SettingScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <CommonHeader title="設定" />
+      <CommonHeader title="設定" showBackButton onBack={() => navigation.goBack()} />
       <ScrollView showsVerticalScrollIndicator={false}>
         {/* 設定セクション */}
         <View style={styles.settingsSection}>
@@ -90,6 +90,7 @@ export default function SettingScreen({ navigation }) {
                   index < getIntegratedSettingsItems().length - 1 && styles.integratedSettingItemBorder
                 ]}
                 onPress={item.onPress}
+                activeOpacity={1}
               >
                 <View style={styles.settingItemLeft}>
                   <Ionicons name={item.icon} size={20} color="#333" />
@@ -112,6 +113,7 @@ export default function SettingScreen({ navigation }) {
                   index < getIntegratedInfoItems().length - 1 && styles.integratedSettingItemBorder
                 ]}
                 onPress={item.onPress}
+                activeOpacity={1}
               >
                 <View style={styles.settingItemLeft}>
                   <Ionicons name={item.icon} size={20} color="#333" />
@@ -128,6 +130,7 @@ export default function SettingScreen({ navigation }) {
           <TouchableOpacity
             style={styles.logoutItem}
             onPress={handleLogout}
+            activeOpacity={1}
           >
             <View style={styles.settingItemLeft}>
               <Ionicons name="log-out-outline" size={20} color="#ff3b30" />
@@ -143,7 +146,7 @@ export default function SettingScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#f5f5f5' 
+    backgroundColor: '#f0f2f5' 
   },
   sectionTitle: {
     fontSize: 18,

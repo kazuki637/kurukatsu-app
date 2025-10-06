@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert, ActivityIndicator, Image, Platform, KeyboardAvoidingView, Animated, Dimensions } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert, ActivityIndicator, Image, Platform, KeyboardAvoidingView, Animated, Dimensions, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { db, storage } from '../firebaseConfig';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
@@ -7,6 +7,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import CommonHeader from '../components/CommonHeader';
+import KurukatsuButton from '../components/KurukatsuButton';
 import { compressCircleImage } from '../utils/imageCompression';
 
 const GENRES = [
@@ -44,23 +45,9 @@ export default function CircleSettingsScreen({ route, navigation }) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [circleType, setCircleType] = useState('学内サークル'); // サークル種別を追加
-  const [imageLoading, setImageLoading] = useState(true);
   const [imageError, setImageError] = useState(false);
+  const [saveCompleted, setSaveCompleted] = useState(false); // 保存完了フラグ
   
-  // アニメーション用のstate
-  const circleImageOpacity = useRef(new Animated.Value(0)).current;
-
-  // 画像のフェードインアニメーション
-  useEffect(() => {
-    if (!imageLoading && (circleImage || circleImageUrl || !imageError)) {
-      // 画像が読み込まれた時、またはデフォルトアイコンの時にフェードイン
-      Animated.timing(circleImageOpacity, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
-    }
-  }, [imageLoading, circleImage, circleImageUrl, imageError]);
 
   useEffect(() => {
     const fetchCircle = async () => {
@@ -89,11 +76,9 @@ export default function CircleSettingsScreen({ route, navigation }) {
           setCircleImageUrl(newImageUrl);
           setCircleType(d.circleType || '学内サークル'); // サークル種別を設定
           
-          // 画像URLが変更された場合のみ読み込み状態をリセット
+          // 画像URLが変更された場合のみエラー状態をリセット
           if (isImageUrlChanged) {
-            setImageLoading(true);
             setImageError(false);
-            circleImageOpacity.setValue(0);
           }
         }
       } catch (e) {
@@ -150,7 +135,7 @@ export default function CircleSettingsScreen({ route, navigation }) {
   useFocusEffect(
     React.useCallback(() => {
       const unsubscribe = navigation.addListener('beforeRemove', (e) => {
-        if (!hasUnsavedChanges || isSaving) {
+        if (!hasUnsavedChanges || isSaving || saveCompleted) {
           return;
         }
 
@@ -180,7 +165,7 @@ export default function CircleSettingsScreen({ route, navigation }) {
       });
 
       return unsubscribe;
-    }, [navigation, hasUnsavedChanges])
+    }, [navigation, hasUnsavedChanges, isSaving, saveCompleted])
   );
 
   const pickCircleImage = async () => {
@@ -203,10 +188,7 @@ export default function CircleSettingsScreen({ route, navigation }) {
         onCropComplete: (croppedUri) => {
           setCircleImage(croppedUri);
           setHasUnsavedChanges(true);
-          // 画像の読み込み状態をリセット
-          setImageLoading(true);
           setImageError(false);
-          circleImageOpacity.setValue(0);
           console.log('サークル設定画面: 画像切り抜き完了');
         }
       });
@@ -214,8 +196,13 @@ export default function CircleSettingsScreen({ route, navigation }) {
   };
 
   const handleSave = async () => {
+    // 既に保存処理中または保存完了済みの場合は何もしない（連続押下防止）
+    if (isSaving || saveCompleted) {
+      return;
+    }
+    
     setIsSaving(true);
-    setLoading(true);
+    setSaveCompleted(true);
     try {
       let imageUrl = circleImageUrl;
       if (circleImage) {
@@ -259,23 +246,17 @@ export default function CircleSettingsScreen({ route, navigation }) {
         },
       });
       setHasUnsavedChanges(false);
-      setIsSaving(false);
-      Alert.alert('保存完了', 'サークル設定を保存しました');
-      // 少し遅延を入れてから画面遷移（アラートの表示を待つ）
+      // 保存完了後は少し遅延してから画面遷移する
       setTimeout(() => {
         navigation.goBack();
       }, 100);
     } catch (e) {
       Alert.alert('エラー', 'サークル設定の保存に失敗しました');
+      setSaveCompleted(false); // エラー時はリセット
     } finally {
-      setLoading(false);
       setIsSaving(false);
     }
   };
-
-  if (loading) {
-    return <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><ActivityIndicator size="small" color="#999" /></View>;
-  }
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
@@ -283,7 +264,7 @@ export default function CircleSettingsScreen({ route, navigation }) {
         title="サークル設定" 
         rightButtonLabel="保存" 
         onRightButtonPress={handleSave}
-        rightButtonDisabled={isSaving || loading}
+        rightButtonDisabled={isSaving || saveCompleted}
       />
       <SafeAreaView style={{ flex: 1 }}>
         <KeyboardAvoidingView
@@ -302,24 +283,25 @@ export default function CircleSettingsScreen({ route, navigation }) {
               <Text style={styles.label}>サークルアイコン画像<Text style={styles.optional}>(任意)</Text></Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start' }}>
                 <TouchableOpacity onPress={pickCircleImage} style={styles.imagePicker}>
-                  <Animated.View style={{ opacity: circleImageOpacity }}>
-                    {circleImage || circleImageUrl ? (
-                      <Image 
-                        source={{ uri: circleImage || circleImageUrl }} 
-                        style={styles.circleImage}
-                        onLoad={() => setImageLoading(false)}
-                        onError={() => {
-                          setImageLoading(false);
-                          setImageError(true);
-                        }}
-                        fadeDuration={300}
-                      />
-                    ) : (
-                      <View style={[styles.circleImage, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
-                        <Ionicons name="image-outline" size={60} color="#aaa" />
-                      </View>
-                    )}
-                  </Animated.View>
+                  {loading ? (
+                    <View style={[styles.circleImage, {backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
+                      <ActivityIndicator size="small" color="#999" />
+                    </View>
+                  ) : (circleImage || circleImageUrl) && !imageError ? (
+                    <Image 
+                      source={{ 
+                        uri: circleImage || circleImageUrl,
+                        cache: 'force-cache'
+                      }} 
+                      style={styles.circleImage}
+                      onError={() => setImageError(true)}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View style={[styles.circleImage, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
+                      <Ionicons name="image-outline" size={60} color="#aaa" />
+                    </View>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>
@@ -604,61 +586,66 @@ export default function CircleSettingsScreen({ route, navigation }) {
             {/* 入会募集状況 */}
             <View style={styles.formGroup}>
               <Text style={styles.label}>入会募集状況</Text>
-            <View style={styles.recruitingContainer}>
-              <View style={styles.recruitingStatusContainer}>
-                {isRecruiting ? (
-                  <>
-                    <Ionicons name="checkmark-circle" size={24} color="#28a745" />
-                    <Text style={styles.recruitingStatusText}>入会募集中</Text>
-                  </>
-                ) : (
-                  <>
-                    <Ionicons name="close-circle" size={24} color="#e74c3c" />
-                    <Text style={styles.recruitingStatusText}>現在入会の募集はありません</Text>
-                  </>
-                )}
+              <View style={styles.recruitingContainer}>
+                <View style={styles.recruitingItemContent}>
+                  <View style={[
+                    styles.iconContainer,
+                    { backgroundColor: isRecruiting ? "#d1fae5" : "#fee2e2" }
+                  ]}>
+                    <Ionicons 
+                      name={isRecruiting ? "checkmark" : "close"} 
+                      size={24} 
+                      color={isRecruiting ? "#10b981" : "#ef4444"} 
+                    />
+                  </View>
+                  <View style={styles.textContainer}>
+                    <Text style={styles.recruitingLabel}>
+                      {isRecruiting ? "入会募集中" : "現在入会の募集はありません"}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.switchContainer}>
+                  <Switch
+                    value={isRecruiting}
+                    onValueChange={(newRecruitingStatus) => {
+                      setIsRecruiting(newRecruitingStatus);
+                      // 状態変更を即座に検知
+                      if (!circle) return;
+                      
+                      const originalFeatures = circle.features || [];
+                      const currentFeatures = features || [];
+                      const featuresChanged = 
+                        originalFeatures.length !== currentFeatures.length ||
+                        !originalFeatures.every(feature => currentFeatures.includes(feature)) ||
+                        !currentFeatures.every(feature => originalFeatures.includes(feature));
+                      
+                      const hasChanges = 
+                        name !== (circle.name || '') ||
+                        genre !== (circle.genre || '') ||
+                        featuresChanged ||
+                        frequency !== (circle.frequency || '') ||
+                        members !== (circle.members || '') ||
+                        genderratio !== (circle.genderratio || '') ||
+                        newRecruitingStatus !== (circle.welcome?.isRecruiting || false) ||
+                        circleImage !== null;
+                      
+                      setHasUnsavedChanges(hasChanges);
+                    }}
+                    trackColor={{ false: '#e0e0e0', true: '#1380ec' }}
+                    thumbColor={isRecruiting ? '#fff' : '#f4f3f4'}
+                  />
+                </View>
               </View>
-              <TouchableOpacity
-                style={[styles.toggleButton, isRecruiting && styles.toggleButtonActive]}
-                onPress={() => {
-                  const newRecruitingStatus = !isRecruiting;
-                  setIsRecruiting(newRecruitingStatus);
-                  // 状態変更を即座に検知
-                  if (!circle) return;
-                  
-                  const originalFeatures = circle.features || [];
-                  const currentFeatures = features || [];
-                  const featuresChanged = 
-                    originalFeatures.length !== currentFeatures.length ||
-                    !originalFeatures.every(feature => currentFeatures.includes(feature)) ||
-                    !currentFeatures.every(feature => originalFeatures.includes(feature));
-                  
-                  const hasChanges = 
-                    name !== (circle.name || '') ||
-                    genre !== (circle.genre || '') ||
-                    featuresChanged ||
-                    frequency !== (circle.frequency || '') ||
-                    members !== (circle.members || '') ||
-                    genderratio !== (circle.genderratio || '') ||
-                    newRecruitingStatus !== (circle.welcome?.isRecruiting || false) ||
-                    circleImage !== null;
-                  
-                  setHasUnsavedChanges(hasChanges);
-                }}
-              >
-                <View style={[styles.toggleCircle, isRecruiting && styles.toggleCircleActive]} />
-              </TouchableOpacity>
-            </View>
             {/* SNSリンク（Instagram）、SNSリンク（X）、新歓LINEグループリンクを削除 */}
-              <TouchableOpacity 
-                style={styles.saveButton} 
-                onPress={handleSave} 
-                disabled={isSaving || loading}
-              >
-                <Text style={styles.saveButtonText}>
-                  {isSaving || loading ? '保存中...' : '保存する'}
-                </Text>
-              </TouchableOpacity>
+              <KurukatsuButton
+                title="保存する"
+                onPress={handleSave}
+                disabled={isSaving || saveCompleted}
+                size="medium"
+                variant="primary"
+                hapticFeedback={true}
+                style={styles.saveButtonContainer}
+              />
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
@@ -735,18 +722,8 @@ const styles = StyleSheet.create({
     color: '#ffffff', 
     fontWeight: '500' 
   },
-  saveButton: { 
-    backgroundColor: '#1380ec', 
-    borderRadius: 12, 
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    alignItems: 'center', 
-    marginTop: 24 
-  },
-  saveButtonText: { 
-    color: '#ffffff', 
-    fontSize: 16, 
-    fontWeight: '600' 
+  saveButtonContainer: {
+    marginTop: 24,
   },
   imagePicker: { 
     alignItems: 'center', 
@@ -769,45 +746,55 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 16,
   },
-  recruitingStatusContainer: {
+  // 入会募集状況関連
+  recruitingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    justifyContent: 'space-between',
+    backgroundColor: '#ffffff',
     borderRadius: 12,
-    padding: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+    minHeight: 72,
+  },
+  recruitingItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
+    height: 40,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#eff6ff',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 16,
   },
-  recruitingStatusText: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 12,
-  },
-  toggleButton: {
-    width: 60,
-    height: 32,
-    backgroundColor: '#e9ecef',
-    borderRadius: 16,
-    padding: 2,
+  textContainer: {
+    flex: 1,
+    height: 40,
     justifyContent: 'center',
   },
-  toggleButtonActive: {
-    backgroundColor: '#28a745',
+  recruitingLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
   },
-  toggleCircle: {
-    width: 28,
-    height: 28,
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1,
-    elevation: 2,
-  },
-  toggleCircleActive: {
-    transform: [{ translateX: 28 }],
+  switchContainer: {
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 }); 

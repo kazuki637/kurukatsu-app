@@ -7,6 +7,7 @@ import { db, auth } from '../firebaseConfig';
 import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot, increment, collection, addDoc, getDocs, query, where, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import CommonHeader from '../components/CommonHeader';
+import KurukatsuButton from '../components/KurukatsuButton';
 import { checkStudentIdVerification } from '../utils/permissionUtils';
 import useFirestoreDoc from '../hooks/useFirestoreDoc';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -35,22 +36,76 @@ export default function CircleProfileScreen({ route, navigation }) {
   const [members, setMembers] = useState([]);
   const [activeTab, setActiveTab] = useState('top');
   const [leaderProfileImage, setLeaderProfileImage] = useState(null);
+  const horizontalScrollRef = useRef(null);
+  const indicatorAnim = useRef(new Animated.Value(0)).current;
+  const [scrollProgress, setScrollProgress] = useState(0);
+  
+  // インジケーターアニメーション関数
+  const animateIndicator = (tabIndex) => {
+    Animated.timing(indicatorAnim, {
+      toValue: tabIndex,
+      duration: 250,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  // タブ切り替え関数
+  const handleTabChange = (tabName) => {
+    setActiveTab(tabName);
+    const tabIndex = ['top', 'events', 'welcome'].indexOf(tabName);
+    animateIndicator(tabIndex);
+    setScrollProgress(tabIndex);
+    if (horizontalScrollRef.current) {
+      horizontalScrollRef.current.scrollTo({
+        x: tabIndex * Dimensions.get('window').width,
+        animated: true,
+      });
+    }
+  };
+
+  // 水平スクロール完了時の最終同期
+  const handleHorizontalScroll = (event) => {
+    const scrollX = event.nativeEvent.contentOffset.x;
+    const screenWidth = Dimensions.get('window').width;
+    const tabIndex = Math.round(scrollX / screenWidth);
+    const tabs = ['top', 'events', 'welcome'];
+    if (tabIndex >= 0 && tabIndex < tabs.length) {
+      setActiveTab(tabs[tabIndex]);
+      // スクロール完了時は即座に最終位置に設定
+      indicatorAnim.setValue(tabIndex);
+      setScrollProgress(tabIndex);
+    }
+  };
+
+  // スクロール中のリアルタイム追従
+  const handleScroll = (event) => {
+    const scrollX = event.nativeEvent.contentOffset.x;
+    const screenWidth = Dimensions.get('window').width;
+    const progress = scrollX / screenWidth;
+    
+    // インジケーターをリアルタイムで移動
+    indicatorAnim.setValue(progress);
+    // スクロールプログレスを更新
+    setScrollProgress(progress);
+  };
+
+  // タブテキストのハイライト状態を計算
+  const getTabTextStyle = (tabIndex) => {
+    const isActive = Math.round(scrollProgress) === tabIndex;
+    
+    return {
+      color: isActive ? '#2563eb' : '#666',
+      fontWeight: isActive ? 'bold' : 'normal',
+    };
+  };
   
   // アクションメニュー用の状態
   const [actionMenuVisible, setActionMenuVisible] = useState(false);
   const [userBlockedCircleIds, setUserBlockedCircleIds] = useState([]);
   
-  // 画面全体のフェードイン用のアニメーション値
-  const screenOpacity = useRef(new Animated.Value(0)).current;
+  // 入会申請確認モーダル用の状態
+  const [showJoinConfirmModal, setShowJoinConfirmModal] = useState(false);
   
-  // 画面全体のフェードインアニメーション関数
-  const fadeInScreen = () => {
-    Animated.timing(screenOpacity, {
-      toValue: 1,
-      duration: 500,
-      useNativeDriver: true,
-    }).start();
-  };
   
   // 画像のプリロード関数
   const preloadImages = async () => {
@@ -82,12 +137,10 @@ export default function CircleProfileScreen({ route, navigation }) {
     }
   };
 
-  // データ読み込み完了時に画像をプリロードしてから画面をフェードイン
+  // データ読み込み完了時に画像をプリロード
   useEffect(() => {
     if (circleData && !loading) {
-      preloadImages().then(() => {
-        fadeInScreen();
-      });
+      preloadImages();
     }
   }, [circleData, loading]);
   
@@ -208,21 +261,6 @@ export default function CircleProfileScreen({ route, navigation }) {
         
         // グローバルメンバー数を更新
         global.updateMemberCount(circleId, membersData.length);
-        
-        // テスト用のダミーデータ（メンバーが0人の場合）
-        if (membersData.length === 0) {
-          console.log('メンバーが0人のため、ダミーデータを設定');
-          const dummyMembers = [
-            { id: '1', gender: '男性', university: '東京大学' },
-            { id: '2', gender: '男性', university: '東京大学' },
-            { id: '3', gender: '男性', university: '早稲田大学' },
-            { id: '4', gender: '女性', university: '東京大学' },
-            { id: '5', gender: '女性', university: '慶應義塾大学' },
-          ];
-          setMembers(dummyMembers);
-          // ダミーデータの場合もグローバル更新
-          global.updateMemberCount(circleId, dummyMembers.length);
-        }
       } catch (error) {
         console.error('Error fetching members:', error);
       }
@@ -298,11 +336,18 @@ export default function CircleProfileScreen({ route, navigation }) {
 
 
 
-  const handleJoinRequest = async () => {
+  // 入会申請確認モーダルを表示
+  const handleJoinRequestPress = () => {
     if (!user) {
       Alert.alert('ログインが必要です', '入会申請にはログインが必要です。');
       return;
     }
+    setShowJoinConfirmModal(true);
+  };
+
+  // 実際の入会申請処理
+  const handleJoinRequest = async () => {
+    setShowJoinConfirmModal(false);
 
     // 学生証認証状態を確認 - 一時的に無効化
     /*
@@ -315,7 +360,7 @@ export default function CircleProfileScreen({ route, navigation }) {
           { text: 'キャンセル', style: 'cancel' },
           { 
             text: 'プロフィール編集へ', 
-            onPress: () => navigation.navigate('ProfileEdit')
+            onPress: () => navigation.navigate('共通', { screen: 'ProfileEdit' })
           }
         ]
       );
@@ -336,7 +381,6 @@ export default function CircleProfileScreen({ route, navigation }) {
         requestedAt: new Date(),
       });
       setHasRequested(true);
-      Alert.alert('申請完了', '入会申請を送信しました。');
 
       // グローバル入会申請数を更新（+1）
       const currentCount = global.globalJoinRequestsCount?.[circleId] || 0;
@@ -483,10 +527,10 @@ export default function CircleProfileScreen({ route, navigation }) {
 
   // 報告機能
   const handleReport = () => {
-    navigation.navigate('Report', {
+    navigation.navigate('共通', { screen: 'Report', params: {
       circleId: circleId,
       circleName: circleData?.name || '不明なサークル'
-    });
+    }});
     hideActionSheet();
   };
 
@@ -709,12 +753,16 @@ export default function CircleProfileScreen({ route, navigation }) {
         <Text style={styles.sectionTitle}>入会募集状況</Text>
         {circleData.welcome?.isRecruiting ? (
           <View style={styles.recruitingStatusContainer}>
-            <Ionicons name="checkmark-circle" size={24} color="#28a745" />
+            <View style={[styles.recruitingIconContainer, { backgroundColor: '#d1fae5' }]}>
+              <Ionicons name="checkmark" size={24} color="#10b981" />
+            </View>
             <Text style={styles.recruitingStatusText}>入会募集中</Text>
           </View>
         ) : (
           <View style={styles.recruitingStatusContainer}>
-            <Ionicons name="close-circle" size={24} color="#e74c3c" />
+            <View style={[styles.recruitingIconContainer, { backgroundColor: '#fee2e2' }]}>
+              <Ionicons name="close" size={24} color="#ef4444" />
+            </View>
             <Text style={styles.recruitingStatusText}>現在入会の募集はありません</Text>
           </View>
         )}
@@ -753,31 +801,43 @@ export default function CircleProfileScreen({ route, navigation }) {
       <View style={styles.tabBar}>
         <TouchableOpacity
           style={[styles.tabItem, activeTab === 'top' && styles.activeTabItem]}
-          onPress={() => setActiveTab('top')}
+          onPress={() => handleTabChange('top')}
         >
-          <Text style={[styles.tabLabel, activeTab === 'top' && styles.activeTabLabel]}>
+          <Text style={[styles.tabLabel, getTabTextStyle(0)]}>
             トップ
           </Text>
-          {activeTab === 'top' && <View style={styles.activeIndicator} />}
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tabItem, activeTab === 'events' && styles.activeTabItem]}
-          onPress={() => setActiveTab('events')}
+          onPress={() => handleTabChange('events')}
         >
-          <Text style={[styles.tabLabel, activeTab === 'events' && styles.activeTabLabel]}>
+          <Text style={[styles.tabLabel, getTabTextStyle(1)]}>
             イベント
           </Text>
-          {activeTab === 'events' && <View style={styles.activeIndicator} />}
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tabItem, activeTab === 'welcome' && styles.activeTabItem]}
-          onPress={() => setActiveTab('welcome')}
+          onPress={() => handleTabChange('welcome')}
         >
-          <Text style={[styles.tabLabel, activeTab === 'welcome' && styles.activeTabLabel]}>
+          <Text style={[styles.tabLabel, getTabTextStyle(2)]}>
             新歓情報
           </Text>
-          {activeTab === 'welcome' && <View style={styles.activeIndicator} />}
         </TouchableOpacity>
+        
+        {/* アニメーションするインジケーター */}
+        <Animated.View 
+          style={[
+            styles.animatedIndicator,
+            {
+              transform: [{
+                translateX: indicatorAnim.interpolate({
+                  inputRange: [0, 1, 2],
+                  outputRange: [0, Dimensions.get('window').width / 3, (Dimensions.get('window').width / 3) * 2],
+                })
+              }]
+            }
+          ]}
+        />
       </View>
     </View>
   );
@@ -807,8 +867,8 @@ export default function CircleProfileScreen({ route, navigation }) {
   }
 
   return (
-    <Animated.View style={[styles.container, { opacity: screenOpacity }]}>
-              <CommonHeader 
+    <View style={styles.container}>
+      <CommonHeader 
         title={circleData && circleData.name ? circleData.name : 'サークル詳細'} 
         showBackButton 
         onBack={() => navigation.goBack()}
@@ -899,11 +959,27 @@ export default function CircleProfileScreen({ route, navigation }) {
         {renderTabBar()}
 
         {/* タブコンテンツ */}
-        <View style={styles.tabContentContainer}>
-          {activeTab === 'top' && renderTopTab()}
-          {activeTab === 'events' && renderEventsTab()}
-          {activeTab === 'welcome' && renderWelcomeTab()}
-        </View>
+        <ScrollView
+          ref={horizontalScrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onScroll={handleScroll}
+          onMomentumScrollEnd={handleHorizontalScroll}
+          scrollEventThrottle={16}
+          style={styles.horizontalScrollView}
+          contentContainerStyle={styles.horizontalScrollContent}
+        >
+          <View style={styles.tabContentContainer}>
+            {renderTopTab()}
+          </View>
+          <View style={styles.tabContentContainer}>
+            {renderEventsTab()}
+          </View>
+          <View style={styles.tabContentContainer}>
+            {renderWelcomeTab()}
+          </View>
+        </ScrollView>
       </ScrollView>
 
       {/* アクションメニュー */}
@@ -954,45 +1030,123 @@ export default function CircleProfileScreen({ route, navigation }) {
         </TouchableOpacity>
       </Modal>
 
+      {/* 入会申請確認モーダル */}
+      <Modal
+        visible={showJoinConfirmModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowJoinConfirmModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.confirmModal}>
+            <Text style={styles.confirmModalTitle}>入会申請</Text>
+            <Text style={styles.confirmModalText}>
+              {circleData?.name} に入会申請を{'\n'}
+              送信しますか？
+            </Text>
+            <Text style={styles.confirmModalWarning}>
+              申請後は取り消すことができません。
+            </Text>
+            <View style={styles.confirmModalButtons}>
+              <KurukatsuButton
+                title="キャンセル"
+                onPress={() => setShowJoinConfirmModal(false)}
+                size="medium"
+                variant="secondary"
+                hapticFeedback={true}
+                style={styles.confirmModalButtonCancelContainer}
+              />
+              <KurukatsuButton
+                title="申請する"
+                onPress={handleJoinRequest}
+                size="medium"
+                variant="primary"
+                hapticFeedback={true}
+                style={styles.confirmModalButtonConfirmContainer}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* アクションボタン */}
       <SafeAreaView style={styles.actionBar}>
         <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.favoriteButton} onPress={toggleFavorite}>
-            <Ionicons 
-              name={isFavorite ? "heart" : "heart-outline"} 
-              size={24} 
-              color={isFavorite ? "#ff6b9d" : "#666"} 
-            />
-            <Text style={[styles.favoriteButtonText, isFavorite && styles.favoriteButtonTextActive]}>
-              {isFavorite ? "いいね！" : "いいね！"}
-            </Text>
-          </TouchableOpacity>
+          <KurukatsuButton
+            title=""
+            onPress={toggleFavorite}
+            size="medium"
+            variant="secondary"
+            hapticFeedback={true}
+            style={styles.actionButtonKurukatsu}
+          >
+            <View style={styles.buttonContent}>
+              <Ionicons 
+                name={isFavorite ? "heart" : "heart-outline"} 
+                size={20} 
+                color={isFavorite ? "#ff6b9d" : "#666"} 
+                style={styles.buttonIcon}
+              />
+              <Text style={[
+                styles.buttonText,
+                { color: isFavorite ? "#ff6b9d" : "#666" }
+              ]}>
+                いいね！
+              </Text>
+            </View>
+          </KurukatsuButton>
           
           {isMember ? (
-            <View style={styles.memberButton}>
-              <Ionicons name="checkmark-circle" size={20} color="#fff" />
-              <Text style={styles.memberButtonText}>入会済み</Text>
-            </View>
+            <KurukatsuButton
+              title=""
+              disabled={true}
+              size="medium"
+              variant="primary"
+              style={styles.actionButtonKurukatsu}
+            >
+              <View style={styles.buttonContent}>
+                <Ionicons name="checkmark-circle" size={20} color="#fff" style={styles.buttonIcon} />
+                <Text style={[styles.buttonText, { color: "#fff" }]}>入会済み</Text>
+              </View>
+            </KurukatsuButton>
           ) : hasRequested ? (
-            <View style={styles.requestedButton}>
-              <Ionicons name="checkmark-circle" size={20} color="#28a745" />
-              <Text style={styles.requestedButtonText}>申請済み</Text>
-            </View>
+            <KurukatsuButton
+              title=""
+              disabled={true}
+              size="medium"
+              variant="secondary"
+              style={styles.actionButtonKurukatsu}
+            >
+              <View style={styles.buttonContent}>
+                <Ionicons name="checkmark-circle" size={20} color="#6b7280" style={styles.buttonIcon} />
+                <Text style={[styles.buttonText, { color: "#6b7280" }]}>申請済み</Text>
+              </View>
+            </KurukatsuButton>
           ) : circleData.welcome?.isRecruiting ? (
-            <TouchableOpacity style={styles.joinButton} onPress={handleJoinRequest}>
-              <Text style={styles.joinButtonText}>入会申請</Text>
-            </TouchableOpacity>
+            <KurukatsuButton
+              title=""
+              onPress={handleJoinRequestPress}
+              size="medium"
+              variant="primary"
+              hapticFeedback={true}
+              style={styles.actionButtonKurukatsu}
+            >
+              <View style={styles.buttonContent}>
+                <Ionicons name="person-add" size={20} color="#fff" style={styles.buttonIcon} />
+                <Text style={[styles.buttonText, { color: "#fff" }]}>入会申請</Text>
+              </View>
+            </KurukatsuButton>
           ) : null}
         </View>
       </SafeAreaView>
-    </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#f0f2f5',
   },
   scrollView: {
     flex: 1,
@@ -1001,7 +1155,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#f0f2f5',
   },
   scrollViewContent: {
     paddingBottom: 20,
@@ -1026,11 +1180,9 @@ const styles = StyleSheet.create({
   },
   
   circleInfoSection: {
-    backgroundColor: '#fff',
-    paddingVertical: 30,
+    backgroundColor: '#ffffff',
+    paddingVertical: 24,
     paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
     position: 'relative',
   },
   circleInfo: {
@@ -1070,7 +1222,7 @@ const styles = StyleSheet.create({
   circleName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1f2937',
     lineHeight: 30,
   },
   circleDetailsContainer: {
@@ -1078,24 +1230,25 @@ const styles = StyleSheet.create({
   },
   universityName: {
     fontSize: 16,
-    color: '#666',
+    color: '#6b7280',
     lineHeight: 22,
   },
   genre: {
     fontSize: 14,
-    color: '#666',
+    color: '#6b7280',
     lineHeight: 20,
   },
   tabBarContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#e5e7eb',
     width: '100%',
   },
   tabBar: {
     flexDirection: 'row',
     alignItems: 'stretch',
     width: '100%',
+    position: 'relative',
   },
   tabItem: {
     flex: 1,
@@ -1112,20 +1265,26 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   activeTabLabel: {
-    color: '#007bff',
+    color: '#2563eb',
     fontWeight: 'bold',
   },
-  activeIndicator: {
+  animatedIndicator: {
     position: 'absolute',
     bottom: 0,
-    left: 0,
-    right: 0,
+    width: Dimensions.get('window').width / 3,
     height: 2,
-    backgroundColor: '#007bff',
+    backgroundColor: '#2563eb',
   },
   tabContentContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#ffffff',
+    width: Dimensions.get('window').width,
+  },
+  horizontalScrollView: {
+    flex: 1,
+  },
+  horizontalScrollContent: {
+    flexDirection: 'row',
   },
   tabContent: {
     padding: 20,
@@ -1134,16 +1293,16 @@ const styles = StyleSheet.create({
     marginBottom: 25,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 15,
+    color: '#1f2937',
+    marginBottom: 16,
   },
   description: {
     fontSize: 16,
     textAlign: 'left',
     lineHeight: 24,
-    color: '#666',
+    color: '#374151',
   },
   infoGrid: {
     flexDirection: 'row',
@@ -1151,24 +1310,24 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   infoItem: {
-    width: '30%', // Adjust as needed
+    width: '30%',
     alignItems: 'center',
-    backgroundColor: '#f8fafd',
+    backgroundColor: '#f8fafc',
     borderWidth: 1,
-    borderColor: '#cce5ed',
+    borderColor: '#e2e8f0',
     borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
   },
   infoLabel: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 5,
+    color: '#6b7280',
+    marginBottom: 6,
   },
   infoValue: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#1f2937',
   },
   featuresContainer: {
     marginTop: 10,
@@ -1179,16 +1338,17 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   featureTag: {
-    backgroundColor: '#e0f2f7',
-    borderRadius: 15,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+    backgroundColor: '#dbeafe',
+    borderRadius: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: '#cce5ed',
+    borderColor: '#bfdbfe',
   },
   featureText: {
     fontSize: 13,
-    color: '#333',
+    color: '#2563eb',
+    fontWeight: '600',
   },
   snsButton: {
     flexDirection: 'row',
@@ -1246,85 +1406,34 @@ const styles = StyleSheet.create({
   },
   actionBar: {
     backgroundColor: '#fff',
-    paddingVertical: 18, // 以前は22
+    paddingVertical: 20,
     paddingHorizontal: 20,
     borderTopWidth: 0.5,
     borderTopColor: '#eee',
+    paddingBottom: 28,
   },
   actionButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    borderTopWidth: 0.5,
-    borderTopColor: '#eee',
-    paddingVertical: 18, // 以前は22
+    justifyContent: 'center',
+    gap: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
   },
-  favoriteButton: {
+  actionButtonKurukatsu: {
+    minWidth: 140,
+    maxWidth: 160,
+  },
+  buttonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingVertical: 16, // 以前は10
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    justifyContent: 'center',
   },
-  favoriteButtonText: {
-    marginLeft: 8,
+  buttonIcon: {
+    marginRight: 6,
+  },
+  buttonText: {
     fontSize: 16,
-    color: '#666',
-  },
-  favoriteButtonTextActive: {
-    color: '#000',
-    fontWeight: 'bold',
-  },
-  memberButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#007bff',
-    paddingVertical: 16, // 以前は10
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: '#007bff',
-  },
-  memberButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  requestedButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#eee',
-    paddingVertical: 16, // 以前は10
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: '#ccc',
-  },
-  requestedButtonText: {
-    color: '#28a745',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  joinButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center', // 中央揃えを追加
-    backgroundColor: '#007bff',
-    paddingVertical: 16, // 以前は10
-    paddingHorizontal: 20,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: '#007bff',
-  },
-  joinButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    textAlign: 'center', // テキスト中央揃えを追加
+    fontWeight: '600',
   },
   leaderSection: {
     alignItems: 'flex-start',
@@ -1551,6 +1660,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 12,
   },
+  recruitingIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
   activityLocationText: {
     fontSize: 16,
     color: '#333',
@@ -1604,5 +1721,46 @@ const styles = StyleSheet.create({
   },
   actionMenuTextRed: {
     color: '#dc3545',
+  },
+  // 入会申請確認モーダル用のスタイル
+  confirmModal: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 320,
+  },
+  confirmModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  confirmModalText: {
+    fontSize: 16,
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  confirmModalWarning: {
+    fontSize: 14,
+    color: '#dc2626',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  confirmModalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  confirmModalButtonCancelContainer: {
+    flex: 1,
+    marginRight: 8,
+    minWidth: 120,
+  },
+  confirmModalButtonConfirmContainer: {
+    flex: 1,
+    marginLeft: 8,
+    minWidth: 120,
   },
 });

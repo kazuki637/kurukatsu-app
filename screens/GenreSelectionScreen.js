@@ -51,17 +51,20 @@ const GenreSelectionScreen = ({ route, navigation }) => {
         <FlatList
           data={GENRES}
           keyExtractor={(item) => item}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.listItem}
-              onPress={() => handleToggleGenre(item)}
-            >
-              <Text style={styles.listItemText}>{item}</Text>
-              {selectedGenres.includes(item) && (
-                <Ionicons name="checkmark" size={24} color="#007bff" />
-              )}
-            </TouchableOpacity>
-          )}
+          contentContainerStyle={styles.listContainer}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.listItem}
+                onPress={() => handleToggleGenre(item)}
+              >
+                <Text style={styles.listItemText}>{item}</Text>
+                <View style={styles.checkmarkContainer}>
+                  {selectedGenres.includes(item) && (
+                    <Ionicons name="checkmark" size={24} color="#1380ec" />
+                  )}
+                </View>
+              </TouchableOpacity>
+            )}
         />
       </SafeAreaView>
     </View>
@@ -71,29 +74,51 @@ const GenreSelectionScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
-    backgroundColor: '#eef2f5',
+    backgroundColor: '#f0f2f5',
   },
   contentSafeArea: {
     flex: 1,
-    backgroundColor: '#eef2f5',
+    backgroundColor: '#f0f2f5',
   },
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#f0f2f5',
   },
   listItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    height: 60, // 固定の高さ
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingVertical: 16,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   listItemText: {
     fontSize: 16,
-    color: '#333',
+    color: '#374151',
+    fontWeight: '500',
+    flex: 1,
+  },
+  checkmarkContainer: {
+    width: 30,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  listContainer: {
+    paddingTop: 16,
   },
 });
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, FlatList, ActivityIndicator } from 'react-native';
 import CommonHeader from '../components/CommonHeader';
 import { db } from '../firebaseConfig';
@@ -168,6 +169,14 @@ export default function CircleMemberContactScreen({ route, navigation }) {
     fetchMessages();
   }, [circleId]);
 
+  // 画面にフォーカスが戻った時にデータを再読み取り
+  useFocusEffect(
+    React.useCallback(() => {
+      // 削除後に戻ってきた場合はデータを再読み取り
+      fetchMessages();
+    }, [circleId])
+  );
+
   return (
     <>
       <CommonHeader 
@@ -206,7 +215,7 @@ export default function CircleMemberContactScreen({ route, navigation }) {
                     onPress={() => {
                       const currentUser = auth.currentUser;
                       if (currentUser) {
-                        navigation.navigate('CircleMessageDetail', { message: { ...item, userUid: currentUser.uid } });
+                        navigation.navigate('共通', { screen: 'CircleMessageDetail', params: { message: { ...item, userUid: currentUser.uid } } });
                       }
                     }}
                   >

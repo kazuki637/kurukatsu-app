@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, SafeAreaView, ActivityIndicator } from 'react-native';
 import CommonHeader from '../components/CommonHeader';
+import KurukatsuButton from '../components/KurukatsuButton';
 import { db, auth } from '../firebaseConfig';
 import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 
@@ -63,10 +64,7 @@ export default function HelpScreen({ navigation }) {
         [
           {
             text: 'OK',
-            onPress: () => {
-              setSubject('');
-              setInquiry('');
-            }
+            onPress: () => navigation.goBack()
           }
         ]
       );
@@ -135,25 +133,21 @@ export default function HelpScreen({ navigation }) {
               【受信許可設定について】「kurukatsu.app@gmail.com」からのメールを受信できるよう、受信許可設定(迷惑メール設定・ドメイン指定受信等)のご確認をお願いいたします。
             </Text>
           </View>
-        </ScrollView>
 
-        {/* 送信ボタン */}
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[
-              styles.submitButton,
-              (!subject.trim() || !inquiry.trim() || isSubmitting) && styles.submitButtonDisabled
-            ]}
+          <View style={{ height: 20 }} />
+
+          {/* 送信ボタン */}
+          <KurukatsuButton
+            title="送信する"
             onPress={handleSubmit}
+            variant="primary"
+            size="medium"
             disabled={!subject.trim() || !inquiry.trim() || isSubmitting}
-          >
-            {isSubmitting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.submitButtonText}>送信する</Text>
-            )}
-          </TouchableOpacity>
-        </View>
+            loading={isSubmitting}
+          />
+
+          <View style={{ height: 40 }} />
+        </ScrollView>
       </SafeAreaView>
     </View>
   );
@@ -162,7 +156,7 @@ export default function HelpScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff', // 背景色を白に変更
+    backgroundColor: '#f0f2f5',
   },
   contentSafeArea: {
     flex: 1,
@@ -172,7 +166,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingBottom: 80, // ボタンの高さを考慮
   },
   section: {
     marginBottom: 20,
@@ -222,41 +215,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginBottom: 5,
-  },
-  buttonContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  submitButton: {
-    backgroundColor: '#007bff',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#ccc',
-    opacity: 0.7,
-  },
-  submitButtonLoading: {
-    backgroundColor: '#007bff',
-    opacity: 0.8,
   },
 });

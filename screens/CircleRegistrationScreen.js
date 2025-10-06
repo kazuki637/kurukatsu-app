@@ -1,5 +1,22 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, SafeAreaView, Alert, Image, ActivityIndicator, StatusBar, Platform, KeyboardAvoidingView } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  TouchableOpacity, 
+  StyleSheet, 
+  Alert, 
+  ActivityIndicator, 
+  TouchableWithoutFeedback, 
+  Keyboard, 
+  ScrollView, 
+  Image, 
+  Dimensions,
+  Animated,
+  Platform,
+  SafeAreaView,
+  Switch
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { db, storage, auth } from '../firebaseConfig';
@@ -7,109 +24,76 @@ import { collection, addDoc, doc, getDoc, updateDoc, arrayUnion, setDoc } from '
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { compressCircleImage } from '../utils/imageCompression';
-import CommonHeader from '../components/CommonHeader';
+import KurukatsuButton from '../components/KurukatsuButton';
 
-export default function CircleRegistrationScreen() {
-  const navigation = useNavigation();
+const { width: screenWidth } = Dimensions.get('window');
+
+// 選択肢の定義
+const FREQUENCIES = ['週１回', '週２回', '週３回', '月１回', '不定期'];
+const ACTIVITY_WEEKDAYS = ['月曜日', '火曜日', '水曜日', '木曜日', '金曜日', '土曜日', '日曜日', '不定期'];
+const GENDER_RATIO_OPTIONS = ['男性多め', '女性多め', '半々'];
+const MEMBERS_OPTIONS = ['1-10人', '11-30人', '31-50人', '51-100人', '100人以上'];
+const GENRES = [
+  'スポーツ（球技）', 'スポーツ（球技以外）', 'アウトドア・旅行', '文化・教養', '芸術・芸能', 
+  '音楽', '学問・研究', '趣味・娯楽', '国際交流', 'ボランティア', 'イベント', 'オールラウンド', 'その他'
+];
+const FEATURES = [
+  'イベント充実', '友達作り重視', '初心者歓迎', 'ゆるめ', '真剣', 
+  '体育会系', 'フラット', '和やか', '賑やか'
+];
+
+// サークル登録ステップ定義
+const circleRegistrationSteps = [
+  { key: 1, title: 'サークルアイコンを選択してください', type: 'image' },
+  { key: 2, title: 'サークル種別を選択してください', type: 'circleType' },
+  { key: 3, title: 'サークル名を入力してください', type: 'circleName' },
+  { key: 4, title: 'ジャンルを選択してください', type: 'genre' },
+  { key: 5, title: '特色を選択してください', type: 'features' },
+  { key: 6, title: '活動頻度を選択してください', type: 'frequency' },
+  { key: 7, title: '活動曜日を選択してください', type: 'activityDays' },
+  { key: 8, title: '人数を選択してください', type: 'members' },
+  { key: 9, title: '男女比を選択してください', type: 'genderRatio' },
+  { key: 10, title: '入会募集状況を設定してください', type: 'recruiting' }
+];
+
+const CircleRegistrationScreen = ({ navigation }) => {
+  // 横スワイプによる戻る機能を無効化
+  React.useEffect(() => {
+    navigation.setOptions({
+      gestureEnabled: false,
+    });
+  }, [navigation]);
+
+  // ステップ管理
+  const [activeStep, setActiveStep] = useState(0);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const scrollViewRef = useRef(null);
+  
+  // プログレスバーアニメーション
+  const progressAnim = useRef(new Animated.Value(1 / circleRegistrationSteps.length * 100)).current;
+
+  // フォームデータ
+  const [circleImage, setCircleImage] = useState(null);
+  const [circleType, setCircleType] = useState('学内サークル');
   const [circleName, setCircleName] = useState('');
-  const [universityName, setUniversityName] = useState('');
-
+  const [genre, setGenre] = useState('');
   const [features, setFeatures] = useState([]);
   const [frequency, setFrequency] = useState('');
   const [activityDays, setActivityDays] = useState([]);
-  const [genderratio, setGenderratio] = useState('');
-  const [genre, setGenre] = useState('');
   const [members, setMembers] = useState('');
+  const [genderRatio, setGenderRatio] = useState('');
+  const [isRecruiting, setIsRecruiting] = useState(false);
+  
+  // 自動取得データ
+  const [universityName, setUniversityName] = useState('');
   const [contactInfo, setContactInfo] = useState('');
   const [representativeName, setRepresentativeName] = useState('');
-  const [isRecruiting, setIsRecruiting] = useState(false);
-  const [uploading, setUploading] = useState(false);
-  const [circleImage, setCircleImage] = useState(null);
-  const [circleType, setCircleType] = useState('学内サークル'); // デフォルトは学内サークル
   const [userProfile, setUserProfile] = useState(null);
+  
+  // UI状態
+  const [uploading, setUploading] = useState(false);
 
-  const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
-      quality: 1,
-    });
-
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      // 選択された画像でクロップ画面に遷移
-      navigation.navigate('ImageCrop', {
-        imageType: 'circle',
-        selectedImageUri: result.assets[0].uri,
-        circleName: circleName, // サークル名を渡す
-        onCropComplete: (croppedUri) => {
-          setCircleImage(croppedUri);
-          console.log('サークル画像切り抜き完了');
-        }
-      });
-    }
-  };
-
-  const FREQUENCIES = [
-    '週１回',
-    '週２回',
-    '週３回',
-    '月１回',
-    '不定期',
-  ];
-
-  const ACTIVITY_WEEKDAYS = [
-    '月曜日',
-    '火曜日',
-    '水曜日',
-    '木曜日',
-    '金曜日',
-    '土曜日',
-    '日曜日',
-    '不定期',
-  ];
-
-  const GENDER_RATIO_OPTIONS = [
-    '男性多め',
-    '女性多め',
-    '半々',
-  ];
-
-  const MEMBERS_OPTIONS = [
-    '1-10人',
-    '11-30人',
-    '31-50人',
-    '51-100人',
-    '100人以上',
-  ];
-
-  const GENRES = [
-    'スポーツ（球技）',
-    'スポーツ（球技以外）',
-    'アウトドア・旅行',
-    '文化・教養',
-    '芸術・芸能',
-    '音楽',
-    '学問・研究',
-    '趣味・娯楽',
-    '国際交流',
-    'ボランティア',
-    'イベント',
-    'オールラウンド',
-    'その他',
-  ];
-
-  const FEATURES = [
-    'イベント充実',
-    '友達作り重視',
-    '初心者歓迎',
-    'ゆるめ',
-    '真剣',
-    '体育会系',
-    'フラット',
-    '和やか',
-    '賑やか',
-  ];
-
+  // ユーザーデータの取得
   useEffect(() => {
     const fetchUserData = async () => {
       const user = auth.currentUser;
@@ -120,7 +104,7 @@ export default function CircleRegistrationScreen() {
           const userData = docSnap.data();
           setUserProfile(userData);
           setUniversityName(userData.university || '');
-          setContactInfo(user.email || ''); // Firebase Authenticationのメールアドレスを使用
+          setContactInfo(user.email || '');
           setRepresentativeName(userData.name || '');
         }
       }
@@ -128,55 +112,179 @@ export default function CircleRegistrationScreen() {
     fetchUserData();
   }, []);
 
+  // 画像選択
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 1,
+    });
+
+    if (!result.canceled && result.assets && result.assets.length > 0) {
+      navigation.navigate('ImageCrop', {
+        imageType: 'circle',
+        selectedImageUri: result.assets[0].uri,
+        circleName: circleName,
+        onCropComplete: (croppedUri) => {
+          setCircleImage(croppedUri);
+          console.log('サークル画像切り抜き完了');
+        }
+      });
+    }
+  };
+
+  // 次へボタンの処理
+  const handleNext = () => {
+    if (activeStep < circleRegistrationSteps.length - 1) {
+      const nextStep = activeStep + 1;
+      setIsTransitioning(true);
+      
+      // データ保存は一切行わない（最終ステップ以外）
+      console.log(`ステップ ${activeStep + 1} → ${nextStep + 1} に遷移（データ保存なし）`);
+      
+      // プログレスバーアニメーション
+      Animated.timing(progressAnim, {
+        toValue: ((nextStep + 1) / circleRegistrationSteps.length) * 100,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+      
+      scrollViewRef.current?.scrollTo({
+        x: screenWidth * nextStep,
+        animated: true,
+      });
+      
+      setTimeout(() => {
+        setActiveStep(nextStep);
+        setIsTransitioning(false);
+      }, 300);
+    }
+  };
+
+  // 戻るボタンの処理
+  const handlePrevious = () => {
+    if (activeStep > 0) {
+      const prevStep = activeStep - 1;
+      setIsTransitioning(true);
+      
+      // データ保存は一切行わない（戻る操作）
+      console.log(`ステップ ${activeStep + 1} → ${prevStep + 1} に戻る（データ保存なし）`);
+      
+      // プログレスバーアニメーション
+      Animated.timing(progressAnim, {
+        toValue: ((prevStep + 1) / circleRegistrationSteps.length) * 100,
+        duration: 300,
+        useNativeDriver: false,
+      }).start();
+      
+      scrollViewRef.current?.scrollTo({
+        x: screenWidth * prevStep,
+        animated: true,
+      });
+      
+      setTimeout(() => {
+        setActiveStep(prevStep);
+        setIsTransitioning(false);
+      }, 300);
+    }
+  };
+
+  // 各ステップの入力検証
+  const isStepValid = () => {
+    const currentStepData = circleRegistrationSteps[activeStep];
+    switch (currentStepData.type) {
+      case 'image':
+        return circleImage !== null;
+      case 'circleType':
+        return circleType !== '';
+      case 'circleName':
+        return circleName.trim() !== '';
+      case 'genre':
+        return genre !== '';
+      case 'features':
+        return features.length > 0;
+      case 'frequency':
+        return frequency !== '';
+      case 'activityDays':
+        return activityDays.length > 0;
+      case 'members':
+        return members !== '';
+      case 'genderRatio':
+        return genderRatio !== '';
+      case 'recruiting':
+        return true; // 入会募集状況は必須ではない
+      default:
+        return true;
+    }
+  };
+
+  // 全項目の入力完了をチェックする関数
+  const isAllDataComplete = () => {
+    return (
+      circleImage !== null &&
+      circleType !== '' &&
+      circleName.trim() !== '' &&
+      genre !== '' &&
+      features.length > 0 &&
+      frequency !== '' &&
+      activityDays.length > 0 &&
+      members !== '' &&
+      genderRatio !== ''
+    );
+  };
+
+  // サークル登録処理
   const handleRegister = async () => {
-    // 必須項目バリデーション
-    if (!circleImage) {
-      Alert.alert('入力不足', 'サークルアイコンを選択してください。');
+    // 全項目の入力完了を確認
+    if (!isAllDataComplete()) {
+      Alert.alert('入力不完了', 'すべての項目を入力してください。');
       return;
     }
-    if (!circleName || !universityName || !representativeName || !contactInfo || !genre || features.length === 0 || !frequency || !members || !genderratio) {
-      Alert.alert('入力不足', '必須項目をすべて入力してください。');
+
+    // ユーザー情報の確認
+    const user = auth.currentUser;
+    if (!user) {
+      Alert.alert('エラー', 'ユーザー情報が取得できませんでした。');
+      return;
+    }
+
+    if (!userProfile) {
+      Alert.alert('エラー', 'ユーザープロフィール情報が取得できませんでした。');
       return;
     }
 
     setUploading(true);
     let imageUrl = null;
-    if (circleImage) {
-      try {
-        // 画像を圧縮
-        console.log('サークル画像圧縮開始...');
-        const compressedUri = await compressCircleImage(circleImage);
-        console.log('サークル画像圧縮完了');
-        
-        // 圧縮された画像をアップロード
-        const response = await fetch(compressedUri);
-        const blob = await response.blob();
-        const storageRef = ref(storage, `circle_images/${circleName}/icons/${Date.now()}_${circleName}`);
-        const uploadTask = uploadBytes(storageRef, blob);
-        await uploadTask;
-        imageUrl = await getDownloadURL(storageRef);
-        
-        console.log('サークル画像アップロード完了');
-      } catch (error) {
-        console.error("Error uploading image:", error);
-        Alert.alert('画像アップロードエラー', 'サークルアイコンのアップロード中にエラーが発生しました。');
-        setUploading(false);
-        return;
-      }
-    }
-
+    
     try {
-      const user = auth.currentUser;
-      if (!user) {
-        Alert.alert('エラー', 'ユーザー情報が取得できませんでした。');
-        return;
+      // 画像アップロード処理
+      if (circleImage) {
+        try {
+          // 画像を圧縮
+          console.log('サークル画像圧縮開始...');
+          const compressedUri = await compressCircleImage(circleImage);
+          console.log('サークル画像圧縮完了');
+          
+          // 圧縮された画像をアップロード
+          const response = await fetch(compressedUri);
+          const blob = await response.blob();
+          const storageRef = ref(storage, `circle_images/${circleName}/icons/${Date.now()}_${circleName}`);
+          const uploadTask = uploadBytes(storageRef, blob);
+          await uploadTask;
+          imageUrl = await getDownloadURL(storageRef);
+          
+          console.log('サークル画像アップロード完了');
+        } catch (error) {
+          console.error("Error uploading image:", error);
+          Alert.alert('画像アップロードエラー', 'サークルアイコンのアップロード中にエラーが発生しました。');
+          setUploading(false);
+          return;
+        }
       }
 
-      if (!userProfile) {
-        Alert.alert('エラー', 'ユーザープロフィール情報が取得できませんでした。');
-        return;
-      }
-
+      // サークルデータの一括保存（全てのデータが揃った時点で実行）
+      console.log('サークル登録開始 - 全データ一括保存');
+      
       // サークルを登録
       const circleDocRef = await addDoc(collection(db, 'circles'), {
         name: circleName,
@@ -184,24 +292,24 @@ export default function CircleRegistrationScreen() {
         features,
         frequency,
         activityDays,
-        genderratio,
+        genderratio: genderRatio,
         genre,
         members,
         contactInfo,
         imageUrl,
-        circleType, // サークル種別を追加
+        circleType,
         welcome: {
           isRecruiting,
         },
         createdAt: new Date(),
-        leaderId: user.uid, // 代表者ID
-        leaderName: representativeName, // 代表者名
+        leaderId: user.uid,
+        leaderName: representativeName,
       });
 
       // 作成者をmembersサブコレクションに追加（代表者として）
       await setDoc(doc(db, 'circles', circleDocRef.id, 'members', user.uid), { 
         joinedAt: new Date(),
-        role: 'leader', // 作成者を代表者として設定
+        role: 'leader',
         assignedAt: new Date(),
         assignedBy: user.uid,
         gender: userProfile.gender || '',
@@ -215,7 +323,7 @@ export default function CircleRegistrationScreen() {
       const userDocRef = doc(db, 'users', user.uid);
       await updateDoc(userDocRef, {
         joinedCircleIds: arrayUnion(circleDocRef.id),
-        adminCircleIds: arrayUnion(circleDocRef.id) // 代表者としてadminCircleIdsにも追加
+        adminCircleIds: arrayUnion(circleDocRef.id)
       });
 
       // サークル登録完了後、検索画面のキャッシュを無効化
@@ -223,30 +331,23 @@ export default function CircleRegistrationScreen() {
         global.invalidateCirclesCache();
       }
 
-      Alert.alert('登録完了', 'サークル情報が正常に登録されました。', [
-        { text: 'OK', onPress: () => {
-          navigation.dispatch(
-            CommonActions.reset({
-              index: 0,
-              routes: [
-                { name: 'CircleManagementScreen' },
-              ],
-            })
-          );
-        } }
-      ]);
-      // フォームをクリア
-      setCircleName('');
-      setUniversityName('');
+      console.log('サークル登録完了 - 全データ一括保存成功');
 
-      setFeatures([]);
-      setFrequency('');
-      setActivityDays([]);
-      setGenderratio('');
-      setGenre('');
-      setMembers('');
-      setContactInfo('');
-      setCircleType('学内サークル'); // サークル種別をリセット
+      // サークル運営画面に直接遷移
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ 
+            name: 'Main',
+            params: {
+              screen: 'サークル運営',
+              params: {
+                screen: 'CircleManagementScreen'
+              }
+            }
+          }],
+        })
+      );
     } catch (error) {
       console.error('Error registering circle:', error);
       Alert.alert('登録エラー', 'サークル情報の登録中にエラーが発生しました。');
@@ -255,272 +356,551 @@ export default function CircleRegistrationScreen() {
     }
   };
 
-  return (
-    <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      <CommonHeader title="サークル登録" showBackButton onBack={() => navigation.goBack()} />
-      <SafeAreaView style={{ flex: 1 }}>
-        <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 40}
-        >
-          <ScrollView contentContainerStyle={{ padding: 20 }}>
-        
+  // 各ステップのコンテンツをレンダリング
+  const renderStepContent = (step, index) => {
+    const stepData = circleRegistrationSteps[index];
 
-            {/* サークルアイコン画像 */}
-            <Text style={styles.label}>サークルアイコン画像</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: 8, marginBottom: 16 }}>
-              <TouchableOpacity style={[styles.circleImagePicker, {marginTop: 0, marginBottom: 0}]} onPress={pickImage}>
+    return (
+      <View key={step.key} style={styles.stepContainer}>
+        <View style={styles.stepHeader}>
+          <Text style={styles.stepTitle}>{stepData.title}</Text>
+        </View>
+        
+        <View style={styles.stepContent}>
+          {stepData.type === 'image' && (
+            <View style={styles.imageStepContainer}>
+              <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
                 {circleImage ? (
                   <Image source={{ uri: circleImage }} style={styles.circleImage} />
                 ) : (
-                  <View style={[styles.circleImage, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
+                  <View style={[styles.circleImage, styles.circleImagePlaceholder]}>
                     <Ionicons name="people-outline" size={60} color="#aaa" />
                   </View>
                 )}
               </TouchableOpacity>
+              <Text style={styles.imageHelperText}>
+                タップしてアイコンを選択
+              </Text>
             </View>
+          )}
 
-            {/* サークル種別選択 */}
-            <Text style={styles.label}>サークル種別</Text>
-            <View style={styles.circleTypeContainer}>
+          {stepData.type === 'circleType' && (
+            <View style={styles.optionsContainer}>
               <TouchableOpacity 
-                style={styles.circleTypeButton} 
+                style={[styles.optionButton, circleType === '学内サークル' && styles.optionButtonSelected]}
                 onPress={() => setCircleType('学内サークル')}
               >
                 <View style={styles.radioButton}>
                   {circleType === '学内サークル' && <View style={styles.radioButtonInner} />}
                 </View>
-                <Text style={styles.circleTypeText}>学内サークル</Text>
+                <Text style={[styles.optionText, circleType === '学内サークル' && styles.optionTextSelected]}>
+                  学内サークル
+                </Text>
               </TouchableOpacity>
               
               <TouchableOpacity 
-                style={styles.circleTypeButton} 
+                style={[styles.optionButton, circleType === 'インカレサークル' && styles.optionButtonSelected]}
                 onPress={() => setCircleType('インカレサークル')}
               >
                 <View style={styles.radioButton}>
                   {circleType === 'インカレサークル' && <View style={styles.radioButtonInner} />}
                 </View>
-                <Text style={styles.circleTypeText}>インカレサークル</Text>
+                <Text style={[styles.optionText, circleType === 'インカレサークル' && styles.optionTextSelected]}>
+                  インカレサークル
+                </Text>
               </TouchableOpacity>
             </View>
+          )}
 
-            <Text style={styles.label}>サークル名</Text>
-            <TextInput 
-              style={styles.input} 
-              value={circleName} 
-              onChangeText={setCircleName} 
+          {stepData.type === 'circleName' && (
+            <TextInput
+              style={styles.input}
               placeholder="サークル名を入力してください"
+              value={circleName}
+              onChangeText={setCircleName}
+              returnKeyType="next"
             />
+          )}
 
-            <Text style={styles.label}>大学名</Text>
-            <TextInput 
-              style={[styles.input, styles.disabledInput]} 
-              value={universityName} 
-              onChangeText={setUniversityName}
-              editable={false}
-              placeholder="登録時に設定された大学名"
-            />
-            <Text style={styles.label}>代表者連絡先</Text>
-            <TextInput 
-              style={[styles.input, styles.disabledInput]} 
-              value={contactInfo} 
-              onChangeText={setContactInfo}
-              editable={false}
-              placeholder="登録時に設定された連絡先"
-            />
-
-
-
-            <Text style={styles.label}>ジャンル</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
-              {GENRES.map(item => (
-                <TouchableOpacity key={item} style={[styles.optionButton, genre === item && styles.optionButtonActive]} onPress={() => setGenre(item)}>
-                  <Text style={[styles.optionButtonText, genre === item && styles.optionButtonTextActive]}>{item}</Text>
+          {stepData.type === 'genre' && (
+            <View style={styles.optionsContainer}>
+              {GENRES.map((genreOption) => (
+                <TouchableOpacity
+                  key={genreOption}
+                  style={[
+                    styles.optionButton,
+                    genre === genreOption && styles.optionButtonSelected
+                  ]}
+                  onPress={() => setGenre(genreOption)}
+                >
+                  <Text style={[
+                    styles.optionText,
+                    genre === genreOption && styles.optionTextSelected
+                  ]}>
+                    {genreOption}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
+          )}
 
-            <Text style={styles.label}>特色（複数選択可）</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
-              {FEATURES.map(item => (
-                <TouchableOpacity key={item} style={[styles.optionButton, features.includes(item) && styles.optionButtonActive]} onPress={() => {
-                  setFeatures((prev) =>
-                    prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
-                  );
-                }}>
-                  <Text style={[styles.optionButtonText, features.includes(item) && styles.optionButtonTextActive]}>{item}</Text>
+          {stepData.type === 'features' && (
+            <View style={styles.optionsContainer}>
+              {FEATURES.map((feature) => (
+                <TouchableOpacity
+                  key={feature}
+                  style={[
+                    styles.optionButton,
+                    features.includes(feature) && styles.optionButtonSelected
+                  ]}
+                  onPress={() => {
+                    setFeatures((prev) =>
+                      prev.includes(feature) ? prev.filter((f) => f !== feature) : [...prev, feature]
+                    );
+                  }}
+                >
+                  <Text style={[
+                    styles.optionText,
+                    features.includes(feature) && styles.optionTextSelected
+                  ]}>
+                    {feature}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
+          )}
 
-            <Text style={styles.label}>活動頻度</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
-              {FREQUENCIES.map(item => (
-                <TouchableOpacity key={item} style={[styles.optionButton, frequency === item && styles.optionButtonActive]} onPress={() => setFrequency(item)}>
-                  <Text style={[styles.optionButtonText, frequency === item && styles.optionButtonTextActive]}>{item}</Text>
+          {stepData.type === 'frequency' && (
+            <View style={styles.optionsContainer}>
+              {FREQUENCIES.map((frequencyOption) => (
+                <TouchableOpacity
+                  key={frequencyOption}
+                  style={[
+                    styles.optionButton,
+                    frequency === frequencyOption && styles.optionButtonSelected
+                  ]}
+                  onPress={() => setFrequency(frequencyOption)}
+                >
+                  <Text style={[
+                    styles.optionText,
+                    frequency === frequencyOption && styles.optionTextSelected
+                  ]}>
+                    {frequencyOption}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
+          )}
 
-            <Text style={styles.label}>活動曜日（複数選択可）</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
-              {ACTIVITY_WEEKDAYS.map(item => (
-                <TouchableOpacity key={item} style={[styles.optionButton, activityDays.includes(item) && styles.optionButtonActive]} onPress={() => {
-                  setActivityDays((prev) =>
-                    prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
-                  );
-                }}>
-                  <Text style={[styles.optionButtonText, activityDays.includes(item) && styles.optionButtonTextActive]}>{item}</Text>
+          {stepData.type === 'activityDays' && (
+            <View style={styles.optionsContainer}>
+              {ACTIVITY_WEEKDAYS.map((day) => (
+                <TouchableOpacity
+                  key={day}
+                  style={[
+                    styles.optionButton,
+                    activityDays.includes(day) && styles.optionButtonSelected
+                  ]}
+                  onPress={() => {
+                    setActivityDays((prev) =>
+                      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+                    );
+                  }}
+                >
+                  <Text style={[
+                    styles.optionText,
+                    activityDays.includes(day) && styles.optionTextSelected
+                  ]}>
+                    {day}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
+          )}
 
-            <Text style={styles.label}>人数</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
-              {MEMBERS_OPTIONS.map(item => (
-                <TouchableOpacity key={item} style={[styles.optionButton, members === item && styles.optionButtonActive]} onPress={() => setMembers(item)}>
-                  <Text style={[styles.optionButtonText, members === item && styles.optionButtonTextActive]}>{item}</Text>
+          {stepData.type === 'members' && (
+            <View style={styles.optionsContainer}>
+              {MEMBERS_OPTIONS.map((memberOption) => (
+                <TouchableOpacity
+                  key={memberOption}
+                  style={[
+                    styles.optionButton,
+                    members === memberOption && styles.optionButtonSelected
+                  ]}
+                  onPress={() => setMembers(memberOption)}
+                >
+                  <Text style={[
+                    styles.optionText,
+                    members === memberOption && styles.optionTextSelected
+                  ]}>
+                    {memberOption}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
+          )}
 
-            <Text style={styles.label}>男女比</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 }}>
-              {GENDER_RATIO_OPTIONS.map(item => (
-                <TouchableOpacity key={item} style={[styles.optionButton, genderratio === item && styles.optionButtonActive]} onPress={() => setGenderratio(item)}>
-                  <Text style={[styles.optionButtonText, genderratio === item && styles.optionButtonTextActive]}>{item}</Text>
+          {stepData.type === 'genderRatio' && (
+            <View style={styles.optionsContainer}>
+              {GENDER_RATIO_OPTIONS.map((ratioOption) => (
+                <TouchableOpacity
+                  key={ratioOption}
+                  style={[
+                    styles.optionButton,
+                    genderRatio === ratioOption && styles.optionButtonSelected
+                  ]}
+                  onPress={() => setGenderRatio(ratioOption)}
+                >
+                  <Text style={[
+                    styles.optionText,
+                    genderRatio === ratioOption && styles.optionTextSelected
+                  ]}>
+                    {ratioOption}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
+          )}
 
-            {/* 入会募集状況 */}
-            <Text style={styles.label}>入会募集状況</Text>
+          {stepData.type === 'recruiting' && (
             <View style={styles.recruitingContainer}>
-              <View style={styles.recruitingStatusContainer}>
-                {isRecruiting ? (
-                  <>
-                    <Ionicons name="checkmark-circle" size={24} color="#28a745" />
-                    <Text style={styles.recruitingStatusText}>入会募集中</Text>
-                  </>
-                ) : (
-                  <>
-                    <Ionicons name="close-circle" size={24} color="#e74c3c" />
-                    <Text style={styles.recruitingStatusText}>現在入会の募集はありません</Text>
-                  </>
-                )}
+              <View style={styles.recruitingItemContent}>
+                <View style={[
+                  styles.iconContainer,
+                  { backgroundColor: isRecruiting ? "#d1fae5" : "#fee2e2" }
+                ]}>
+                  <Ionicons 
+                    name={isRecruiting ? "checkmark" : "close"} 
+                    size={24} 
+                    color={isRecruiting ? "#10b981" : "#ef4444"} 
+                  />
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={styles.recruitingLabel}>
+                    {isRecruiting ? "入会募集中" : "現在入会の募集はありません"}
+                  </Text>
+                </View>
               </View>
-              <TouchableOpacity
-                style={[styles.toggleButton, isRecruiting && styles.toggleButtonActive]}
-                onPress={() => setIsRecruiting(!isRecruiting)}
-              >
-                <View style={[styles.toggleCircle, isRecruiting && styles.toggleCircleActive]} />
-              </TouchableOpacity>
+              <View style={styles.switchContainer}>
+                <Switch
+                  value={isRecruiting}
+                  onValueChange={setIsRecruiting}
+                  trackColor={{ false: '#e0e0e0', true: '#1380ec' }}
+                  thumbColor={isRecruiting ? '#fff' : '#f4f3f4'}
+                />
+              </View>
             </View>
+          )}
 
-            <TouchableOpacity style={styles.saveButton} onPress={handleRegister} disabled={uploading}>
-              <Text style={styles.saveButtonText}>{uploading ? '登録中...' : 'サークルを登録'}</Text>
-            </TouchableOpacity>
-                </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    </View>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View style={styles.container}>
+        {/* ヘッダー */}
+        <View style={styles.header}>
+          {/* 戻るボタン / 閉じるボタン */}
+          <TouchableOpacity
+            style={styles.headerBackButton}
+            onPress={activeStep === 0 ? () => navigation.goBack() : handlePrevious}
+            disabled={isTransitioning}
+          >
+            {activeStep === 0 ? (
+              <Ionicons 
+                name="close" 
+                size={32} 
+                color={isTransitioning ? "#9CA3AF" : "#2563eb"} 
+              />
+            ) : (
+              <Ionicons 
+                name="chevron-back" 
+                size={32} 
+                color={isTransitioning ? "#9CA3AF" : "#2563eb"} 
+              />
+            )}
+          </TouchableOpacity>
+          
+          {/* プログレスバー */}
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <Animated.View 
+                style={[
+                  styles.progressFill,
+                  { 
+                    width: progressAnim.interpolate({
+                      inputRange: [0, 100],
+                      outputRange: ['0%', '100%'],
+                      extrapolate: 'clamp',
+                    })
+                  }
+                ]} 
+              />
+            </View>
+          </View>
+        </View>
+
+        {/* スライドコンテンツ */}
+        <ScrollView
+          ref={scrollViewRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          scrollEnabled={false}
+          style={styles.scrollView}
+        >
+          {circleRegistrationSteps.map((step, index) => renderStepContent(step, index))}
+        </ScrollView>
+
+        {/* ナビゲーションボタン */}
+        <View style={styles.bottomContainer}>
+            <KurukatsuButton
+              title={
+                circleRegistrationSteps[activeStep].type === 'recruiting' 
+                  ? (uploading ? '' : 'サークルを登録') 
+                  : '次へ'
+              }
+              onPress={
+                circleRegistrationSteps[activeStep].type === 'recruiting' 
+                  ? handleRegister 
+                  : handleNext
+              }
+              disabled={!isStepValid() || uploading || isTransitioning}
+              loading={!isStepValid() || uploading || isTransitioning}
+              size="medium"
+              variant="primary"
+              hapticFeedback={true}
+              style={styles.nextButtonFull}
+            >
+              {uploading && circleRegistrationSteps[activeStep].type === 'recruiting' && (
+                <ActivityIndicator size="small" color="#fff" />
+              )}
+            </KurukatsuButton>
+        </View>
+      </View>
+    </TouchableWithoutFeedback>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, color: '#333' },
-  label: { fontSize: 16, color: '#333', marginTop: 12, marginBottom: 4 },
-  input: { borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 10, fontSize: 16, backgroundColor: '#fafafa', marginBottom: 4 },
-  disabledInput: { backgroundColor: '#f0f0f0', color: '#666', borderColor: '#ddd' },
-  optionButton: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 16, borderWidth: 1, borderColor: '#ccc', marginRight: 8, marginBottom: 6, backgroundColor: '#fff' },
-  optionButtonActive: { backgroundColor: '#007bff', borderColor: '#007bff' },
-  optionButtonText: { color: '#333', fontSize: 15 },
-  optionButtonTextActive: { color: '#fff', fontWeight: 'bold' },
-  saveButton: { backgroundColor: '#007bff', borderRadius: 8, padding: 14, alignItems: 'center', marginTop: 24 },
-  saveButtonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  circleImagePicker: { alignItems: 'center', marginBottom: 16 },
-  circleImage: { width: 100, height: 100, borderRadius: 50 },
-  // 入会募集状況関連のスタイル
-  recruitingContainer: {
-    flexDirection: 'row',
+  container: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
+  header: {
+    paddingTop: 60,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    backgroundColor: '#ffffff',
+    position: 'relative',
+    height: 80,
+  },
+  headerBackButton: {
+    position: 'absolute',
+    left: 20,
+    top: 60,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'space-between',
+  },
+  progressContainer: {
+    position: 'absolute',
+    left: 50,
+    right: 0,
+    top: 60,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  progressBar: {
+    width: '80%',
+    height: 12,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 6,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#1380ec',
+    borderRadius: 6,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  stepContainer: {
+    width: screenWidth,
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 40,
+  },
+  stepHeader: {
+    alignItems: 'flex-start',
     marginBottom: 16,
   },
-  recruitingStatusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-    flex: 1,
-    marginRight: 16,
-  },
-  recruitingStatusText: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 12,
-  },
-  toggleButton: {
-    width: 60,
-    height: 32,
-    backgroundColor: '#e9ecef',
-    borderRadius: 16,
-    padding: 2,
-    justifyContent: 'center',
-  },
-  toggleButtonActive: {
-    backgroundColor: '#28a745',
-  },
-  toggleCircle: {
-    width: 28,
-    height: 28,
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1,
-    elevation: 2,
-  },
-  toggleCircleActive: {
-    transform: [{ translateX: 28 }],
-  },
-  // サークル種別選択関連のスタイル
-  circleTypeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
+  stepTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1f2937',
     marginBottom: 8,
+    textAlign: 'left',
+    alignSelf: 'flex-start',
   },
-  circleTypeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
+  stepContent: {
+    flex: 1,
+  },
+  input: {
+    width: '100%',
+    height: 48,
+    borderColor: '#d1d5db',
+    borderWidth: 1,
+    borderRadius: 8,
+    marginBottom: 16,
     paddingHorizontal: 16,
-    backgroundColor: '#fff',
-  },
-  circleTypeText: {
-    marginLeft: 8,
+    backgroundColor: '#f3f4f6',
     fontSize: 16,
-    color: '#333',
+    color: '#374151',
   },
+  optionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  optionButton: {
+    width: '48%',
+    height: 48,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+    flexDirection: 'row',
+  },
+  optionButtonSelected: {
+    borderColor: '#1380ec',
+    backgroundColor: '#eff6ff',
+  },
+  optionText: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  optionTextSelected: {
+    color: '#1380ec',
+    fontWeight: 'bold',
+  },
+  // 画像選択関連
+  imageStepContainer: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingTop: 60,
+  },
+  imagePicker: {
+    marginBottom: 20,
+  },
+  circleImage: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+  },
+  circleImagePlaceholder: {
+    backgroundColor: '#e0e0e0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  imageHelperText: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  // ラジオボタン関連
   radioButton: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#007bff',
-    backgroundColor: '#fff',
+    borderColor: '#1380ec',
+    backgroundColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
   },
   radioButtonInner: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#007bff',
+    backgroundColor: '#1380ec',
+  },
+  // 入会募集状況関連
+  recruitingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+    minHeight: 72,
+  },
+  recruitingItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    height: 40,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#eff6ff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  textContainer: {
+    flex: 1,
+    height: 40,
+    justifyContent: 'center',
+  },
+  recruitingLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+  },
+  switchContainer: {
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bottomContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+    paddingHorizontal: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  nextButtonFull: {
+    width: '100%',
   },
 });
+
+export default CircleRegistrationScreen;

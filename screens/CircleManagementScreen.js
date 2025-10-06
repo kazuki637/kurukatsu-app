@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, StatusBar, ActivityIndicator, Image, Alert, FlatList, Modal, ScrollView, Animated } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, StatusBar, ActivityIndicator, Image, Alert, FlatList, Modal, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { db, auth } from '../firebaseConfig';
@@ -7,6 +7,7 @@ import { collection, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore
 import { onAuthStateChanged } from 'firebase/auth';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import CommonHeader from '../components/CommonHeader';
+import KurukatsuButton from '../components/KurukatsuButton';
 import { getUserRole, checkStudentIdVerification } from '../utils/permissionUtils';
 
 export default function CircleManagementScreen({ navigation }) {
@@ -15,7 +16,6 @@ export default function CircleManagementScreen({ navigation }) {
   const [adminCircles, setAdminCircles] = useState([]);
   const [isModalVisible, setModalVisible] = useState(false);
   const [totalJoinRequestsCount, setTotalJoinRequestsCount] = useState(0);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -219,20 +219,6 @@ export default function CircleManagementScreen({ navigation }) {
     }, [user?.uid])
   );
 
-  // 画面表示時のフェードインアニメーション（サークル登録済・未登録両方）
-  useEffect(() => {
-    if (!loading && user) {
-      // ローディング完了かつユーザー認証済みの場合、フェードインアニメーションを開始
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 400,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      // 他の状態の場合は透明度をリセット
-      fadeAnim.setValue(0);
-    }
-  }, [loading, user, fadeAnim]);
 
   // 入会申請数のイベントベース更新
   useEffect(() => {
@@ -280,7 +266,7 @@ export default function CircleManagementScreen({ navigation }) {
           { text: 'キャンセル', style: 'cancel' },
           { 
             text: 'プロフィール編集へ', 
-            onPress: () => navigation.navigate('ProfileEdit')
+            onPress: () => navigation.navigate('共通', { screen: 'ProfileEdit' })
           }
         ]
       );
@@ -293,7 +279,8 @@ export default function CircleManagementScreen({ navigation }) {
 
   const handleAgree = () => {
     setModalVisible(false);
-    navigation.navigate('CircleRegistration');
+    // RootStackのCircleRegistrationに遷移
+    navigation.getParent()?.navigate('CircleRegistration');
   };
 
   const handleDisagree = () => {
@@ -301,85 +288,71 @@ export default function CircleManagementScreen({ navigation }) {
   };
 
   if (loading) {
-      return (
-    <LinearGradient
-      colors={['#1e3a8a', '#3b82f6', '#60a5fa']}
-      style={styles.fullScreenContainer}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-    >
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>サークル運営</Text>
-      </View>
-      <SafeAreaView style={styles.contentSafeArea}>
+    return (
+      <View style={styles.modernContainer}>
+        <CommonHeader title="サークル運営" />
+        <SafeAreaView style={styles.contentSafeArea}>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#007bff" />
+            <ActivityIndicator size="small" color="#2563eb" />
           </View>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     );
   }
 
   if (user === null) {
     // 認証状態がまだ確定していない場合はローディング画面を表示
     return (
-      <LinearGradient
-        colors={['#1e3a8a', '#3b82f6', '#60a5fa']}
-        style={styles.fullScreenContainer}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>サークル運営</Text>
-        </View>
+      <View style={styles.modernContainer}>
+        <CommonHeader title="サークル運営" />
         <SafeAreaView style={styles.contentSafeArea}>
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#007bff" />
+            <ActivityIndicator size="small" color="#2563eb" />
           </View>
         </SafeAreaView>
-      </LinearGradient>
+      </View>
     );
   }
 
   if (adminCircles.length === 0) {
     return (
-      <LinearGradient
-        colors={['#1e3a8a', '#3b82f6', '#60a5fa']}
-        style={styles.fullScreenContainer}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>サークル運営</Text>
-        </View>
+      <View style={styles.modernContainer}>
+        <CommonHeader title="サークル運営" />
         <SafeAreaView style={styles.contentSafeArea}>
-          <Animated.View style={[styles.mainContentWrapper, { opacity: fadeAnim }]}>
-            <View style={styles.cardContainer}>
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>サークルの管理ができる！</Text>
-                <Text style={styles.cardSubtitle}>
-                  {`メンバーの管理やイベントの企画など\nあなたのサークル運営をサポートします`}
-                </Text>
-                <Text style={styles.cardNote}>
-                  ※これはサークル代表者向けの機能です
-                </Text>
+          <View style={styles.modernMainContent}>
+            <View style={styles.modernCardContainer}>
+              <View style={styles.modernCard}>
+                <View style={styles.modernCardHeader}>
+                  <Text style={styles.modernCardTitle}>サークルの管理ができる！</Text>
+                  <Text style={styles.modernCardSubtitle}>
+                    メンバーの管理やイベントの企画など{"\n"}あなたのサークル運営をサポートします
+                  </Text>
+                </View>
                 <Image 
                   source={require('../assets/CircleManagement.png')} 
-                  style={styles.circleManagementImage}
-                  contentFit="contain"
+                  style={styles.modernManagementImage}
+                  resizeMode="contain"
                 />
+                <Text style={styles.modernCardNote}>
+                  ※これはサークル代表者向けの機能です
+                </Text>
               </View>
             </View>
-            <View style={styles.createButtonContainer}>
-              <TouchableOpacity
-                style={styles.createButton}
+            <View style={styles.modernButtonContainer}>
+              <KurukatsuButton
                 onPress={handleRegisterCirclePress}
+                size="medium"
+                variant="primary"
+                hapticFeedback={true}
+                style={styles.kurukatsuButtonStyle}
               >
-                <Ionicons name="add-circle-outline" size={32} color="#fff" />
-                <Text style={styles.createButtonText}>新しいサークルを登録する</Text>
-              </TouchableOpacity>
+                <View style={styles.buttonContent}>
+                  <Ionicons name="add-circle-outline" size={24} color="#ffffff" />
+                  <Text style={styles.kurukatsuButtonText}>新しいサークルを登録する</Text>
+                </View>
+              </KurukatsuButton>
             </View>
-          </Animated.View>
+          </View>
         </SafeAreaView>
 
         <Modal
@@ -415,23 +388,27 @@ export default function CircleManagementScreen({ navigation }) {
                 </Text>
               </ScrollView>
               <View style={styles.modalButtonContainer}>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.buttonDisagree]}
+                <KurukatsuButton
+                  title="同意しない"
                   onPress={handleDisagree}
-                >
-                  <Text style={styles.buttonText}>同意しない</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.buttonAgree]}
+                  size="medium"
+                  variant="secondary"
+                  hapticFeedback={true}
+                  style={styles.modalButtonKurukatsu}
+                />
+                <KurukatsuButton
+                  title="同意する"
                   onPress={handleAgree}
-                >
-                  <Text style={styles.buttonText}>同意する</Text>
-                </TouchableOpacity>
+                  size="medium"
+                  variant="primary"
+                  hapticFeedback={true}
+                  style={styles.modalButtonKurukatsu}
+                />
               </View>
             </View>
           </View>
         </Modal>
-      </LinearGradient>
+      </View>
     );
   }
 
@@ -439,6 +416,7 @@ export default function CircleManagementScreen({ navigation }) {
     <TouchableOpacity 
       style={styles.circleCard}
       onPress={() => navigation.navigate('CircleManagementDetail', { circleId: item.id, circleName: item.name })}
+      activeOpacity={1}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         {item.imageUrl ? (
@@ -464,33 +442,31 @@ export default function CircleManagementScreen({ navigation }) {
   );
 
   return (
-    <LinearGradient
-      colors={['#1e3a8a', '#3b82f6', '#60a5fa']}
-      style={styles.fullScreenContainer}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-    >
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>サークル運営</Text>
-      </View>
+    <View style={styles.modernContainer}>
+      <CommonHeader title="サークル運営" />
       <SafeAreaView style={styles.contentSafeArea}>
-        <Animated.View style={{ flex: 1, opacity: fadeAnim }}>
+        <View style={{ flex: 1 }}>
           <FlatList
             data={adminCircles}
             keyExtractor={item => item.id}
             renderItem={renderCircleItem}
-            contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
+            contentContainerStyle={{ paddingTop: 16, paddingBottom: 100 }}
           />
-          <View style={styles.createButtonContainer}>
-            <TouchableOpacity
-              style={styles.createButton}
+          <View style={styles.modernButtonContainer}>
+            <KurukatsuButton
               onPress={handleRegisterCirclePress}
+              size="medium"
+              variant="primary"
+              hapticFeedback={true}
+              style={styles.kurukatsuButtonStyle}
             >
-              <Ionicons name="add-circle-outline" size={32} color="#fff" />
-              <Text style={styles.createButtonText}>新しいサークルを登録する</Text>
-            </TouchableOpacity>
+              <View style={styles.buttonContent}>
+                <Ionicons name="add-circle-outline" size={24} color="#ffffff" />
+                <Text style={styles.kurukatsuButtonText}>新しいサークルを登録する</Text>
+              </View>
+            </KurukatsuButton>
           </View>
-        </Animated.View>
+        </View>
       </SafeAreaView>
 
       <Modal
@@ -526,135 +502,57 @@ export default function CircleManagementScreen({ navigation }) {
               </Text>
             </ScrollView>
             <View style={styles.modalButtonContainer}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.buttonDisagree]}
+              <KurukatsuButton
+                title="同意しない"
                 onPress={handleDisagree}
-              >
-                <Text style={styles.buttonText}>同意しない</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.buttonAgree]}
+                size="medium"
+                variant="secondary"
+                hapticFeedback={true}
+                style={styles.modalButtonKurukatsu}
+              />
+              <KurukatsuButton
+                title="同意する"
                 onPress={handleAgree}
-              >
-                <Text style={styles.buttonText}>同意する</Text>
-              </TouchableOpacity>
+                size="medium"
+                variant="primary"
+                hapticFeedback={true}
+                style={styles.modalButtonKurukatsu}
+              />
             </View>
           </View>
         </View>
-              </Modal>
-      </LinearGradient>
+      </Modal>
+      </View>
     );
   }
 
 const styles = StyleSheet.create({
-  fullScreenContainer: { 
-    flex: 1, 
-    backgroundColor: '#1e3a8a',
+  modernContainer: {
+    flex: 1,
+    backgroundColor: '#f0f2f5',
   },
-  header: { 
-    width: '100%', 
-    height: 100, 
-    paddingTop: StatusBar.currentHeight, 
-    backgroundColor: 'rgba(255, 255, 255, 0.1)', 
-    borderBottomWidth: 1, 
-    borderBottomColor: 'rgba(255, 255, 255, 0.2)', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    position: 'relative' 
-  },
-  headerTitle: { fontSize: 16, fontWeight: 'bold', color: '#fff', position: 'absolute', bottom: 10, left: 0, right: 0, textAlign: 'center' },
   contentSafeArea: { flex: 1 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  registerButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#007bff', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 20, alignSelf: 'center', marginTop: 32 },
-  circleCard: { backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: 12, padding: 16, marginBottom: 20, shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 12, elevation: 5 },
+  circleCard: { 
+    backgroundColor: '#ffffff', 
+    borderRadius: 12, 
+    padding: 16, 
+    marginBottom: 12, 
+    marginHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000', 
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05, 
+    shadowRadius: 2, 
+    elevation: 1 
+  },
   circleImage: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#e0e0e0' },
-  circleName: { fontSize: 18, fontWeight: 'bold', color: '#222' },
-  circleRole: { fontSize: 14, color: '#888', marginTop: 4 },
-  manageButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f0f0f0', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 12, marginRight: 8 },
-  manageButtonText: { color: '#007bff', marginLeft: 4, fontSize: 14, fontWeight: 'bold' },
-  cardContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 0,
-  },
-  card: {
-    width: '95%',
-    maxWidth: 400,
-    alignItems: 'center',
-    borderRadius: 12,
-    paddingTop: 24,
-    paddingBottom: 8,
-    paddingHorizontal: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    shadowColor: '#000',
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  cardTitle: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#007bff',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  cardSubtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 0,
-  },
-  cardNote: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 16,
-    fontStyle: 'italic',
-  },
-  circleManagementImage: {
-    width: '100%',
-    height: 320,
-    borderRadius: 10,
-  },
-  mainContentWrapper: {
-    flex: 1,
-    paddingHorizontal: 15,
-    paddingTop: 10,
-    paddingBottom: 100,
-  },
-  createButtonContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingVertical: 20,
-    paddingHorizontal: 15,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  createButton: {
-    flexDirection: 'row',
-    backgroundColor: '#007bff',
-    borderRadius: 25,
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  createButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
+  circleName: { fontSize: 16, fontWeight: 'bold', color: '#1f2937' },
+  circleRole: { fontSize: 14, color: '#6b7280', marginTop: 4 },
   // Modal styles
   centeredView: {
     flex: 1,
@@ -663,62 +561,50 @@ const styles = StyleSheet.create({
   },
   modalView: {
     margin: 20,
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 35,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 32,
     justifyContent: 'space-between',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
     width: '90%',
     maxHeight: '60%',
   },
   modalTitle: {
-    marginBottom: 15,
+    marginBottom: 16,
     textAlign: 'center',
     fontSize: 20,
     fontWeight: 'bold',
+    color: '#1f2937',
   },
   modalContentScroll: {
     maxHeight: '60%',
     marginBottom: 20,
   },
   modalText: {
-    marginBottom: 15,
+    marginBottom: 16,
     textAlign: 'left',
     lineHeight: 22,
+    color: '#374151',
   },
   modalButtonContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     width: '100%',
+    gap: 12,
   },
-  modalButton: {
-    borderRadius: 20,
-    padding: 10,
-    elevation: 2,
+  modalButtonKurukatsu: {
     flex: 1,
-    marginHorizontal: 10,
-  },
-  buttonAgree: {
-    backgroundColor: '#2196F3',
-  },
-  buttonDisagree: {
-    backgroundColor: '#aaa',
-  },
-  buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    textAlign: 'center',
   },
   // 入会申請通知バッジ（数字付き）
   notificationBadge: {
-    backgroundColor: '#ff4757',
+    backgroundColor: '#dc2626',
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -728,8 +614,90 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   notificationBadgeText: {
-    color: '#fff',
-    fontSize: 12,
+    color: '#ffffff',
+    fontSize: 11,
     fontWeight: 'bold',
+  },
+  // モダンスタイル
+  modernMainContent: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 100,
+  },
+  modernCardContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modernCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 32,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    alignItems: 'center',
+  },
+  modernCardHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modernCardTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#2563eb',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  modernCardSubtitle: {
+    fontSize: 16,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  modernManagementImage: {
+    width: '100%',
+    height: 240,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  modernCardNote: {
+    fontSize: 12,
+    color: '#9ca3af',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  modernButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#ffffff',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  kurukatsuButtonStyle: {
+    width: '100%',
+  },
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  kurukatsuButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
   },
 });

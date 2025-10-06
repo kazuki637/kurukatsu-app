@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { db } from '../firebaseConfig';
 import { collection, getDocs } from 'firebase/firestore';
 import { useFocusEffect } from '@react-navigation/native';
+import KurukatsuButton from '../components/KurukatsuButton';
 
 const SearchScreen = ({ navigation }) => {
   const [searchText, setSearchText] = useState('');
@@ -18,6 +19,10 @@ const SearchScreen = ({ navigation }) => {
   
   const [allCircles, setAllCircles] = useState([]);
   const [initialLoading, setInitialLoading] = useState(true);
+  
+  // 遷移状態管理
+  const [isNavigating, setIsNavigating] = useState(false);
+  
 
   // グローバルキャッシュの初期化とキャッシュ無効化関数の登録
   useEffect(() => {
@@ -148,6 +153,12 @@ const SearchScreen = ({ navigation }) => {
     }, [])
   );
 
+  // 画面にフォーカスが戻った時に遷移状態をリセット
+  useFocusEffect(
+    useCallback(() => {
+      setIsNavigating(false);
+    }, [])
+  );
 
   const updateFilter = (filterType, value) => {
     switch (filterType) {
@@ -162,6 +173,25 @@ const SearchScreen = ({ navigation }) => {
       default: break;
     }
   };
+
+  // 安全なナビゲーション関数（連続タップ防止）
+  const navigateToFilter = useCallback((screenName, params) => {
+    if (isNavigating) {
+      console.log('既に遷移中のため、新しい遷移を無視します:', screenName);
+      return;
+    }
+    
+    setIsNavigating(true);
+    console.log('フィルター画面への遷移開始:', screenName);
+    
+    // 遷移完了を検知するためのタイマー
+    setTimeout(() => {
+      setIsNavigating(false);
+      console.log('遷移状態をリセットしました');
+    }, 500); // 遷移完了まで500ms待機
+    
+    navigation.navigate(screenName, params);
+  }, [isNavigating, navigation]);
 
   const handleClearFilters = () => {
     setSearchText('');
@@ -210,26 +240,33 @@ const SearchScreen = ({ navigation }) => {
 
   const getFilterIcon = (label) => {
     switch (label) {
-      case '大学': return <Ionicons name="school-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
-      case 'ジャンル': return <Ionicons name="grid-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
-      case '特色': return <Ionicons name="star-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
-      case '活動頻度': return <Ionicons name="time-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
-      case '活動曜日': return <Ionicons name="calendar-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
-      case '人数': return <Ionicons name="people-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
-      case '男女比': return <Ionicons name="male-female-outline" size={18} color="#007bff" style={{ marginRight: 6 }} />;
+      case '大学': return <Ionicons name="school-outline" size={18} color="#1380ec" style={{ marginRight: 8 }} />;
+      case 'ジャンル': return <Ionicons name="grid-outline" size={18} color="#1380ec" style={{ marginRight: 8 }} />;
+      case '特色': return <Ionicons name="star-outline" size={18} color="#1380ec" style={{ marginRight: 8 }} />;
+      case '活動頻度': return <Ionicons name="time-outline" size={18} color="#1380ec" style={{ marginRight: 8 }} />;
+      case '活動曜日': return <Ionicons name="calendar-outline" size={18} color="#1380ec" style={{ marginRight: 8 }} />;
+      case '人数': return <Ionicons name="people-outline" size={18} color="#1380ec" style={{ marginRight: 8 }} />;
+      case '男女比': return <Ionicons name="male-female-outline" size={18} color="#1380ec" style={{ marginRight: 8 }} />;
       default: return null;
     }
   };
 
-  const FilterItem = ({ label, value, onPress }) => (
-    <TouchableOpacity style={styles.filterItem} onPress={onPress}>
+  const FilterItem = ({ label, value, onPress, disabled = false }) => (
+    <TouchableOpacity 
+      style={styles.filterItem} 
+      onPress={disabled ? undefined : onPress} 
+      activeOpacity={1}
+      disabled={disabled}
+    >
       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
         {getFilterIcon(label)}
         <Text style={styles.filterLabel}>{label}</Text>
       </View>
       <View style={styles.filterValueContainer}>
-        <Text style={[styles.filterValue, value && value.length > 0 && { color: '#007bff' }]} numberOfLines={1}>{formatFilterValue(value)}</Text>
-        <Ionicons name="chevron-forward" size={20} color="#666" />
+        <Text style={[styles.filterValue, value && value.length > 0 && { color: '#1380ec', fontWeight: '500' }]} numberOfLines={1}>
+          {formatFilterValue(value)}
+        </Text>
+        <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
       </View>
     </TouchableOpacity>
   );
@@ -241,7 +278,7 @@ const SearchScreen = ({ navigation }) => {
       </View>
       <SafeAreaView style={styles.contentSafeArea}>
         <View style={styles.searchBarContainer}>
-          <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+          <Ionicons name="search" size={20} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="サークル名、活動内容、キーワード"
@@ -250,14 +287,13 @@ const SearchScreen = ({ navigation }) => {
           />
         </View>
 
-        <ScrollView style={styles.filterSection}>
-          <Text style={styles.sectionTitle}>サークル情報</Text>
-          
+        <ScrollView style={styles.filterSection} showsVerticalScrollIndicator={false}>
           {/* サークル種別選択 */}
           <View style={styles.circleTypeContainer}>
             <TouchableOpacity 
               style={styles.circleTypeButton} 
               onPress={() => updateFilter('circleType', selectedCircleType === '学内サークル' ? '' : '学内サークル')}
+              activeOpacity={1}
             >
               <View style={styles.radioButton}>
                 {selectedCircleType === '学内サークル' && <View style={styles.radioButtonInner} />}
@@ -268,6 +304,7 @@ const SearchScreen = ({ navigation }) => {
             <TouchableOpacity 
               style={styles.circleTypeButton} 
               onPress={() => updateFilter('circleType', selectedCircleType === 'インカレサークル' ? '' : 'インカレサークル')}
+              activeOpacity={1}
             >
               <View style={styles.radioButton}>
                 {selectedCircleType === 'インカレサークル' && <View style={styles.radioButtonInner} />}
@@ -276,13 +313,69 @@ const SearchScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
 
-          <FilterItem label="大学" value={selectedUniversities} onPress={() => navigation.navigate('UniversitySelection', { currentSelection: selectedUniversities, onComplete: (value) => updateFilter('universities', value) })} />
-          <FilterItem label="ジャンル" value={selectedGenres} onPress={() => navigation.navigate('GenreSelection', { currentSelection: selectedGenres, onComplete: (value) => updateFilter('genres', value) })} />
-          <FilterItem label="特色" value={selectedFeatures} onPress={() => navigation.navigate('FeatureSelection', { currentSelection: selectedFeatures, onComplete: (value) => updateFilter('features', value) })} />
-          <FilterItem label="活動頻度" value={selectedFrequency} onPress={() => navigation.navigate('FrequencySelection', { currentSelection: selectedFrequency, onComplete: (value) => updateFilter('frequency', value) })} />
-          <FilterItem label="活動曜日" value={selectedActivityDays} onPress={() => navigation.navigate('ActivityDaySelection', { currentSelection: selectedActivityDays, onComplete: (value) => updateFilter('activityDays', value) })} />
-          <FilterItem label="人数" value={selectedMembers} onPress={() => navigation.navigate('MembersSelection', { currentSelection: selectedMembers, onComplete: (value) => updateFilter('members', value) })} />
-          <FilterItem label="男女比" value={selectedGenderRatio} onPress={() => navigation.navigate('GenderRatioSelection', { currentSelection: selectedGenderRatio, onComplete: (value) => updateFilter('genderRatio', value) })} />
+          <FilterItem 
+            label="大学" 
+            value={selectedUniversities} 
+            disabled={isNavigating}
+            onPress={() => navigateToFilter('UniversitySelection', { 
+              currentSelection: selectedUniversities, 
+              onComplete: (value) => updateFilter('universities', value) 
+            })} 
+          />
+          <FilterItem 
+            label="ジャンル" 
+            value={selectedGenres} 
+            disabled={isNavigating}
+            onPress={() => navigateToFilter('GenreSelection', { 
+              currentSelection: selectedGenres, 
+              onComplete: (value) => updateFilter('genres', value) 
+            })} 
+          />
+          <FilterItem 
+            label="特色" 
+            value={selectedFeatures} 
+            disabled={isNavigating}
+            onPress={() => navigateToFilter('FeatureSelection', { 
+              currentSelection: selectedFeatures, 
+              onComplete: (value) => updateFilter('features', value) 
+            })} 
+          />
+          <FilterItem 
+            label="活動頻度" 
+            value={selectedFrequency} 
+            disabled={isNavigating}
+            onPress={() => navigateToFilter('FrequencySelection', { 
+              currentSelection: selectedFrequency, 
+              onComplete: (value) => updateFilter('frequency', value) 
+            })} 
+          />
+          <FilterItem 
+            label="活動曜日" 
+            value={selectedActivityDays} 
+            disabled={isNavigating}
+            onPress={() => navigateToFilter('ActivityDaySelection', { 
+              currentSelection: selectedActivityDays, 
+              onComplete: (value) => updateFilter('activityDays', value) 
+            })} 
+          />
+          <FilterItem 
+            label="人数" 
+            value={selectedMembers} 
+            disabled={isNavigating}
+            onPress={() => navigateToFilter('MembersSelection', { 
+              currentSelection: selectedMembers, 
+              onComplete: (value) => updateFilter('members', value) 
+            })} 
+          />
+          <FilterItem 
+            label="男女比" 
+            value={selectedGenderRatio} 
+            disabled={isNavigating}
+            onPress={() => navigateToFilter('GenderRatioSelection', { 
+              currentSelection: selectedGenderRatio, 
+              onComplete: (value) => updateFilter('genderRatio', value) 
+            })} 
+          />
         </ScrollView>
 
         <View style={styles.footer}>
@@ -290,15 +383,24 @@ const SearchScreen = ({ navigation }) => {
             <Text style={styles.filterCountNumber}>{filteredCircles.length}</Text>件に絞り込み中
           </Text>
           <View style={styles.footerButtons}>
-            <TouchableOpacity style={styles.clearButton} onPress={handleClearFilters}>
-              <Text style={styles.clearButtonText}>リセット</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
+            <KurukatsuButton
+              title="リセット"
+              onPress={handleClearFilters}
+              variant="secondary"
+              size="medium"
+              style={styles.clearButtonContainer}
+            />
+            <KurukatsuButton
+              onPress={handleSearch}
+              variant="primary"
+              size="medium"
+              style={styles.searchButtonContainer}
+            >
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Ionicons name="search" size={20} color="#fff" style={{ marginRight: 5 }} />
                 <Text style={styles.searchButtonText}>この条件で検索</Text>
               </View>
-            </TouchableOpacity>
+            </KurukatsuButton>
           </View>
         </View>
       </SafeAreaView>
@@ -309,7 +411,7 @@ const SearchScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f0f2f5',
   },
   header: {
     width: '100%',
@@ -334,11 +436,11 @@ const styles = StyleSheet.create({
   },
   contentSafeArea: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f0f2f5',
   },
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f0f2f5',
   },
   headerButton: {
     width: 40,
@@ -349,47 +451,67 @@ const styles = StyleSheet.create({
   searchBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    margin: 15,
-    paddingHorizontal: 10,
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    margin: 16,
+    paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#d1d5db',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   searchIcon: {
-    marginRight: 10,
+    marginRight: 12,
+    color: '#6b7280',
   },
   searchInput: {
     flex: 1,
-    height: 40,
+    height: 48,
     fontSize: 16,
+    color: '#1f2937',
   },
   filterSection: {
     flex: 1,
-    paddingHorizontal: 15,
-    paddingTop: 10,
+    paddingHorizontal: 16,
+    paddingTop: 8,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
+    marginBottom: 12,
+    color: '#1f2937',
+    marginLeft: 4,
   },
   filterItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    paddingVertical: 15,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    marginBottom: 10,
+    backgroundColor: '#ffffff',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   filterLabel: {
     fontSize: 16,
-    color: '#333',
+    color: '#374151',
+    fontWeight: '500',
   },
   filterValueContainer: {
     flexDirection: 'row',
@@ -397,57 +519,42 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   filterValue: {
-    fontSize: 16,
-    color: '#666',
-    marginRight: 5,
+    fontSize: 14,
+    color: '#6b7280',
+    marginRight: 8,
     flexShrink: 1,
   },
   footer: {
-    paddingVertical: 15,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
     borderTopWidth: 1,
-    borderTopColor: '#eee',
-    backgroundColor: '#fff',
-    alignItems: 'center', // 中央寄せ
+    borderTopColor: '#e5e7eb',
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
   },
   filterCountText: {
     fontSize: 14,
-    color: '#666',
-    marginBottom: 10,
+    color: '#6b7280',
+    marginBottom: 12,
   },
   filterCountNumber: {
-    color: '#007bff',
+    color: '#1380ec',
     fontWeight: 'bold',
   },
   footerButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     width: '100%',
-    paddingHorizontal: 15,
+    gap: 12,
   },
-  clearButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#007bff',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 30,
+  clearButtonContainer: {
+    flex: 1,
   },
-  clearButtonText: {
-    color: '#007bff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  searchButton: {
-    backgroundColor: '#007bff',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    minWidth: 120, 
-    alignItems: 'center',
-    justifyContent: 'center',
+  searchButtonContainer: {
+    flex: 2,
   },
   searchButtonText: {
-    color: '#fff',
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -455,33 +562,42 @@ const styles = StyleSheet.create({
   circleTypeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 10,
-    backgroundColor: '#fff',
-    paddingVertical: 15,
-    paddingHorizontal: 10,
-    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: '#ffffff',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
   circleTypeButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
     paddingHorizontal: 16,
-    backgroundColor: '#fff',
+    backgroundColor: '#ffffff',
   },
   circleTypeText: {
     marginLeft: 8,
     fontSize: 16,
-    color: '#333',
+    color: '#374151',
+    fontWeight: '500',
   },
   radioButton: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#007bff',
-    backgroundColor: '#fff',
+    borderColor: '#1380ec',
+    backgroundColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -489,7 +605,7 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#007bff',
+    backgroundColor: '#1380ec',
   },
 });
 

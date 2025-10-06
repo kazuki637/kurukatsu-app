@@ -6,6 +6,7 @@ import { db } from '../firebaseConfig';
 import { collection, getDocs, addDoc, doc, deleteDoc, query, where, orderBy, getDocs as getDocsFirestore, getDoc } from 'firebase/firestore';
 import CommonHeader from '../components/CommonHeader';
 import { Modalize } from 'react-native-modalize';
+import KurukatsuButton from '../components/KurukatsuButton';
 
 // 高度に洗練されたカレンダーコンポーネント
 const Calendar = ({ selectedDate, onDateSelect, events }) => {
@@ -483,7 +484,7 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
         onBack={() => navigation.goBack()}
       />
       <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView>
+        <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
           {/* カレンダー */}
           <Calendar 
             selectedDate={selectedDate}
@@ -520,7 +521,12 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
                           <Text style={styles.eventTimeBadge}>{event.startTime}</Text>
                         ) : null}
                         {event.location && (
-                          <Text style={styles.eventLocationBadge}>{event.location}</Text>
+                          <Text style={styles.eventLocationBadge} numberOfLines={0}>
+                            {event.location.length > 14 ? 
+                              event.location.match(/.{1,14}/g).join('\n') : 
+                              event.location
+                            }
+                          </Text>
                         )}
                       </View>
                     </View>
@@ -568,14 +574,28 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
               <Text style={styles.noEventText}>この日に予定はありません</Text>
             )}
             
-            {/* 追加ボタン */}
-            <TouchableOpacity style={styles.addButton} onPress={navigateToAddSchedule}>
-              <Ionicons name="add" size={24} color="#fff" />
-              <Text style={styles.addButtonText}>スケジュール追加</Text>
-            </TouchableOpacity>
           </View>
         </ScrollView>
       </SafeAreaView>
+
+      {/* 下部固定ボタン */}
+      <View style={styles.modernButtonContainer}>
+        <KurukatsuButton
+          title=""
+          onPress={navigateToAddSchedule}
+          disabled={false}
+          loading={false}
+          size="medium"
+          variant="primary"
+          hapticFeedback={true}
+          style={styles.kurukatsuButtonStyle}
+        >
+          <View style={styles.buttonContent}>
+            <Ionicons name="add-circle-outline" size={24} color="#ffffff" />
+            <Text style={styles.kurukatsuButtonText}>スケジュール追加</Text>
+          </View>
+        </KurukatsuButton>
+      </View>
 
       {/* 回答状況確認ユーザー一覧ボトムシート */}
       <Modalize
@@ -880,70 +900,62 @@ const styles = StyleSheet.create({
   
   // 洗練されたスケジュールセクション
   scheduleSection: {
-    margin: 16,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
   },
   scheduleTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: '#1a1a1a',
     marginBottom: 20,
-    letterSpacing: 0.3,
+    letterSpacing: 0.5,
   },
   eventItem: {
-    backgroundColor: '#f8f9fa',
     padding: 16,
     marginBottom: 16,
-    borderLeftWidth: 8,
+    borderLeftWidth: 4,
     borderLeftColor: '#007bff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
   },
   eventHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 12,
   },
   eventTitle: {
-    fontSize: 17,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#1a1a1a',
-    marginLeft: 12,
+    marginBottom: 8,
+    letterSpacing: 0.3,
   },
   eventTitleContainer: {
     flex: 1,
     marginLeft: 12,
   },
   eventDetails: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
+    flexDirection: 'column',
+    alignItems: 'flex-start',
     marginTop: 2,
   },
   eventTimeBadge: {
+    backgroundColor: '#e3f2fd',
+    color: '#007bff',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
     fontSize: 12,
-    color: '#666',
-    fontWeight: '500',
-    marginRight: 8,
+    fontWeight: '600',
+    marginBottom: 6,
   },
   eventLocationBadge: {
-    fontSize: 12,
-    color: '#28a745',
-    fontWeight: '500',
     backgroundColor: '#e8f5e8',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
+    color: '#28a745',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    fontSize: 12,
+    fontWeight: '600',
   },
   eventActions: {
     flexDirection: 'row',
@@ -975,29 +987,35 @@ const styles = StyleSheet.create({
   },
   noEventText: {
     textAlign: 'center',
-    color: '#999',
-    fontStyle: 'italic',
-    paddingVertical: 32,
+    color: '#888',
     fontSize: 16,
+    marginTop: 20,
+    fontStyle: 'italic',
   },
   
-  // 追加ボタン
-  addButton: {
+  // 下部固定ボタンコンテナ
+  modernButtonContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#ffffff',
+    paddingVertical: 20,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  // KurukatsuButtonスタイル
+  kurukatsuButtonStyle: {
+    width: '100%',
+  },
+  buttonContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#007bff',
-    borderRadius: 24,
-    paddingVertical: 12,
-    marginTop: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
   },
-  addButtonText: {
-    color: '#fff',
+  kurukatsuButtonText: {
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8,

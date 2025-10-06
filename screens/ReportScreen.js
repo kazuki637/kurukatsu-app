@@ -16,6 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '../firebaseConfig';
 import { doc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import CommonHeader from '../components/CommonHeader';
+import KurukatsuButton from '../components/KurukatsuButton';
 
 const ReportScreen = ({ route, navigation }) => {
   const { circleId, circleName } = route.params;
@@ -173,20 +174,14 @@ const ReportScreen = ({ route, navigation }) => {
 
 
           {/* 報告送信ボタン */}
-          <TouchableOpacity
-            style={[
-              styles.submitButton,
-              (!selectedReason || !details.trim() || loading) && styles.submitButtonDisabled
-            ]}
+          <KurukatsuButton
+            title="報告する"
             onPress={handleSubmitReport}
+            variant="primary"
+            size="medium"
             disabled={!selectedReason || !details.trim() || loading}
-          >
-            {loading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={styles.submitButtonText}>報告を送信</Text>
-            )}
-          </TouchableOpacity>
+            loading={loading}
+          />
 
           <View style={{ height: 40 }} />
         </ScrollView>
@@ -199,7 +194,7 @@ const ReportScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f0f2f5',
   },
   contentSafeArea: {
     flex: 1,
@@ -270,25 +265,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     minHeight: 120,
     backgroundColor: '#fff',
-  },
-  submitButton: {
-    backgroundColor: '#dc3545',
-    borderRadius: 8,
-    paddingVertical: 15,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
   },
 });
 

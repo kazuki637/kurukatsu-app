@@ -76,6 +76,9 @@
       [
         "expo-notifications"
       ],
+      [
+        "expo-splash-screen"
+      ],
       "expo-font"
     ],
     "extra": {

@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert, Image, TextInput, Modal } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert, Image, TextInput, Modal, Animated, Dimensions, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { db, auth } from '../firebaseConfig';
 import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc, setDoc, arrayRemove, arrayUnion } from 'firebase/firestore';
 import CommonHeader from '../components/CommonHeader';
+import KurukatsuButton from '../components/KurukatsuButton';
 import { checkUserPermission, getUserRole, getRoleDisplayName } from '../utils/permissionUtils';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -21,13 +22,86 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
     }
     return 'members'; // デフォルトはメンバータブ
   });
+
+  // 初期化時にアニメーション位置を設定
+  useEffect(() => {
+    const initialTabIndex = selectedTab === 'members' ? 0 : 1;
+    indicatorAnim.setValue(initialTabIndex);
+    setScrollProgress(initialTabIndex);
+  }, []);
   const [imageErrorMap, setImageErrorMap] = useState({});
   const [roleChangeModalVisible, setRoleChangeModalVisible] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [currentUserRole, setCurrentUserRole] = useState(null);
+  const [deleteConfirmModalVisible, setDeleteConfirmModalVisible] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState(null);
   const [circleName, setCircleName] = useState('');
   const [membersLoading, setMembersLoading] = useState(true);
   const [requestsLoading, setRequestsLoading] = useState(true);
+  
+  // アニメーション用の状態
+  const indicatorAnim = useRef(new Animated.Value(0)).current;
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const horizontalScrollRef = useRef(null);
+
+  // インジケーターアニメーション関数
+  const animateIndicator = (tabIndex) => {
+    Animated.timing(indicatorAnim, {
+      toValue: tabIndex,
+      duration: 250,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  // タブ切り替え関数
+  const handleTabChange = (tabName) => {
+    setSelectedTab(tabName);
+    const tabIndex = tabName === 'members' ? 0 : 1;
+    animateIndicator(tabIndex);
+    setScrollProgress(tabIndex);
+    if (horizontalScrollRef.current) {
+      horizontalScrollRef.current.scrollTo({
+        x: tabIndex * Dimensions.get('window').width,
+        animated: true,
+      });
+    }
+  };
+
+  // 水平スクロール完了時の最終同期
+  const handleHorizontalScroll = (event) => {
+    const scrollX = event.nativeEvent.contentOffset.x;
+    const screenWidth = Dimensions.get('window').width;
+    const tabIndex = Math.round(scrollX / screenWidth);
+    const tabs = ['members', 'requests'];
+    if (tabIndex >= 0 && tabIndex < tabs.length) {
+      setSelectedTab(tabs[tabIndex]);
+      // スクロール完了時は即座に最終位置に設定
+      indicatorAnim.setValue(tabIndex);
+      setScrollProgress(tabIndex);
+    }
+  };
+
+  // スクロール中のリアルタイム追従
+  const handleScroll = (event) => {
+    const scrollX = event.nativeEvent.contentOffset.x;
+    const screenWidth = Dimensions.get('window').width;
+    const progress = scrollX / screenWidth;
+    
+    // インジケーターをリアルタイムで移動
+    indicatorAnim.setValue(progress);
+    // スクロールプログレスを更新
+    setScrollProgress(progress);
+  };
+
+  // タブテキストのハイライト状態を計算
+  const getTabTextStyle = (tabIndex) => {
+    const isActive = Math.round(scrollProgress) === tabIndex;
+    
+    return {
+      color: isActive ? '#1380ec' : '#6B7280',
+      fontWeight: isActive ? 'bold' : 'normal',
+    };
+  };
 
   // 入会申請数更新関数をグローバルに登録
   React.useEffect(() => {
@@ -142,43 +216,41 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
       return;
     }
 
-    Alert.alert(
-      'メンバー削除',
-      'このメンバーを削除しますか？',
-      [
-        { text: 'キャンセル', style: 'cancel' },
-        {
-          text: '削除',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              // 削除されるメンバーの情報を取得
-              const memberToRemove = members.find(m => m.id === memberId);
-              const memberName = memberToRemove?.name || 'メンバー';
-              
-              // サークルのメンバーコレクションから削除
-              await deleteDoc(doc(db, 'circles', circleId, 'members', memberId));
-              
-              // ユーザーのjoinedCircleIdsとadminCircleIdsからサークルIDを削除
-              const userDocRef = doc(db, 'users', memberId);
-              await updateDoc(userDocRef, {
-                joinedCircleIds: arrayRemove(circleId),
-                adminCircleIds: arrayRemove(circleId) // 管理者/代表者の場合も削除
-              });
-              
-              // 強制退会の通知を送信（削除されたメンバーに）
-              console.log('通知送信処理は一時的に無効化されています');
-              
-              setMembers(prev => prev.filter(m => m.id !== memberId));
-              Alert.alert('削除完了', 'メンバーを削除しました');
-            } catch (e) {
-              console.error('Error removing member:', e);
-              Alert.alert('エラー', 'メンバーの削除に失敗しました');
-            }
-          }
-        }
-      ]
-    );
+    // 削除対象のメンバー情報を設定してモーダルを表示
+    const memberToRemove = members.find(m => m.id === memberId);
+    setMemberToDelete(memberToRemove);
+    setDeleteConfirmModalVisible(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!memberToDelete) return;
+
+    try {
+      // 削除されるメンバーの情報を取得
+      const memberName = memberToDelete?.name || 'メンバー';
+      
+      // サークルのメンバーコレクションから削除
+      await deleteDoc(doc(db, 'circles', circleId, 'members', memberToDelete.id));
+      
+      // ユーザーのjoinedCircleIdsとadminCircleIdsからサークルIDを削除
+      const userDocRef = doc(db, 'users', memberToDelete.id);
+      await updateDoc(userDocRef, {
+        joinedCircleIds: arrayRemove(circleId),
+        adminCircleIds: arrayRemove(circleId) // 管理者/代表者の場合も削除
+      });
+      
+      // 強制退会の通知を送信（削除されたメンバーに）
+      console.log('通知送信処理は一時的に無効化されています');
+      
+      setMembers(prev => prev.filter(m => m.id !== memberToDelete.id));
+      
+      // モーダルを閉じる
+      setDeleteConfirmModalVisible(false);
+      setMemberToDelete(null);
+    } catch (e) {
+      console.error('Error removing member:', e);
+      Alert.alert('エラー', 'メンバーの削除に失敗しました');
+    }
   };
 
   const handleRoleChange = async (memberId, newRole) => {
@@ -226,7 +298,6 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
       
       setRoleChangeModalVisible(false);
       setSelectedMember(null);
-      Alert.alert('変更完了', '役割を変更しました');
     } catch (e) {
       Alert.alert('エラー', '役割の変更に失敗しました');
     }
@@ -389,165 +460,191 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
         onBack={() => navigation.goBack()}
       />
       <SafeAreaView style={styles.content}>
-        {/* タブ切り替え */}
-        <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[styles.tab, selectedTab === 'members' && styles.activeTab]}
-            onPress={() => setSelectedTab('members')}
-          >
-            <Text style={[styles.tabText, selectedTab === 'members' && styles.activeTabText]}>メンバー</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, selectedTab === 'requests' && styles.activeTab]}
-            onPress={() => setSelectedTab('requests')}
-          >
-            <View style={styles.tabContent}>
-              <Text style={[styles.tabText, selectedTab === 'requests' && styles.activeTabText]}>入会申請</Text>
-              {joinRequests.length > 0 && (
-                <View style={styles.notificationBadge}>
-                  <Text style={styles.notificationBadgeText}>{joinRequests.length}</Text>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
-        </View>
+         {/* タブ切り替え */}
+         <View style={styles.tabContainer}>
+           <TouchableOpacity
+             style={styles.tab}
+             onPress={() => handleTabChange('members')}
+           >
+             <Text style={[styles.tabText, getTabTextStyle(0)]}>メンバー</Text>
+           </TouchableOpacity>
+           <TouchableOpacity
+             style={styles.tab}
+             onPress={() => handleTabChange('requests')}
+           >
+             <View style={styles.tabContent}>
+               <Text style={[styles.tabText, getTabTextStyle(1)]}>入会申請</Text>
+               {joinRequests.length > 0 && (
+                 <View style={styles.notificationBadge}>
+                   <Text style={styles.notificationBadgeText}>{joinRequests.length}</Text>
+                 </View>
+               )}
+             </View>
+           </TouchableOpacity>
+           
+           {/* アニメーションするインジケーター */}
+           <Animated.View 
+             style={[
+               styles.animatedIndicator,
+               {
+                 transform: [{
+                   translateX: indicatorAnim.interpolate({
+                     inputRange: [0, 1],
+                     outputRange: [0, Dimensions.get('window').width / 2],
+                   })
+                 }]
+               }
+             ]}
+           />
+         </View>
 
-        {selectedTab === 'members' && (
-          <>
-            <View style={styles.searchBarContainer}>
-              <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="氏名、大学、学年で検索"
-                value={searchText}
-                onChangeText={setSearchText}
-                clearButtonMode="while-editing"
-              />
-            </View>
-            {membersLoading ? (
-              <ActivityIndicator size="small" color="#999" style={{ marginTop: 40 }} />
-            ) : (
-              <FlatList
-                data={filteredMembers}
-                keyExtractor={item => item.id}
-                renderItem={({ item }) => {
-                  const hasImage = item.profileImageUrl && item.profileImageUrl.trim() !== '' && !imageErrorMap[item.id];
-                  const isLeader = item.role === 'leader';
-                  const isAdmin = item.role === 'admin';
-                  const isMember = item.role === 'member';
-                  
-                  return (
-                    <View style={styles.memberItem}>
-                      {hasImage ? (
-                        <Image
-                          source={{ uri: item.profileImageUrl }}
-                          style={styles.memberAvatar}
-                          onError={() => setImageErrorMap(prev => ({ ...prev, [item.id]: true }))}
-                        />
-                      ) : (
-                        <View style={styles.memberAvatarPlaceholder}>
-                          <Ionicons name="person" size={28} color="#9CA3AF" />
-                        </View>
-                      )}
-                      <View style={styles.memberInfoContainer}>
-                        <Text style={styles.memberName}>{item.name || '氏名未設定'}</Text>
-                        <Text style={styles.memberDetails}>{item.university || ''} {item.grade || ''}</Text>
-                      </View>
-                      <View style={[
-                        styles.roleBadge,
-                        isLeader && styles.roleBadgeLeader,
-                        isAdmin && styles.roleBadgeAdmin,
-                        isMember && styles.roleBadgeMember
-                      ]}>
-                        <Text style={[
-                          styles.roleBadgeText,
-                          isLeader && styles.roleBadgeTextLeader,
-                          isAdmin && styles.roleBadgeTextAdmin,
-                          isMember && styles.roleBadgeTextMember
-                        ]}>
-                          {getRoleDisplayName(item.role)}
-                        </Text>
-                      </View>
-                      {canManageRoles && item.role !== 'leader' && (
-                        <TouchableOpacity 
-                          style={styles.roleButton} 
-                          onPress={() => {
-                            setSelectedMember(item);
-                            setRoleChangeModalVisible(true);
-                          }}
-                        >
-                          <Ionicons name="settings-outline" size={24} color="#6B7280" />
-                        </TouchableOpacity>
-                      )}
-                      {canManageRoles && item.role !== 'leader' && (
-                        <TouchableOpacity style={styles.removeButton} onPress={() => handleRemove(item.id)}>
-                          <Ionicons name="remove-circle" size={24} color="#DC2626" />
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  );
-                }}
-                ListEmptyComponent={<Text style={styles.emptyText}>メンバーがいません</Text>}
-                contentContainerStyle={styles.listContainer}
-              />
-            )}
-          </>
-        )}
+         {/* タブコンテンツ */}
+         <ScrollView
+           ref={horizontalScrollRef}
+           horizontal
+           pagingEnabled
+           showsHorizontalScrollIndicator={false}
+           onScroll={handleScroll}
+           onMomentumScrollEnd={handleHorizontalScroll}
+           scrollEventThrottle={16}
+           style={styles.horizontalScrollView}
+           contentContainerStyle={styles.horizontalScrollContent}
+         >
+           {/* メンバータブ */}
+           <View style={styles.tabContentContainer}>
+             <View style={styles.searchBarContainer}>
+               <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
+               <TextInput
+                 style={styles.searchInput}
+                 placeholder="氏名、大学、学年で検索"
+                 value={searchText}
+                 onChangeText={setSearchText}
+                 clearButtonMode="while-editing"
+               />
+             </View>
+             {membersLoading ? (
+               <ActivityIndicator size="small" color="#999" style={{ marginTop: 40 }} />
+             ) : (
+               <FlatList
+                 data={filteredMembers}
+                 keyExtractor={item => item.id}
+                 renderItem={({ item }) => {
+                   const hasImage = item.profileImageUrl && item.profileImageUrl.trim() !== '' && !imageErrorMap[item.id];
+                   const isLeader = item.role === 'leader';
+                   const isAdmin = item.role === 'admin';
+                   const isMember = item.role === 'member';
+                   
+                   return (
+                     <View style={styles.memberItem}>
+                       {hasImage ? (
+                         <Image
+                           source={{ uri: item.profileImageUrl }}
+                           style={styles.memberAvatar}
+                           onError={() => setImageErrorMap(prev => ({ ...prev, [item.id]: true }))}
+                         />
+                       ) : (
+                         <View style={styles.memberAvatarPlaceholder}>
+                           <Ionicons name="person" size={28} color="#9CA3AF" />
+                         </View>
+                       )}
+                       <View style={styles.memberInfoContainer}>
+                         <Text style={styles.memberName}>{item.name || '氏名未設定'}</Text>
+                         <Text style={styles.memberDetails}>{item.university || ''} {item.grade || ''}</Text>
+                       </View>
+                       <View style={[
+                         styles.roleBadge,
+                         isLeader && styles.roleBadgeLeader,
+                         isAdmin && styles.roleBadgeAdmin,
+                         isMember && styles.roleBadgeMember
+                       ]}>
+                         <Text style={[
+                           styles.roleBadgeText,
+                           isLeader && styles.roleBadgeTextLeader,
+                           isAdmin && styles.roleBadgeTextAdmin,
+                           isMember && styles.roleBadgeTextMember
+                         ]}>
+                           {getRoleDisplayName(item.role)}
+                         </Text>
+                       </View>
+                       {canManageRoles && item.role !== 'leader' && (
+                         <TouchableOpacity 
+                           style={styles.roleButton} 
+                           onPress={() => {
+                             setSelectedMember(item);
+                             setRoleChangeModalVisible(true);
+                           }}
+                         >
+                           <Ionicons name="settings-outline" size={24} color="#6B7280" />
+                         </TouchableOpacity>
+                       )}
+                       {canManageRoles && item.role !== 'leader' && (
+                         <TouchableOpacity style={styles.removeButton} onPress={() => handleRemove(item.id)}>
+                           <Ionicons name="remove-circle" size={24} color="#DC2626" />
+                         </TouchableOpacity>
+                       )}
+                     </View>
+                   );
+                 }}
+                 ListEmptyComponent={<Text style={styles.emptyText}>メンバーがいません</Text>}
+                 contentContainerStyle={styles.listContainer}
+               />
+             )}
+           </View>
 
-        {selectedTab === 'requests' && (
-          <>
-            <View style={styles.searchBarContainer}>
-              <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="氏名、大学、学年で検索"
-                value={requestSearchText}
-                onChangeText={setRequestSearchText}
-                clearButtonMode="while-editing"
-              />
-            </View>
-            {requestsLoading ? (
-              <ActivityIndicator size="small" color="#999" style={{ marginTop: 40 }} />
-            ) : filteredRequests.length > 0 ? (
-              <FlatList
-                data={filteredRequests}
-                keyExtractor={item => item.id}
-                renderItem={({ item: request }) => {
-                  const hasImage = request.profileImageUrl && request.profileImageUrl.trim() !== '' && !imageErrorMap[request.id];
-                  return (
-                    <View style={styles.memberItem}>
-                      {hasImage ? (
-                        <Image
-                          source={{ uri: request.profileImageUrl }}
-                          style={styles.memberAvatar}
-                          onError={() => setImageErrorMap(prev => ({ ...prev, [request.id]: true }))}
-                        />
-                      ) : (
-                        <View style={styles.memberAvatarPlaceholder}>
-                          <Ionicons name="person" size={28} color="#9CA3AF" />
-                        </View>
-                      )}
-                      <View style={styles.memberInfoContainer}>
-                        <Text style={styles.memberName}>{request.name || '申請者'}</Text>
-                        <Text style={styles.memberDetails}>{request.university || ''} {request.grade || ''}</Text>
-                      </View>
-                      <TouchableOpacity style={styles.approveButton} onPress={() => handleApprove(request)}>
-                        <Ionicons name="checkmark-circle" size={32} color="#16A34A" />
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.rejectButton} onPress={() => handleReject(request.id)}>
-                        <Ionicons name="close-circle" size={32} color="#DC2626" />
-                      </TouchableOpacity>
-                    </View>
-                  );
-                }}
-                ListEmptyComponent={null}
-                contentContainerStyle={styles.listContainer}
-              />
-            ) : (
-              <Text style={styles.emptyText}>入会申請はありません</Text>
-            )}
-          </>
-        )}
+           {/* 入会申請タブ */}
+           <View style={styles.tabContentContainer}>
+             <View style={styles.searchBarContainer}>
+               <Ionicons name="search" size={20} color="#9CA3AF" style={styles.searchIcon} />
+               <TextInput
+                 style={styles.searchInput}
+                 placeholder="氏名、大学、学年で検索"
+                 value={requestSearchText}
+                 onChangeText={setRequestSearchText}
+                 clearButtonMode="while-editing"
+               />
+             </View>
+             {requestsLoading ? (
+               <ActivityIndicator size="small" color="#999" style={{ marginTop: 40 }} />
+             ) : filteredRequests.length > 0 ? (
+               <FlatList
+                 data={filteredRequests}
+                 keyExtractor={item => item.id}
+                 renderItem={({ item: request }) => {
+                   const hasImage = request.profileImageUrl && request.profileImageUrl.trim() !== '' && !imageErrorMap[request.id];
+                   return (
+                     <View style={styles.memberItem}>
+                       {hasImage ? (
+                         <Image
+                           source={{ uri: request.profileImageUrl }}
+                           style={styles.memberAvatar}
+                           onError={() => setImageErrorMap(prev => ({ ...prev, [request.id]: true }))}
+                         />
+                       ) : (
+                         <View style={styles.memberAvatarPlaceholder}>
+                           <Ionicons name="person" size={28} color="#9CA3AF" />
+                         </View>
+                       )}
+                       <View style={styles.memberInfoContainer}>
+                         <Text style={styles.memberName}>{request.name || '申請者'}</Text>
+                         <Text style={styles.memberDetails}>{request.university || ''} {request.grade || ''}</Text>
+                       </View>
+                       <TouchableOpacity style={styles.approveButton} onPress={() => handleApprove(request)}>
+                         <Ionicons name="checkmark-circle" size={32} color="#16A34A" />
+                       </TouchableOpacity>
+                       <TouchableOpacity style={styles.rejectButton} onPress={() => handleReject(request.id)}>
+                         <Ionicons name="close-circle" size={32} color="#DC2626" />
+                       </TouchableOpacity>
+                     </View>
+                   );
+                 }}
+                 ListEmptyComponent={null}
+                 contentContainerStyle={styles.listContainer}
+               />
+             ) : (
+               <Text style={styles.emptyText}>入会申請はありません</Text>
+             )}
+           </View>
+         </ScrollView>
       </SafeAreaView>
 
       {/* 役割変更モーダル */}
@@ -587,18 +684,63 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
                 selectedMember?.role === 'admin' && styles.roleOptionTextActive
               ]}>管理者</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.modalCancelButton}
+            <KurukatsuButton
+              title="キャンセル"
               onPress={() => setRoleChangeModalVisible(false)}
-            >
-              <Text style={styles.modalCancelButtonText}>キャンセル</Text>
-            </TouchableOpacity>
+              size="medium"
+              variant="secondary"
+              hapticFeedback={true}
+              style={styles.modalCancelButtonKurukatsu}
+            />
           </View>
         </View>
-      </Modal>
-    </View>
-  );
-}
+       </Modal>
+
+       {/* メンバー削除確認モーダル */}
+       <Modal
+         visible={deleteConfirmModalVisible}
+         transparent={true}
+         animationType="fade"
+         onRequestClose={() => {
+           setDeleteConfirmModalVisible(false);
+           setMemberToDelete(null);
+         }}
+       >
+         <View style={styles.modalOverlay}>
+           <View style={styles.modalContent}>
+             <Text style={styles.modalTitle}>メンバー削除</Text>
+             <Text style={styles.modalSubtitle}>
+               {memberToDelete?.name || 'メンバー'} を削除しますか？
+             </Text>
+             <Text style={styles.modalWarning}>
+               削除後は元に戻すことができません。
+             </Text>
+             <View style={styles.modalButtons}>
+               <KurukatsuButton
+                 title="キャンセル"
+                 onPress={() => setDeleteConfirmModalVisible(false)}
+                 size="medium"
+                 variant="secondary"
+                 hapticFeedback={true}
+                 style={styles.modalConfirmButtonKurukatsu}
+               />
+               <KurukatsuButton
+                 title="削除する"
+                 onPress={handleConfirmDelete}
+                 size="medium"
+                 variant="primary"
+                 backgroundColor="#DC2626"
+                 shadowColor="#B91C1C"
+                 hapticFeedback={true}
+                 style={styles.modalConfirmButtonKurukatsu}
+               />
+             </View>
+           </View>
+         </View>
+       </Modal>
+     </View>
+   );
+ }
 
 const styles = StyleSheet.create({
   container: { 
@@ -619,17 +761,9 @@ const styles = StyleSheet.create({
     paddingVertical: 16, 
     alignItems: 'center' 
   },
-  activeTab: { 
-    borderBottomWidth: 2, 
-    borderBottomColor: '#2563EB' 
-  },
   tabText: { 
     fontSize: 16, 
     color: '#6B7280' 
-  },
-  activeTabText: { 
-    color: '#2563EB', 
-    fontWeight: '600' 
   },
   tabContent: { 
     flexDirection: 'row', 
@@ -652,23 +786,26 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   // 検索バーのスタイル
-  searchBarContainer: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    backgroundColor: '#F3F4F6', 
-    borderRadius: 25, 
-    margin: 16, 
-    paddingHorizontal: 12, 
-    paddingVertical: 12 
+  searchBarContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
-  searchIcon: { 
-    marginRight: 12 
+  searchIcon: {
+    marginRight: 12,
   },
-  searchInput: { 
-    flex: 1, 
-    paddingVertical: 0, 
-    fontSize: 14, 
-    color: '#111827' 
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#111827',
   },
   // リストのスタイル
   listContainer: {
@@ -784,18 +921,18 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
   modalTitle: { 
-    fontSize: 20, 
-    fontWeight: '700', 
+    fontSize: 18, 
+    fontWeight: 'bold', 
     textAlign: 'center', 
-    marginBottom: 8,
+    marginBottom: 16,
     color: '#111827'
   },
   modalSubtitle: { 
-    fontSize: 14, 
-    color: '#6B7280', 
+    fontSize: 16, 
+    color: '#111827', 
     textAlign: 'center', 
-    marginBottom: 24,
-    lineHeight: 20
+    marginBottom: 16,
+    lineHeight: 22
   },
   roleOption: { 
     backgroundColor: '#F3F4F6', 
@@ -807,7 +944,7 @@ const styles = StyleSheet.create({
     width: '100%'
   },
   roleOptionActive: { 
-    backgroundColor: '#2563EB' 
+    backgroundColor: '#1380ec' 
   },
   roleOptionText: { 
     fontSize: 16, 
@@ -817,19 +954,43 @@ const styles = StyleSheet.create({
   roleOptionTextActive: { 
     color: '#FFFFFF' 
   },
-  modalCancelButton: { 
-    backgroundColor: '#E5E7EB', 
-    borderRadius: 25, 
-    paddingVertical: 12, 
-    paddingHorizontal: 24, 
-    alignItems: 'center', 
-    marginTop: 8, 
-    alignSelf: 'center', 
-    width: '60%' 
-  },
-  modalCancelButtonText: { 
-    fontSize: 16, 
-    fontWeight: '700', 
-    color: '#374151' 
-  },
-}); 
+   modalCancelButtonKurukatsu: {
+     marginTop: 10,
+     width: '60%',
+     alignSelf: 'center',
+   },
+   modalButtons: {
+     flexDirection: 'row',
+     justifyContent: 'space-around',
+     marginTop: 16,
+     gap: 12,
+   },
+   modalConfirmButtonKurukatsu: {
+     flex: 1,
+   },
+   modalWarning: {
+     fontSize: 14,
+     color: '#dc2626',
+     textAlign: 'center',
+     marginBottom: 20,
+     fontWeight: '500',
+   },
+   animatedIndicator: {
+     position: 'absolute',
+     bottom: 0,
+     width: Dimensions.get('window').width / 2,
+     height: 2,
+     backgroundColor: '#1380ec',
+   },
+   horizontalScrollView: {
+     flex: 1,
+   },
+   horizontalScrollContent: {
+     flexDirection: 'row',
+   },
+   tabContentContainer: {
+     flex: 1,
+     backgroundColor: '#F9FAFB',
+     width: Dimensions.get('window').width,
+   },
+ }); 

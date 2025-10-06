@@ -6,6 +6,7 @@ import { doc, getDoc, getDocs, collection, deleteDoc, updateDoc, arrayRemove } f
 import { auth } from '../firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { getRoleDisplayName } from '../utils/permissionUtils';
+import KurukatsuButton from '../components/KurukatsuButton';
 
 export default function CircleMemberMemberListScreen({ route, navigation }) {
   const { circleId } = route.params;
@@ -158,15 +159,13 @@ export default function CircleMemberMemberListScreen({ route, navigation }) {
       });
       
       setLeaveModalVisible(false);
-      Alert.alert('脱退完了', 'サークルを脱退しました', [
-        { text: 'OK', onPress: () => {
-          // MyPageStackをリセットしてMyPageに遷移
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'MyPage' }],
-          });
-        }}
-      ]);
+      // Mainタブに遷移してからマイページタブに遷移
+      navigation.navigate('Main', {
+        screen: 'マイページ',
+        params: {
+          screen: 'MyPage'
+        }
+      });
     } catch (e) {
       console.error('Error leaving circle:', e);
       Alert.alert('エラー', '脱退に失敗しました');
@@ -179,6 +178,15 @@ export default function CircleMemberMemberListScreen({ route, navigation }) {
         title={circleName} 
         showBackButton={true}
         onBack={() => navigation.goBack()}
+        rightButton={
+          <TouchableOpacity 
+            onPress={() => setLeaveModalVisible(true)}
+            style={styles.leaveButton}
+            activeOpacity={1}
+          >
+            <Ionicons name="log-out-outline" size={24} color="#374151" />
+          </TouchableOpacity>
+        }
       />
       <SafeAreaView style={styles.container}>
         <View style={styles.tabContent}>
@@ -244,17 +252,6 @@ export default function CircleMemberMemberListScreen({ route, navigation }) {
             />
           )}
         </View>
-        
-        {/* 脱退ボタン（フッター） */}
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.leaveButton}
-            onPress={() => setLeaveModalVisible(true)}
-          >
-            <Ionicons name="log-out-outline" size={20} color="#FFFFFF" />
-            <Text style={styles.leaveButtonText}>サークルを脱退する</Text>
-          </TouchableOpacity>
-        </View>
       </SafeAreaView>
 
       {/* 脱退確認モーダル */}
@@ -274,18 +271,24 @@ export default function CircleMemberMemberListScreen({ route, navigation }) {
               この操作は元に戻せません。本当にこのサークルを脱退しますか？
             </Text>
             <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalCancelButton}
+              <KurukatsuButton
+                title="キャンセル"
                 onPress={() => setLeaveModalVisible(false)}
-              >
-                <Text style={styles.modalCancelButtonText}>キャンセル</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalLeaveButton}
+                size="medium"
+                variant="secondary"
+                hapticFeedback={true}
+                style={styles.modalCancelButtonContainer}
+              />
+              <KurukatsuButton
+                title="脱退する"
                 onPress={handleLeave}
-              >
-                <Text style={styles.modalLeaveButtonText}>脱退する</Text>
-              </TouchableOpacity>
+                size="medium"
+                variant="primary"
+                backgroundColor="#DC2626"
+                shadowColor="#B91C1C"
+                hapticFeedback={true}
+                style={styles.modalLeaveButtonContainer}
+              />
             </View>
           </View>
         </View>
@@ -403,32 +406,6 @@ const styles = StyleSheet.create({
   roleBadgeTextMember: {
     color: '#6B7280',
   },
-  // フッターのスタイル
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    padding: 16,
-  },
-  leaveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#DC2626',
-    borderRadius: 25,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    gap: 8,
-  },
-  leaveButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
   // モーダルのスタイル
   modalOverlay: {
     flex: 1,
@@ -472,28 +449,15 @@ const styles = StyleSheet.create({
     gap: 12,
     width: '100%',
   },
-  modalCancelButton: {
+  modalCancelButtonContainer: {
     flex: 1,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 25,
-    paddingVertical: 12,
-    alignItems: 'center',
+    marginRight: 8,
   },
-  modalCancelButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#374151',
-  },
-  modalLeaveButton: {
+  modalLeaveButtonContainer: {
     flex: 1,
-    backgroundColor: '#DC2626',
-    borderRadius: 25,
-    paddingVertical: 12,
-    alignItems: 'center',
+    marginLeft: 8,
   },
-  modalLeaveButtonText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
+  leaveButton: {
+    padding: 0,
   },
 });

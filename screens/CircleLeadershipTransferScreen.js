@@ -19,6 +19,7 @@ import { db, auth } from '../firebaseConfig';
 import { doc, getDoc, getDocs, collection, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import CommonHeader from '../components/CommonHeader';
+import KurukatsuButton from '../components/KurukatsuButton';
 
 const { width } = Dimensions.get('window');
 
@@ -334,7 +335,7 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
               <Ionicons name="search" size={20} color="#9ca3af" style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="メンバーを検索"
+                placeholder="氏名、大学、学年で検索"
                 value={searchText}
                 onChangeText={setSearchText}
                 clearButtonMode="while-editing"
@@ -356,18 +357,15 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
 
           {/* 引き継ぎボタン */}
           <View style={styles.buttonSection}>
-            <TouchableOpacity
-              style={[
-                styles.transferButton,
-                !selectedMember && styles.transferButtonDisabled
-              ]}
+            <KurukatsuButton
+              title={transferring ? '引き継ぎ中...' : '引き継ぐ'}
               onPress={() => setShowConfirmModal(true)}
               disabled={!selectedMember || transferring}
-            >
-              <Text style={styles.transferButtonText}>
-                {transferring ? '引き継ぎ中...' : '次へ'}
-              </Text>
-            </TouchableOpacity>
+              size="medium"
+              variant={!selectedMember ? "secondary" : "primary"}
+              hapticFeedback={true}
+              loading={transferring}
+            />
           </View>
         </Animated.View>
       </SafeAreaView>
@@ -386,12 +384,13 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
               代表者権限を引き継ぐと、あなたの役割は「メンバー」に変更されます。
               引き継ぎ先のメンバーが新しい代表者となり、サークルの管理権限を取得します。
             </Text>
-            <TouchableOpacity
-              style={styles.helpModalButton}
+            <KurukatsuButton
+              title="閉じる"
               onPress={() => setShowHelpModal(false)}
-            >
-              <Text style={styles.helpModalButtonText}>閉じる</Text>
-            </TouchableOpacity>
+              size="medium"
+              variant="secondary"
+              hapticFeedback={true}
+            />
           </View>
         </View>
       </Modal>
@@ -414,18 +413,24 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
               この操作は取り消すことができません。
             </Text>
             <View style={styles.confirmModalButtons}>
-              <TouchableOpacity
-                style={styles.confirmModalButtonCancel}
+              <KurukatsuButton
+                title="キャンセル"
                 onPress={() => setShowConfirmModal(false)}
-              >
-                <Text style={styles.confirmModalButtonCancelText}>キャンセル</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.confirmModalButtonConfirm}
+                size="medium"
+                variant="secondary"
+                hapticFeedback={true}
+                style={styles.confirmModalButtonCancelContainer}
+              />
+              <KurukatsuButton
+                title="引き継ぐ"
                 onPress={handleTransfer}
-              >
-                <Text style={styles.confirmModalButtonConfirmText}>引き継ぐ</Text>
-              </TouchableOpacity>
+                size="medium"
+                variant="primary"
+                backgroundColor="#DC2626"
+                shadowColor="#B91C1C"
+                hapticFeedback={true}
+                style={styles.confirmModalButtonConfirmContainer}
+              />
             </View>
           </View>
         </View>
@@ -451,12 +456,13 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
             <Text style={styles.completionModalSubText}>
               あなたのは「メンバー」に変更されました。
             </Text>
-            <TouchableOpacity
-              style={styles.completionModalButton}
+            <KurukatsuButton
+              title="OK"
               onPress={handleCompletion}
-            >
-              <Text style={styles.completionModalButtonText}>OK</Text>
-            </TouchableOpacity>
+              size="medium"
+              variant="primary"
+              hapticFeedback={true}
+            />
           </View>
         </View>
       </Modal>
@@ -486,6 +492,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
     paddingTop: 16,
+    paddingBottom: 0, // 余白を削除
   },
   sectionHeader: {
     fontSize: 16,
@@ -621,29 +628,15 @@ const styles = StyleSheet.create({
     color: '#6b7280',
   },
   buttonSection: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#ffffff',
+    paddingVertical: 20,
     paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  transferButton: {
-    backgroundColor: '#299cfa',
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  transferButtonDisabled: {
-    backgroundColor: '#d1d5db',
-  },
-  transferButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
   },
   modalOverlay: {
     flex: 1,
@@ -671,17 +664,6 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     lineHeight: 20,
     marginBottom: 20,
-  },
-  helpModalButton: {
-    backgroundColor: '#299cfa',
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  helpModalButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   confirmModal: {
     backgroundColor: '#fff',
@@ -711,33 +693,17 @@ const styles = StyleSheet.create({
   },
   confirmModalButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
   },
-  confirmModalButtonCancel: {
+  confirmModalButtonCancelContainer: {
     flex: 1,
-    backgroundColor: '#f9fafb',
-    borderRadius: 8,
-    paddingVertical: 12,
     marginRight: 8,
-    alignItems: 'center',
+    minWidth: 120,
   },
-  confirmModalButtonCancelText: {
-    color: '#6b7280',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  confirmModalButtonConfirm: {
+  confirmModalButtonConfirmContainer: {
     flex: 1,
-    backgroundColor: '#dc2626',
-    borderRadius: 8,
-    paddingVertical: 12,
     marginLeft: 8,
-    alignItems: 'center',
-  },
-  confirmModalButtonConfirmText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    minWidth: 120,
   },
   completionModal: {
     backgroundColor: '#fff',
@@ -768,17 +734,5 @@ const styles = StyleSheet.create({
     color: '#6b7280',
     textAlign: 'center',
     marginBottom: 20,
-  },
-  completionModalButton: {
-    backgroundColor: '#16a34a',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 32,
-    alignItems: 'center',
-  },
-  completionModalButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
 }); 

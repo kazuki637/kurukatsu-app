@@ -564,9 +564,14 @@ export default function CircleMemberScheduleScreen({ route, navigation }) {
                               ) : event.startTime ? (
                                 <Text style={styles.eventTimeBadge}>{event.startTime}</Text>
                               ) : null}
-                              {event.location && (
-                                <Text style={styles.eventLocationBadge}>{event.location}</Text>
-                              )}
+                               {event.location && (
+                                 <Text style={styles.eventLocationBadge} numberOfLines={0}>
+                                   {event.location.length > 14 ? 
+                                     event.location.match(/.{1,14}/g).join('\n') : 
+                                     event.location
+                                   }
+                                 </Text>
+                               )}
                             </View>
                           </View>
                           <TouchableOpacity
@@ -957,9 +962,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   eventDetails: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 6,
   },
   eventTimeBadge: {
     backgroundColor: '#e3f2fd',
@@ -971,8 +976,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   eventLocationBadge: {
-    backgroundColor: '#f3e5f5',
-    color: '#9c27b0',
+    backgroundColor: '#e8f5e8',
+    color: '#28a745',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,

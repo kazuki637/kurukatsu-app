@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, StatusBar, ActivityIndicator, Image, Alert, Dimensions, ScrollView, Animated, Linking } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, StatusBar, ActivityIndicator, Image, Alert, Dimensions, ScrollView, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { db, auth } from '../firebaseConfig';
 import { doc, getDoc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -25,8 +24,6 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
   const [userRole, setUserRole] = useState(null);
   const [joinRequestsCount, setJoinRequestsCount] = useState(0);
   const [imageError, setImageError] = useState(false);
-  const [isCardFlipped, setIsCardFlipped] = useState(false);
-  const flipAnimation = useState(new Animated.Value(0))[0];
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -196,56 +193,8 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
     ];
   };
 
-  // メニュー項目のリスト
-  const getMenuItems = () => {
-    return [];
-  };
-
-  // 統合メニュー項目のリスト
-  const getIntegratedMenuItems = () => {
-    return [
-      {
-        label: 'ミッション',
-        icon: 'trophy',
-        onPress: () => {
-          // TODO: ミッション画面への遷移
-          Alert.alert('お知らせ', 'ミッション機能は準備中です');
-        }
-      },
-      {
-        label: 'ポイント交換所',
-        icon: 'storefront',
-        onPress: () => {
-          // TODO: ポイント交換所画面への遷移
-          Alert.alert('お知らせ', 'ポイント交換所機能は準備中です');
-        }
-      },
-      {
-        label: 'キャンペーン情報',
-        icon: 'flame',
-        onPress: () => {
-          // TODO: キャンペーン情報画面への遷移
-          Alert.alert('お知らせ', 'キャンペーン情報機能は準備中です');
-        }
-      }
-    ];
-  };
 
   const managementButtonsGrid = getManagementButtonsGrid();
-  const menuItems = getMenuItems();
-  const integratedMenuItems = getIntegratedMenuItems();
-
-  // カードをひっくり返す関数
-  const flipCard = () => {
-    const toValue = isCardFlipped ? 0 : 1;
-    setIsCardFlipped(!isCardFlipped);
-    
-    Animated.timing(flipAnimation, {
-      toValue,
-      duration: 600,
-      useNativeDriver: true,
-    }).start();
-  };
 
   return (
     <View style={styles.fullScreenContainer}>
@@ -260,7 +209,10 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
               <View style={styles.circleImageWrapper}>
                 {circleData.imageUrl && !imageError ? (
                   <Image 
-                    source={{ uri: circleData.imageUrl }} 
+                    source={{ 
+                      uri: circleData.imageUrl,
+                      cache: 'force-cache' // プリロード済みキャッシュを強制使用
+                    }} 
                     style={styles.circleImageLarge}
                     onError={() => setImageError(true)}
                     resizeMode="cover"
@@ -281,80 +233,6 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
             </View>
           </View>
 
-          {/* クルカツポイントカード - 一時的に非表示（ポイント制度導入予定） */}
-          {/* <View style={styles.kurukatsuPointsSection}>
-            <View style={styles.kurukatsuPointsCardContainer}>
-              <Animated.View 
-                style={[
-                  styles.kurukatsuPointsCard,
-                  {
-                    transform: [{
-                      rotateY: flipAnimation.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['0deg', '180deg'],
-                      })
-                    }]
-                  }
-                ]}
-                pointerEvents={isCardFlipped ? 'none' : 'auto'}
-              >
-                <View style={styles.kurukatsuPointsCardFront}>
-                  <Text style={styles.kurukatsuPointsTitle}>クルカツポイント</Text>
-                  <View style={styles.kurukatsuPointsContent}>
-                    <Image source={require('../assets/KP.png')} style={styles.kurukatsuPointsIcon} />
-                    <Text style={styles.kurukatsuPointsAmount}>0</Text>
-                    <Text style={styles.kurukatsuPointsUnit}>pt</Text>
-                  </View>
-                  <TouchableOpacity 
-                    style={[styles.kurukatsuPointsTapButton, styles.kurukatsuPointsTapButtonFront]}
-                    onPress={flipCard}
-                  >
-                    <Text style={[styles.kurukatsuPointsTapText, styles.kurukatsuPointsTapTextFront]}>詳細を見る</Text>
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
-              
-              <Animated.View 
-                style={[
-                  styles.kurukatsuPointsCard,
-                  styles.kurukatsuPointsCardBack,
-                  {
-                    transform: [{
-                      rotateY: flipAnimation.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: ['180deg', '360deg'],
-                      })
-                    }]
-                  }
-                ]}
-                pointerEvents={isCardFlipped ? 'auto' : 'none'}
-              >
-                <View style={styles.kurukatsuPointsCardFront}>
-                  <Text style={styles.kurukatsuPointsTitle}>クルカツポイント</Text>
-                  <View style={styles.kurukatsuPointsBackButtons}>
-                    <TouchableOpacity style={styles.kurukatsuPointsBackButton}>
-                      <Ionicons name="time-outline" size={20} color="#007bff" />
-                      <Text style={styles.kurukatsuPointsBackButtonText}>履歴</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.kurukatsuPointsBackButton}>
-                      <Ionicons name="add-circle-outline" size={20} color="#007bff" />
-                      <Text style={styles.kurukatsuPointsBackButtonText}>貯める</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.kurukatsuPointsBackButton}>
-                      <Ionicons name="remove-circle-outline" size={20} color="#007bff" />
-                      <Text style={styles.kurukatsuPointsBackButtonText}>使う</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <TouchableOpacity 
-                    style={[styles.kurukatsuPointsTapButton, styles.kurukatsuPointsTapButtonBack]}
-                    onPress={flipCard}
-                  >
-                    <Text style={[styles.kurukatsuPointsTapText, styles.kurukatsuPointsTapTextBack]}>戻る</Text>
-                  </TouchableOpacity>
-                </View>
-              </Animated.View>
-            </View>
-          </View> */}
 
           {/* 管理ボタン（3行×2列配置） */}
           <View style={styles.managementGridSection}>
@@ -366,17 +244,17 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
                       key={btn.label}
                       style={styles.managementGridItem2col}
                       onPress={btn.onPress}
+                      activeOpacity={1}
                     >
-                      <LinearGradient
-                        colors={['#B8E6FF', '#E0F6FF', '#C8F0FF']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={styles.buttonGradient}
-                      >
+                      <View style={styles.buttonBackground}>
                         <View style={styles.buttonContent}>
                           <Text style={styles.managementGridItemText}>{btn.label}</Text>
                           <View style={styles.buttonIconContainer}>
-                            <Image source={btn.iconSource} style={styles.buttonIcon} />
+                            <Image 
+                              source={btn.iconSource} 
+                              style={styles.buttonIcon}
+                              resizeMode="contain"
+                            />
                           </View>
                           {btn.hasNotification && (
                             <View style={styles.notificationBadge}>
@@ -384,7 +262,7 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
                             </View>
                           )}
                         </View>
-                      </LinearGradient>
+                      </View>
                     </TouchableOpacity>
                   ) : (
                     <View key={`empty-${colIdx}`} style={styles.managementGridItem2col} />
@@ -401,10 +279,15 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
               onPress={() => {
                 Linking.openURL('https://www.instagram.com/kurukatsu_app?igsh=bmRhcTk3bWsyYmVj&utm_source=qr');
               }}
+              activeOpacity={1}
             >
               <View style={styles.promotionContent}>
                 <View style={styles.promotionIconContainer}>
-                  <Image source={require('../assets/icon.png')} style={styles.promotionIcon} />
+                  <Image 
+                    source={require('../assets/icon.png')} 
+                    style={styles.promotionIcon}
+                    resizeMode="cover"
+                  />
                 </View>
                 <View style={styles.promotionTextContainer}>
                   <View style={styles.promotionTitleContainer}>
@@ -418,44 +301,7 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
 
-          {/* メニュー項目（moomoo証券スタイル） */}
-          <View style={styles.menuSection}>
-            {menuItems.map((item, index) => (
-              <TouchableOpacity
-                key={item.label}
-                style={styles.menuItem}
-                onPress={item.onPress}
-              >
-                <View style={styles.menuItemLeft}>
-                  <Ionicons name={item.icon} size={20} color="#007bff" />
-                  <Text style={styles.menuItemText}>{item.label}</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color="#ccc" />
-              </TouchableOpacity>
-            ))}
-          </View>
 
-          {/* 統合メニュー項目（一つのカード） - 一時的に非表示 */}
-          {/* <View style={styles.integratedMenuSection}>
-            <View style={styles.integratedMenuCard}>
-              {integratedMenuItems.map((item, index) => (
-                <TouchableOpacity
-                  key={item.label}
-                  style={[
-                    styles.integratedMenuItem,
-                    index < integratedMenuItems.length - 1 && styles.integratedMenuItemBorder
-                  ]}
-                  onPress={item.onPress}
-                >
-                  <View style={styles.menuItemLeft}>
-                    <Ionicons name={item.icon} size={20} color="#007bff" />
-                    <Text style={styles.menuItemText}>{item.label}</Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color="#ccc" />
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View> */}
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -568,9 +414,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
-  buttonGradient: {
+  buttonBackground: {
     flex: 1,
     borderRadius: 12,
+    backgroundColor: '#d9effe',
   },
   managementGridItemText: {
     fontSize: 16,
@@ -615,190 +462,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 
-  menuSection: {
-    marginTop: 5,
-    paddingVertical: 0,
-    paddingHorizontal: 20,
-    marginBottom: 0,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  menuItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  menuItemText: {
-    fontSize: 16,
-    color: '#333',
-    marginLeft: 12,
-    fontWeight: '400',
-  },
-
-  // クルカツポイントカードのスタイル
-  kurukatsuPointsSection: {
-    marginTop: 15,
-    paddingHorizontal: 40,
-  },
-  kurukatsuPointsCardContainer: {
-    position: 'relative',
-  },
-  kurukatsuPointsCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-    backfaceVisibility: 'hidden',
-  },
-  kurukatsuPointsCardBack: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-    backfaceVisibility: 'hidden',
-  },
-  kurukatsuPointsCardFront: {
-    flex: 1,
-    position: 'relative',
-    minHeight: 130,
-  },
-  kurukatsuPointsTapButton: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    borderRadius: 15,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  kurukatsuPointsTapText: {
-    fontSize: 12,
-    color: '#666',
-    fontWeight: '500',
-  },
-  kurukatsuPointsTapButtonFront: {
-    backgroundColor: 'rgba(0, 123, 255, 0.1)',
-  },
-  kurukatsuPointsTapTextFront: {
-    color: '#007bff',
-  },
-  kurukatsuPointsTapButtonBack: {
-    backgroundColor: 'rgba(128, 128, 128, 0.1)',
-  },
-  kurukatsuPointsTapTextBack: {
-    color: '#808080',
-  },
-  kurukatsuPointsBackButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'baseline',
-    paddingVertical: 20,
-    minHeight: 80,
-  },
-  kurukatsuPointsBackButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-  },
-  kurukatsuPointsBackButtonText: {
-    fontSize: 16,
-    color: '#007bff',
-    fontWeight: '300',
-    marginTop: 8,
-  },
-  kurukatsuPointsTitle: {
-    fontSize: 16,
-    fontWeight: '300',
-    color: '#666',
-    marginBottom: 15,
-  },
-  kurukatsuPointsContent: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'center',
-    paddingVertical: 20,
-    minHeight: 80,
-  },
-  kurukatsuPointsIcon: {
-    width: 24,
-    height: 24,
-    marginRight: 8,
-  },
-  kurukatsuPointsAmount: {
-    fontSize: 40,
-    fontWeight: 'bold',
-    color: '#007bff',
-  },
-  kurukatsuPointsUnit: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#007bff',
-    marginLeft: 4,
-  },
-  kurukatsuPointsDescription: {
-    fontSize: 14,
-    color: '#666',
-  },
-
-  integratedMenuSection: {
-    marginTop: 15,
-    paddingHorizontal: 20,
-  },
-  integratedMenuCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  integratedMenuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  integratedMenuItemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
 
   // プロモーションセクション
   promotionSection: {

@@ -216,10 +216,10 @@ const SearchResultsScreen = ({ route, navigation }) => {
   const handleReport = () => {
     if (selectedCircle) {
       hideActionSheet();
-      navigation.navigate('Report', {
+      navigation.navigate('共通', { screen: 'Report', params: {
         circleId: selectedCircle.id,
         circleName: selectedCircle.name
-      });
+      }});
     }
   };
 
@@ -229,6 +229,7 @@ const SearchResultsScreen = ({ route, navigation }) => {
     <TouchableOpacity 
       style={styles.resultItemWrapper}
       onPress={() => navigation.navigate('共通', { screen: 'CircleDetail', params: { circleId: item.id } })}
+      activeOpacity={1}
     >
       {/* ヘッダー画像（カードの外側に配置） */}
       {item.headerImageUrl && (
@@ -239,17 +240,6 @@ const SearchResultsScreen = ({ route, navigation }) => {
         styles.resultItem,
         !item.headerImageUrl && styles.resultItemWithoutHeader
       ]}>
-        {/* 「・・・」ボタン（右上） */}
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={(e) => {
-            e.stopPropagation(); // サークルアイテムのタップを防ぐ
-            showActionSheetForCircle(item);
-          }}
-        >
-          <Ionicons name="ellipsis-horizontal" size={24} color="#666" />
-        </TouchableOpacity>
-
         <View style={styles.headerContainer}>
           {item.imageUrl ? (
             <Image source={{ uri: item.imageUrl }} style={styles.accountImage} />
@@ -263,6 +253,17 @@ const SearchResultsScreen = ({ route, navigation }) => {
             <Text style={styles.resultDetail} numberOfLines={1} ellipsizeMode="tail">{item.universityName} - {item.genre}</Text>
           </View>
           
+          {/* 「・・・」ボタン（ヘッダーコンテナ内の右側） */}
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={(e) => {
+              e.stopPropagation(); // サークルアイテムのタップを防ぐ
+              showActionSheetForCircle(item);
+            }}
+            activeOpacity={1}
+          >
+            <Ionicons name="ellipsis-horizontal" size={24} color="#666" />
+          </TouchableOpacity>
         </View>
 
         {item.thumbnailImage && (
@@ -273,24 +274,6 @@ const SearchResultsScreen = ({ route, navigation }) => {
           />
         )}
 
-        
-        {/* 活動場所と募集中表示 */}
-        {(item.welcome?.isRecruiting === true || item.activityLocation) && (
-          <View style={styles.infoContainer}>
-            {item.welcome?.isRecruiting === true && (
-              <View style={styles.infoItem}>
-                <Ionicons name="time" size={16} color="#666" />
-                <Text style={styles.infoText}>募集中</Text>
-              </View>
-            )}
-            {item.activityLocation && (
-              <View style={styles.infoItem}>
-                <Ionicons name="location" size={16} color="#666" />
-                <Text style={styles.infoText}>{item.activityLocation}</Text>
-              </View>
-            )}
-          </View>
-        )}
       </View>
     </TouchableOpacity>
   );
@@ -311,6 +294,7 @@ const SearchResultsScreen = ({ route, navigation }) => {
                 <TouchableOpacity 
                   style={styles.filterCheckbox}
                   onPress={() => setShowOnlyRecruiting(!showOnlyRecruiting)}
+                  activeOpacity={1}
                 >
                   <View style={[styles.checkbox, showOnlyRecruiting && styles.checkboxChecked]}>
                     {showOnlyRecruiting && (
@@ -356,6 +340,7 @@ const SearchResultsScreen = ({ route, navigation }) => {
               <TouchableOpacity
                 style={styles.actionMenuItemWithBorder}
                 onPress={handleBlock}
+                activeOpacity={1}
               >
                 <Ionicons name="ban-outline" size={20} color="#dc3545" />
                 <Text style={[styles.actionMenuText, styles.actionMenuTextRed]}>ブロック</Text>
@@ -365,6 +350,7 @@ const SearchResultsScreen = ({ route, navigation }) => {
             <TouchableOpacity
               style={styles.actionMenuItemWithBorder}
               onPress={handleReport}
+              activeOpacity={1}
             >
               <Ionicons name="flag-outline" size={20} color="#dc3545" />
               <Text style={[styles.actionMenuText, styles.actionMenuTextRed]}>報告する</Text>
@@ -373,6 +359,7 @@ const SearchResultsScreen = ({ route, navigation }) => {
               <TouchableOpacity
                 style={styles.actionMenuItem}
                 onPress={hideActionSheet}
+                activeOpacity={1}
               >
                 <Ionicons name="close-outline" size={20} color="#666" />
                 <Text style={styles.actionMenuText}>キャンセル</Text>
@@ -387,7 +374,7 @@ const SearchResultsScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   fullScreenContainer: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f0f2f5',
   },
   header: {
     width: '100%',
@@ -421,7 +408,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f0f2f5',
   },
   listContent: {
     paddingHorizontal: 15,
@@ -447,7 +434,6 @@ const styles = StyleSheet.create({
   headerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
   },
   accountImage: {
     width: 50,
@@ -457,7 +443,6 @@ const styles = StyleSheet.create({
   },
   headerTextContainer: {
     flex: 1,
-    marginRight: 50, // 「・・・」ボタンのスペースを確保
   },
   resultTitle: {
     fontSize: 18,
@@ -475,7 +460,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 180,
     borderRadius: 8,
-    marginBottom: 10,
+    marginTop: 12,
   },
   descriptionContainer: {
     marginBottom: 5,
@@ -544,27 +529,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  infoContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 15,
-    marginTop: 8,
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 4,
-  },
   actionButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    zIndex: 10,
-    padding: 12,
+    alignSelf: 'center',
+    padding: 8,
+    marginLeft: 10,
   },
   modalOverlay: {
     flex: 1,
