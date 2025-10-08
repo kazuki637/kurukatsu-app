@@ -1,20 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, StatusBar, ActivityIndicator, Image, Alert, Dimensions, ScrollView, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { db, auth } from '../firebaseConfig';
 import { doc, getDoc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { useFocusEffect } from '@react-navigation/native';
 import CommonHeader from '../components/CommonHeader';
-
-const BUTTON_SIZE = (Dimensions.get('window').width - 40) / 2.5; // 2列+等間隔
-const GRID_WIDTH = BUTTON_SIZE * 2 + 10; // ボタン2個＋間隔
-const GRID_COLUMNS = 3;
-const GRID_ROWS = 2;
-const BUTTON_GRID_MARGIN = 32;
-const BUTTON_GRID_GAP = 16;
-const BUTTON_SIZE_3COL = (Dimensions.get('window').width - BUTTON_GRID_GAP * (GRID_COLUMNS + 1)) / GRID_COLUMNS;
 
 export default function CircleManagementDetailScreen({ route, navigation }) {
   const { circleId, circleName } = route.params;
@@ -137,7 +127,7 @@ export default function CircleManagementDetailScreen({ route, navigation }) {
     return [
       // 1行目
       {
-        label: 'プロフィールを\n編集する',
+        label: '新歓プロフィールを\n編集する',
         iconSource: require('../assets/Button-icons/Profile.png'),
         onPress: () => navigation.navigate('CircleProfileEdit', { circleId })
       },
@@ -409,7 +399,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   managementGridItem2col: {
-    width: (Dimensions.get('window').width - 60) / 2,
+    width: (Dimensions.get('window').width - 55) / 2, // paddingHorizontal 20*2 + gap 15 = 55
     height: 120,
     borderRadius: 12,
     overflow: 'hidden',
@@ -429,16 +419,14 @@ const styles = StyleSheet.create({
   buttonContent: {
     flex: 1,
     padding: 12,
-    justifyContent: 'space-between',
-    alignItems: 'stretch',
     position: 'relative',
   },
   buttonIconContainer: {
-    alignItems: 'flex-end',
-    justifyContent: 'flex-end',
-    position: 'relative',
-    paddingRight: 20,
-    paddingBottom: 20,
+    position: 'absolute',
+    right: 8,
+    bottom: 8,
+    width: 60,
+    height: 60,
   },
   buttonIcon: {
     width: 60,

@@ -1,12 +1,100 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert, TextInput, Modal, ScrollView, Platform, Switch, Keyboard, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert, TextInput, Modal, ScrollView, Platform, Switch, Keyboard, Dimensions, KeyboardAvoidingView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { db } from '../firebaseConfig';
-import { collection, getDocs, addDoc, doc, deleteDoc, query, where, orderBy, getDocs as getDocsFirestore, getDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, doc, deleteDoc, query, where, orderBy, getDocs as getDocsFirestore, getDoc, updateDoc } from 'firebase/firestore';
 import CommonHeader from '../components/CommonHeader';
 import { Modalize } from 'react-native-modalize';
 import KurukatsuButton from '../components/KurukatsuButton';
+
+// 追加: 4桁時刻入力用のカスタムコンポーネント
+function TimeInput({ value, onChange, placeholder }) {
+  // value: "hhmm" 形式の4桁または空文字
+  const inputRef = useRef(null);
+  const [isFocused, setIsFocused] = useState(false);
+  
+  // 入力値を4桁に制限
+  const handleChange = (text) => {
+    // 数字以外除去
+    let newText = text.replace(/[^0-9]/g, "");
+    if (newText.length > 4) newText = newText.slice(0, 4);
+    onChange(newText);
+  };
+  
+  // バックスペース対応
+  const handleKeyPress = (e) => {
+    if (e.nativeEvent.key === 'Backspace' && value.length > 0) {
+      onChange(value.slice(0, -1));
+    }
+  };
+  
+  // 表示用分割
+  const h1 = value[0] || '';
+  const h2 = value[1] || '';
+  const m1 = value[2] || '';
+  const m2 = value[3] || '';
+  
+  return (
+    <TouchableOpacity
+      style={{ flexDirection: 'row', alignItems: 'center' }}
+      activeOpacity={1}
+      onPress={() => inputRef.current && inputRef.current.focus()}
+    >
+      <View style={[
+        styles.timeInputBox,
+        isFocused && styles.timeInputBoxFocused
+      ]}>
+        <Text style={[
+          styles.timeInputText,
+          isFocused && styles.timeInputTextFocused
+        ]}>{h1}</Text>
+      </View>
+      <View style={[
+        styles.timeInputBox,
+        isFocused && styles.timeInputBoxFocused
+      ]}>
+        <Text style={[
+          styles.timeInputText,
+          isFocused && styles.timeInputTextFocused
+        ]}>{h2}</Text>
+      </View>
+      <Text style={{ fontSize: 20, marginHorizontal: 4 }}>:</Text>
+      <View style={[
+        styles.timeInputBox,
+        isFocused && styles.timeInputBoxFocused
+      ]}>
+        <Text style={[
+          styles.timeInputText,
+          isFocused && styles.timeInputTextFocused
+        ]}>{m1}</Text>
+      </View>
+      <View style={[
+        styles.timeInputBox,
+        isFocused && styles.timeInputBoxFocused
+      ]}>
+        <Text style={[
+          styles.timeInputText,
+          isFocused && styles.timeInputTextFocused
+        ]}>{m2}</Text>
+      </View>
+      <TextInput
+        ref={inputRef}
+        value={value}
+        onChangeText={handleChange}
+        onKeyPress={handleKeyPress}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        keyboardType="number-pad"
+        maxLength={4}
+        style={{ position: 'absolute', opacity: 0, width: 1, height: 1 }}
+        placeholder={placeholder}
+        blurOnSubmit={false}
+        caretHidden
+      />
+    </TouchableOpacity>
+  );
+}
 
 // 高度に洗練されたカレンダーコンポーネント
 const Calendar = ({ selectedDate, onDateSelect, events }) => {
@@ -281,6 +369,7 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
   
   // refs
   const attendanceModalizeRef = useRef(null);
+  const scheduleModalizeRef = useRef(null);
   
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState([]);
@@ -294,6 +383,17 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
   const [attendanceModalType, setAttendanceModalType] = useState('all');
   const [userList, setUserList] = useState([]);
   const [userCount, setUserCount] = useState(0);
+  
+  // スケジュール追加/編集用のstate
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editingEventId, setEditingEventId] = useState(null);
+  const [newTitle, setNewTitle] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [isAllDay, setIsAllDay] = useState(false);
+  const [startTimeInput, setStartTimeInput] = useState('');
+  const [endTimeInput, setEndTimeInput] = useState('');
+  const [location, setLocation] = useState('');
+  const [selectedColor, setSelectedColor] = useState('#007bff');
 
 
   useEffect(() => {
@@ -338,24 +438,92 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
     setSelectedDate(date);
   };
 
+  // スケジュール保存処理
+  const handleSaveEvent = async () => {
+    if (!newTitle.trim()) {
+      Alert.alert('入力エラー', 'タイトルを入力してください');
+      return;
+    }
 
+    try {
+      const formatDate = (date) => {
+        // タイムゾーンの影響を避けるため、ローカル日付として処理
+        const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+        const year = localDate.getFullYear();
+        const month = String(localDate.getMonth() + 1).padStart(2, '0');
+        const day = String(localDate.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      };
 
-  // 新規スケジュール追加画面への遷移
-  const navigateToAddSchedule = () => {
-    navigation.navigate('AddSchedule', {
-      selectedDate: selectedDate,
-      circleId: circleId
-    });
+      const updateData = {
+        title: newTitle.trim(),
+        date: formatDate(selectedDate),
+        isAllDay: isAllDay,
+        startTime: isAllDay ? '' : (startTimeInput.length === 4 ? `${startTimeInput.slice(0,2)}:${startTimeInput.slice(2,4)}` : ''),
+        endTime: isAllDay ? '' : (endTimeInput.length === 4 ? `${endTimeInput.slice(0,2)}:${endTimeInput.slice(2,4)}` : ''),
+        description: newDescription.trim(),
+        location: location.trim(),
+        color: selectedColor,
+        updatedAt: new Date()
+      };
+
+      if (isEditMode && editingEventId) {
+        // 編集モード：既存のスケジュールを更新
+        const eventRef = doc(db, 'circles', circleId, 'schedule', editingEventId);
+        await updateDoc(eventRef, updateData);
+        
+        // ローカルのeventsも更新
+        setEvents(prev => prev.map(e => e.id === editingEventId ? { ...e, ...updateData } : e));
+        
+        scheduleModalizeRef.current?.close();
+        Alert.alert('成功', 'スケジュールが更新されました');
+      } else {
+        // 新規追加モード
+        const eventsRef = collection(db, 'circles', circleId, 'schedule');
+        const newEventData = { ...updateData };
+        newEventData.createdAt = new Date();
+        delete newEventData.updatedAt;
+        
+        const docRef = await addDoc(eventsRef, newEventData);
+        
+        // ローカルのeventsも更新
+        setEvents(prev => [...prev, { id: docRef.id, ...newEventData }]);
+        
+        scheduleModalizeRef.current?.close();
+        Alert.alert('成功', 'スケジュールが追加されました');
+      }
+    } catch (e) {
+      console.error('Error saving event:', e);
+      Alert.alert('エラー', isEditMode ? 'スケジュールの更新に失敗しました' : 'スケジュールの追加に失敗しました');
+    }
   };
 
-  // スケジュール編集画面への遷移
+  // 新規スケジュール追加モーダルを開く
+  const navigateToAddSchedule = () => {
+    setIsEditMode(false);
+    setEditingEventId(null);
+    setNewTitle('');
+    setNewDescription('');
+    setIsAllDay(false);
+    setStartTimeInput('');
+    setEndTimeInput('');
+    setLocation('');
+    setSelectedColor('#007bff');
+    scheduleModalizeRef.current?.open();
+  };
+
+  // スケジュール編集モーダルを開く
   const navigateToEditSchedule = (event) => {
-    navigation.navigate('AddSchedule', {
-      selectedDate: selectedDate,
-      circleId: circleId,
-      editMode: true,
-      eventData: event
-    });
+    setIsEditMode(true);
+    setEditingEventId(event.id);
+    setNewTitle(event.title || '');
+    setNewDescription(event.description || '');
+    setIsAllDay(event.isAllDay || false);
+    setStartTimeInput(event.startTime ? event.startTime.replace(':', '') : '');
+    setEndTimeInput(event.endTime ? event.endTime.replace(':', '') : '');
+    setLocation(event.location || '');
+    setSelectedColor(event.color || '#007bff');
+    scheduleModalizeRef.current?.open();
   };
 
   const handleDelete = async (eventId) => {
@@ -602,10 +770,9 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
         ref={attendanceModalizeRef}
         adjustToContentHeight={false}
         modalHeight={SHEET_HEIGHT}
-        handleStyle={{ backgroundColor: '#222', borderTopLeftRadius: 16, borderTopRightRadius: 16 }}
+        withHandle={false}
         modalStyle={{ borderTopLeftRadius: 16, borderTopRightRadius: 16, backgroundColor: '#fff' }}
         overlayStyle={{ backgroundColor: 'rgba(0,0,0,0.2)' }}
-        handlePosition="inside"
         HeaderComponent={
           <>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 20, paddingHorizontal: 20, paddingBottom: 12 }}>
@@ -654,6 +821,145 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
           ListEmptyComponent: <Text style={{ color: '#888', textAlign: 'center', marginTop: 20 }}>ユーザーがいません</Text>,
         }}
       />
+
+      {/* スケジュール追加/編集ボトムシート */}
+      <Modalize
+        ref={scheduleModalizeRef}
+        adjustToContentHeight={false}
+        modalHeight={SHEET_HEIGHT}
+        withHandle={false}
+        panGestureEnabled={false}
+        modalStyle={{ borderTopLeftRadius: 16, borderTopRightRadius: 16, backgroundColor: '#fff' }}
+        overlayStyle={{ backgroundColor: 'rgba(0,0,0,0.2)' }}
+        HeaderComponent={
+          <View style={styles.scheduleModalHeader}>
+            <TouchableOpacity 
+              style={styles.scheduleModalHeaderButton} 
+              onPress={() => scheduleModalizeRef.current?.close()}
+            >
+              <Text style={styles.scheduleModalHeaderButtonText} numberOfLines={1}>キャンセル</Text>
+            </TouchableOpacity>
+            <View style={styles.scheduleModalHeaderTitleContainer}>
+              <Text style={styles.scheduleModalHeaderTitle}>{isEditMode ? '予定を編集' : '新しい予定'}</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.scheduleModalHeaderButton} 
+              onPress={handleSaveEvent}
+            >
+              <Text style={styles.scheduleModalHeaderButtonText} numberOfLines={1}>保存</Text>
+            </TouchableOpacity>
+          </View>
+        }
+      >
+        <KeyboardAvoidingView 
+          style={styles.scheduleModalKeyboardView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          {/* 選択された日付表示 */}
+          <View style={styles.scheduleModalDateSection}>
+            <Text style={styles.scheduleModalDateText}>{formatDateForDisplay(selectedDate)}</Text>
+          </View>
+
+          {/* 入力フォーム */}
+          <ScrollView 
+            style={styles.scheduleModalForm} 
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scheduleModalFormContent}
+          >
+            {/* タイトル行 */}
+            <View style={styles.scheduleModalFormRow}>
+              <Text style={styles.scheduleModalFormLabel}>タイトル</Text>
+              <TextInput 
+                style={styles.scheduleModalTitleInput} 
+                value={newTitle} 
+                onChangeText={setNewTitle} 
+                placeholder="タイトル"
+              />
+            </View>
+
+            {/* 終日予定トグル */}
+            <View style={styles.scheduleModalFormRow}>
+              <Text style={styles.scheduleModalFormLabel}>終日予定</Text>
+              <Switch 
+                value={isAllDay} 
+                onValueChange={setIsAllDay}
+                trackColor={{ false: '#e0e0e0', true: '#007bff' }}
+                thumbColor={isAllDay ? '#fff' : '#f4f3f4'}
+              />
+            </View>
+
+            {/* 開始時刻 */}
+            {!isAllDay && (
+              <View style={styles.scheduleModalTimeRow}>
+                <Text style={styles.scheduleModalTimeLabel}>開始</Text>
+                <TimeInput
+                  value={startTimeInput}
+                  onChange={setStartTimeInput}
+                  placeholder="hhmm"
+                />
+              </View>
+            )}
+
+            {/* 終了時刻 */}
+            {!isAllDay && (
+              <View style={styles.scheduleModalTimeRow}>
+                <Text style={styles.scheduleModalTimeLabel}>終了</Text>
+                <TimeInput
+                  value={endTimeInput}
+                  onChange={setEndTimeInput}
+                  placeholder="hhmm"
+                />
+              </View>
+            )}
+
+            {/* 場所入力 */}
+            <View style={styles.scheduleModalFormRow}>
+              <Text style={styles.scheduleModalFormLabel}>場所</Text>
+              <TextInput 
+                style={styles.scheduleModalFormInput} 
+                value={location}
+                onChangeText={setLocation}
+                placeholder="場所"
+              />
+            </View>
+
+            {/* 色選択 */}
+            <View style={styles.scheduleModalFormRow}>
+              <Text style={styles.scheduleModalFormLabel}>色</Text>
+              <View style={styles.scheduleModalColorContainer}>
+                {['#007bff', '#28a745', '#ffc107', '#dc3545', '#6f42c1', '#fd7e14'].map((color) => (
+                  <TouchableOpacity
+                    key={color}
+                    style={[
+                      styles.scheduleModalColorOption,
+                      selectedColor === color && styles.scheduleModalSelectedColorOption
+                    ]}
+                    onPress={() => setSelectedColor(color)}
+                  >
+                    <View style={[styles.scheduleModalColorCircle, { backgroundColor: color }]} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* 詳細入力 */}
+            <View style={styles.scheduleModalFormRow}>
+              <Text style={styles.scheduleModalFormLabel}>詳細</Text>
+              <View style={styles.scheduleModalDetailInputContainer}>
+                <TextInput 
+                  style={[styles.scheduleModalFormInput, styles.scheduleModalDetailInput]} 
+                  value={newDescription} 
+                  onChangeText={setNewDescription} 
+                  placeholder="詳細を入力してください"
+                  multiline
+                />
+              </View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modalize>
     </View>
   );
 }
@@ -1143,5 +1449,163 @@ const styles = StyleSheet.create({
     color: '#666',
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  
+  // スケジュール追加/編集ボトムシート用スタイル
+  scheduleModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: 'hidden',
+  },
+  scheduleModalHeaderButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    minWidth: 100,
+  },
+  scheduleModalHeaderButtonText: {
+    fontSize: 14,
+    color: '#007bff',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  scheduleModalHeaderTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scheduleModalHeaderTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  scheduleModalKeyboardView: {
+    flex: 1,
+  },
+  scheduleModalDateSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#f8f9fa',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  scheduleModalDateText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500',
+  },
+  scheduleModalForm: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  scheduleModalFormContent: {
+    paddingBottom: 20,
+  },
+  scheduleModalFormRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  scheduleModalFormLabel: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+    width: 80,
+  },
+  scheduleModalTitleInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    paddingVertical: 0,
+  },
+  scheduleModalTimeRow: {
+    flexDirection: 'column',
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  scheduleModalTimeLabel: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+    width: 80,
+    marginBottom: 8,
+  },
+  scheduleModalFormInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    paddingVertical: 0,
+  },
+  scheduleModalDetailInputContainer: {
+    flex: 1,
+  },
+  scheduleModalDetailInput: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  scheduleModalColorContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  scheduleModalColorOption: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  scheduleModalSelectedColorOption: {
+    borderColor: '#333',
+    borderWidth: 3,
+  },
+  scheduleModalColorCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+  },
+  
+  // TimeInput用スタイル
+  timeInputBox: {
+    width: 32,
+    height: 40,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 6,
+    marginHorizontal: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fafbfc',
+  },
+  timeInputBoxFocused: {
+    borderColor: '#007bff',
+    borderWidth: 2,
+    backgroundColor: '#fff',
+    shadowColor: '#007bff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  timeInputText: {
+    fontSize: 20,
+    color: '#333',
+    fontWeight: 'bold',
+  },
+  timeInputTextFocused: {
+    color: '#007bff',
   },
 }); 

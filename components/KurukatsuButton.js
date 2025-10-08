@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Animated, Platform } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
 /**
- * KurukatsuButton - Duolingo風3Dボタンコンポーネント
+ * KurukatsuButton - モダンなシャドウ付きボタンコンポーネント
  * 
  * @param {string} title - ボタンのテキスト
  * @param {function} onPress - ボタンが押された時の処理
@@ -11,7 +11,6 @@ import * as Haptics from 'expo-haptics';
  * @param {object} buttonStyle - メインボタンの追加スタイル
  * @param {object} textStyle - テキストの追加スタイル
  * @param {string} backgroundColor - メインボタンの背景色
- * @param {string} shadowColor - 影レイヤーの色
  * @param {boolean} disabled - ボタンの無効化
  * @param {string} size - ボタンサイズ ('small', 'medium', 'large')
  * @param {string} variant - ボタンの種類 ('primary', 'secondary', 'outline')
@@ -25,7 +24,6 @@ const KurukatsuButton = ({
   buttonStyle = {},
   textStyle = {},
   backgroundColor = '#1380ec',
-  shadowColor = '#0f5bb5',
   disabled = false,
   loading = false,
   size = 'medium',
@@ -34,28 +32,36 @@ const KurukatsuButton = ({
   ...props
 }) => {
   const [pressed, setPressed] = useState(false);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  // 押し込みアニメーション
+  useEffect(() => {
+    Animated.spring(scaleAnim, {
+      toValue: (pressed || loading) ? 0.96 : 1,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 4,
+    }).start();
+  }, [pressed, loading]);
 
   // サイズ設定
   const getSizeStyles = () => {
     switch (size) {
       case 'small':
         return {
-          paddingVertical: 8,
-          shadowPaddingVertical: 14,
+          paddingVertical: 10,
           fontSize: 16,
           borderRadius: 12,
         };
       case 'large':
         return {
-          paddingVertical: 16,
-          shadowPaddingVertical: 22,
+          paddingVertical: 18,
           fontSize: 20,
           borderRadius: 20,
         };
       default: // medium
         return {
-          paddingVertical: 12,
-          shadowPaddingVertical: 18,
+          paddingVertical: 14,
           fontSize: 18,
           borderRadius: 16,
         };
@@ -68,7 +74,6 @@ const KurukatsuButton = ({
       case 'secondary':
         return {
           backgroundColor: '#ffffff',
-          shadowColor: '#B0B7C3',
           textColor: '#2563eb',
           borderWidth: 2,
           borderColor: '#B0B7C3',
@@ -76,7 +81,6 @@ const KurukatsuButton = ({
       case 'outline':
         return {
           backgroundColor: 'transparent',
-          shadowColor: '#E5E7EB',
           textColor: '#2563eb',
           borderWidth: 2,
           borderColor: backgroundColor,
@@ -84,7 +88,6 @@ const KurukatsuButton = ({
       default: // primary
         return {
           backgroundColor: backgroundColor,
-          shadowColor: shadowColor,
           textColor: '#FFFFFF',
           borderWidth: 0,
           borderColor: 'transparent',
@@ -94,6 +97,9 @@ const KurukatsuButton = ({
 
   const sizeStyles = getSizeStyles();
   const variantStyles = getVariantStyles();
+  
+  // 枠線がある場合はpaddingを調整して視覚的な高さを統一
+  const adjustedPaddingVertical = sizeStyles.paddingVertical - (variantStyles.borderWidth || 0);
 
   const handlePressIn = () => {
     if (disabled || loading) return;
@@ -113,40 +119,55 @@ const KurukatsuButton = ({
     onPress && onPress();
   };
 
+  // シャドウスタイルを取得
+  const getShadowStyle = () => {
+    if (disabled || variant === 'outline') {
+      return {}; // disabledまたはoutlineの場合はシャドウなし
+    }
+    
+    return Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: {
+          width: 0,
+          height: pressed || loading ? 1 : 3,
+        },
+        shadowOpacity: pressed || loading ? 0.1 : 0.15,
+        shadowRadius: pressed || loading ? 2 : 4,
+      },
+      android: {
+        elevation: pressed || loading ? 2 : 4,
+      },
+    });
+  };
+
   return (
-    <View style={[styles.buttonContainer, style]}>
-      {/* 影レイヤー */}
-      <View 
-        style={[
-          styles.shadowLayer,
-          {
-            opacity: (pressed || loading || disabled) ? 0 : 1, // disabled時は影を非表示
-            backgroundColor: variantStyles.shadowColor,
-            borderRadius: sizeStyles.borderRadius,
-            paddingVertical: sizeStyles.shadowPaddingVertical,
-            bottom: variant === 'secondary' ? -2 : -3, // 白い背景の場合は1px小さく
-          }
-        ]} 
-      />
-      
-      {/* メインボタン */}
+    <Animated.View 
+      style={[
+        styles.buttonContainer,
+        {
+          transform: [{ scale: scaleAnim }],
+        },
+        style,
+      ]}
+    >
       <TouchableOpacity 
         style={[
           styles.mainButton,
           {
             backgroundColor: loading ? '#D1D5DB' : (disabled ? '#D1D5DB' : variantStyles.backgroundColor),
             borderRadius: sizeStyles.borderRadius,
-            paddingVertical: sizeStyles.paddingVertical,
+            paddingVertical: adjustedPaddingVertical,
             borderWidth: variantStyles.borderWidth,
             borderColor: disabled ? '#D1D5DB' : variantStyles.borderColor,
-            transform: [{ translateY: (pressed || loading) ? (variant === 'secondary' ? 2 : 3) : 0 }], // secondaryは2px、他は3px移動
           },
+          getShadowStyle(),
           buttonStyle,
         ]}
         onPressIn={handlePressIn}
         onPressOut={handlePressOut}
         onPress={handlePress}
-        activeOpacity={1}
+        activeOpacity={1.0}
         disabled={disabled || loading}
         {...props}
       >
@@ -166,31 +187,18 @@ const KurukatsuButton = ({
         )}
         {props.children}
       </TouchableOpacity>
-    </View>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   buttonContainer: {
     width: '100%',
-    position: 'relative',
-    marginBottom: 4,
-  },
-  shadowLayer: {
-    position: 'absolute',
-    bottom: -3,
-    left: 0,
-    right: 0,
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   mainButton: {
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    position: 'relative',
-    zIndex: 1,
     minHeight: 48,
   },
   buttonText: {

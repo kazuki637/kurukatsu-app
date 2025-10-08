@@ -29,6 +29,7 @@ import GenreSelectionScreen from './screens/GenreSelectionScreen';
 import ProfileEditScreen from './screens/ProfileEditScreen';
 
 import CircleProfileScreen from './screens/CircleProfileScreen';
+import CircleEventDetailScreen from './screens/CircleEventDetailScreen';
 import FeatureSelectionScreen from './screens/FeatureSelectionScreen';
 import FrequencySelectionScreen from './screens/FrequencySelectionScreen';
 import GenderRatioSelectionScreen from './screens/GenderRatioSelectionScreen';
@@ -46,7 +47,6 @@ import CircleRegistrationScreen from './screens/CircleRegistrationScreen';
 import CircleProfileEditScreen from './screens/CircleProfileEditScreen';
 import CircleMemberManagementScreen from './screens/CircleMemberManagementScreen';
 import CircleScheduleManagementScreen from './screens/CircleScheduleManagementScreen';
-import AddScheduleScreen from './screens/AddScheduleScreen';
 import CircleContactScreen from './screens/CircleContactScreen';
 import CircleMemberScreen from './screens/CircleMemberScreen';
 import CircleMemberScheduleScreen from './screens/CircleMemberScheduleScreen';
@@ -371,7 +371,6 @@ function CircleManagementStackScreen() {
       <CircleManagementStack.Screen name="CircleSettings" component={CircleSettingsScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleMemberManagement" component={CircleMemberManagementScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleScheduleManagement" component={CircleScheduleManagementScreen} options={{ headerShown: false, gestureEnabled: true }} />
-      <CircleManagementStack.Screen name="AddSchedule" component={AddScheduleScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleContact" component={CircleContactScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleLeadershipTransfer" component={CircleLeadershipTransferScreen} options={{ headerShown: false, gestureEnabled: true }} />
     </CircleManagementStack.Navigator>
@@ -383,6 +382,7 @@ function SharedStackScreen() {
   return (
     <SharedStack.Navigator screenOptions={{ headerShown: false }}>
       <SharedStack.Screen name="CircleDetail" component={CircleProfileScreen} />
+      <SharedStack.Screen name="CircleEventDetail" component={CircleEventDetailScreen} />
       <SharedStack.Screen name="CircleMessageDetail" component={CircleMessageDetailScreen} />
       <SharedStack.Screen name="CircleMember" component={CircleMemberScreen} />
       <SharedStack.Screen name="CircleMemberSchedule" component={CircleMemberScheduleScreen} />
@@ -437,8 +437,6 @@ function AppNavigator() {
   const [isPreloadComplete, setIsPreloadComplete] = useState(false);
 
   useEffect(() => {
-
-
     const initialize = async () => {
       try {
         console.log('🚀 スプラッシュ画面でのプリロード開始');
@@ -462,18 +460,9 @@ function AppNavigator() {
         console.log('✅ スプラッシュ画面でのプリロード完了');
         setIsPreloadComplete(true);
         
-        // 4. 最小表示時間を確保（UX向上）
-        await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // 5. スプラッシュ画面を非表示
-        await SplashScreen.hideAsync();
-        console.log('📱 スプラッシュ画面非表示完了');
-        
       } catch (error) {
         console.warn('スプラッシュプリロードエラー:', error);
         setIsPreloadComplete(true);
-        // エラー時もスプラッシュ画面を非表示
-        await SplashScreen.hideAsync();
       }
     };
     
@@ -506,9 +495,28 @@ function AppNavigator() {
     // クリーンアップ関数を返す
     return () => {
       subscriber();
-
     };
   }, []);
+
+  // スプラッシュ画面を非表示にする処理（すべての初期化完了後）
+  useEffect(() => {
+    const hideSplash = async () => {
+      // すべての初期化条件が満たされたらスプラッシュ画面を非表示
+      if (!initializing && showOnboarding !== null && isPreloadComplete) {
+        try {
+          console.log('🎬 すべての初期化完了、スプラッシュ画面フェードアウト開始');
+          // 最小表示時間を確保（UX向上）
+          await new Promise(resolve => setTimeout(resolve, 300));
+          await SplashScreen.hideAsync();
+          console.log('✅ スプラッシュ画面フェードアウト完了');
+        } catch (error) {
+          console.warn('スプラッシュ画面非表示エラー:', error);
+        }
+      }
+    };
+
+    hideSplash();
+  }, [initializing, showOnboarding, isPreloadComplete]);
 
   if (initializing || showOnboarding === null || !isPreloadComplete) return null;
 

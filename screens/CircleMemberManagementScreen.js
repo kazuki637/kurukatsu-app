@@ -35,6 +35,8 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
   const [currentUserRole, setCurrentUserRole] = useState(null);
   const [deleteConfirmModalVisible, setDeleteConfirmModalVisible] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState(null);
+  const [rejectModalVisible, setRejectModalVisible] = useState(false);
+  const [requestToReject, setRequestToReject] = useState(null);
   const [circleName, setCircleName] = useState('');
   const [membersLoading, setMembersLoading] = useState(true);
   const [requestsLoading, setRequestsLoading] = useState(true);
@@ -389,7 +391,7 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
     }
   };
 
-  const handleReject = async (requestId) => {
+  const handleReject = async (request) => {
     const user = auth.currentUser;
     if (!user) return;
 
@@ -401,9 +403,17 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
       return;
     }
 
+    // 却下対象のリクエスト情報を設定してモーダルを表示
+    setRequestToReject(request);
+    setRejectModalVisible(true);
+  };
+
+  const handleConfirmReject = async () => {
+    if (!requestToReject) return;
+
     try {
-      await deleteDoc(doc(db, 'circles', circleId, 'joinRequests', requestId));
-      setJoinRequests(prev => prev.filter(r => r.id !== requestId));
+      await deleteDoc(doc(db, 'circles', circleId, 'joinRequests', requestToReject.id));
+      setJoinRequests(prev => prev.filter(r => r.id !== requestToReject.id));
       
       // グローバル入会申請数を更新（-1）
       if (global.updateCircleManagementJoinRequests) {
@@ -414,8 +424,11 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
         global.updateCircleManagementDetailJoinRequests(circleId, joinRequests.length - 1);
       }
       
-      Alert.alert('却下完了', '入会申請を却下しました');
+      // モーダルを閉じる
+      setRejectModalVisible(false);
+      setRequestToReject(null);
     } catch (e) {
+      console.error('Error rejecting request:', e);
       Alert.alert('エラー', '申請の却下に失敗しました');
     }
   };
@@ -628,10 +641,10 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
                          <Text style={styles.memberName}>{request.name || '申請者'}</Text>
                          <Text style={styles.memberDetails}>{request.university || ''} {request.grade || ''}</Text>
                        </View>
-                       <TouchableOpacity style={styles.approveButton} onPress={() => handleApprove(request)}>
-                         <Ionicons name="checkmark-circle" size={32} color="#16A34A" />
-                       </TouchableOpacity>
-                       <TouchableOpacity style={styles.rejectButton} onPress={() => handleReject(request.id)}>
+                      <TouchableOpacity style={styles.approveButton} onPress={() => handleApprove(request)}>
+                        <Ionicons name="checkmark-circle" size={32} color="#1380ec" />
+                      </TouchableOpacity>
+                       <TouchableOpacity style={styles.rejectButton} onPress={() => handleReject(request)}>
                          <Ionicons name="close-circle" size={32} color="#DC2626" />
                        </TouchableOpacity>
                      </View>
@@ -660,30 +673,24 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
             <Text style={styles.modalSubtitle}>
               {selectedMember?.name} の役割を選択してください
             </Text>
-            <TouchableOpacity
-              style={[
-                styles.roleOption,
-                selectedMember?.role === 'member' && styles.roleOptionActive
-              ]}
+            <KurukatsuButton
+              title="メンバー"
               onPress={() => handleRoleChange(selectedMember?.id, 'member')}
-            >
-              <Text style={[
-                styles.roleOptionText,
-                selectedMember?.role === 'member' && styles.roleOptionTextActive
-              ]}>メンバー</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.roleOption,
-                selectedMember?.role === 'admin' && styles.roleOptionActive
-              ]}
+              size="medium"
+              variant={selectedMember?.role === 'member' ? 'primary' : 'secondary'}
+              backgroundColor="#1380ec"
+              hapticFeedback={true}
+              style={styles.roleOptionButton}
+            />
+            <KurukatsuButton
+              title="管理者"
               onPress={() => handleRoleChange(selectedMember?.id, 'admin')}
-            >
-              <Text style={[
-                styles.roleOptionText,
-                selectedMember?.role === 'admin' && styles.roleOptionTextActive
-              ]}>管理者</Text>
-            </TouchableOpacity>
+              size="medium"
+              variant={selectedMember?.role === 'admin' ? 'primary' : 'secondary'}
+              backgroundColor="#1380ec"
+              hapticFeedback={true}
+              style={styles.roleOptionButton}
+            />
             <KurukatsuButton
               title="キャンセル"
               onPress={() => setRoleChangeModalVisible(false)}
@@ -730,7 +737,54 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
                  size="medium"
                  variant="primary"
                  backgroundColor="#DC2626"
-                 shadowColor="#B91C1C"
+                 hapticFeedback={true}
+                 style={styles.modalConfirmButtonKurukatsu}
+               />
+             </View>
+           </View>
+         </View>
+       </Modal>
+
+       {/* 入会申請却下確認モーダル */}
+       <Modal
+         visible={rejectModalVisible}
+         transparent={true}
+         animationType="fade"
+         onRequestClose={() => {
+           setRejectModalVisible(false);
+           setRequestToReject(null);
+         }}
+       >
+         <View style={styles.modalOverlay}>
+           <View style={styles.modalContent}>
+             <View style={styles.modalIconContainer}>
+               <Ionicons name="close-circle-outline" size={40} color="#DC2626" />
+             </View>
+             <Text style={styles.modalTitle}>入会申請を却下しますか？</Text>
+             <Text style={styles.modalSubtitle}>
+               {requestToReject?.name || '申請者'} の入会申請を却下します。
+             </Text>
+             <Text style={styles.modalWarning}>
+               この操作は元に戻すことができません。
+             </Text>
+             <View style={styles.modalButtons}>
+               <KurukatsuButton
+                 title="キャンセル"
+                 onPress={() => {
+                   setRejectModalVisible(false);
+                   setRequestToReject(null);
+                 }}
+                 size="medium"
+                 variant="secondary"
+                 hapticFeedback={true}
+                 style={styles.modalConfirmButtonKurukatsu}
+               />
+               <KurukatsuButton
+                 title="却下する"
+                 onPress={handleConfirmReject}
+                 size="medium"
+                 variant="primary"
+                 backgroundColor="#DC2626"
                  hapticFeedback={true}
                  style={styles.modalConfirmButtonKurukatsu}
                />
@@ -920,6 +974,15 @@ const styles = StyleSheet.create({
     maxWidth: 320,
     alignItems: 'center'
   },
+  modalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FEE2E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   modalTitle: { 
     fontSize: 18, 
     fontWeight: 'bold', 
@@ -934,31 +997,15 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     lineHeight: 22
   },
-  roleOption: { 
-    backgroundColor: '#F3F4F6', 
-    borderRadius: 12, 
-    paddingVertical: 16, 
-    paddingHorizontal: 20, 
-    marginBottom: 12, 
-    alignItems: 'center',
-    width: '100%'
+  roleOptionButton: {
+    marginBottom: 12,
+    width: '100%',
   },
-  roleOptionActive: { 
-    backgroundColor: '#1380ec' 
+  modalCancelButtonKurukatsu: {
+    marginTop: 10,
+    width: '60%',
+    alignSelf: 'center',
   },
-  roleOptionText: { 
-    fontSize: 16, 
-    fontWeight: '600', 
-    color: '#374151' 
-  },
-  roleOptionTextActive: { 
-    color: '#FFFFFF' 
-  },
-   modalCancelButtonKurukatsu: {
-     marginTop: 10,
-     width: '60%',
-     alignSelf: 'center',
-   },
    modalButtons: {
      flexDirection: 'row',
      justifyContent: 'space-around',

@@ -754,7 +754,6 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
           variant="primary"
           size="medium"
           backgroundColor="#DC2626"
-          shadowColor="#B91C1C"
           disabled={isDeleting}
           style={styles.deleteButtonContainer}
         />
@@ -791,7 +790,6 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
                 size="medium"
                 variant="primary"
                 backgroundColor="#DC2626"
-                shadowColor="#B91C1C"
                 hapticFeedback={true}
                 disabled={isDeleting}
                 style={styles.modalDeleteButtonContainer}

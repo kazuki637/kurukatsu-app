@@ -18,7 +18,7 @@ import * as Haptics from 'expo-haptics';
 import LottieView from 'lottie-react-native';
 import KurukatsuButton from '../components/KurukatsuButton';
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 // --- AnimatedIcon Component ---
 const AnimatedIcon = ({ source, style }) => {
@@ -259,9 +259,9 @@ export default function OnboardingScreen({ navigation, onFinish }) {
       >
         {onboardingSlides.map((slide) => (
           <View style={styles.slide} key={slide.key}>
-            {/* テキストを画面上部に配置（全画面共通の高さ維持） */}
-            <View style={styles.topTextContainer}>
-              {/* クルカツアイコンを角丸で表示（絶対位置固定） */}
+            {/* テキストとアイコンセクション */}
+            <View style={styles.topSection}>
+              {/* クルカツアイコンを角丸で表示 */}
               <View style={styles.iconContainer}>
                 <Image 
                   source={require('../assets/icon.png')}
@@ -270,7 +270,7 @@ export default function OnboardingScreen({ navigation, onFinish }) {
                 />
               </View>
               
-              {/* テキスト部分も絶対位置で固定 */}
+              {/* テキスト部分 */}
               <View style={styles.textContentContainer}>
                 {/* アクティブなスライドのテキストのみ表示 */}
                 {activeIndex === parseInt(slide.key, 10) - 1 && (
@@ -300,7 +300,7 @@ export default function OnboardingScreen({ navigation, onFinish }) {
               </View>
             </View>
             
-            {/* 全画面共通のアニメーションコンテナ（高さ統一） */}
+            {/* アニメーションセクション */}
             <View style={styles.animationContainer}>
               {/* 1画面目のアニメーション */}
               {slide.key === '1' && (
@@ -332,6 +332,9 @@ export default function OnboardingScreen({ navigation, onFinish }) {
                 />
               )}
             </View>
+            
+            {/* ボタン用のスペーサー */}
+            <View style={styles.bottomSpacer} />
           </View>
         ))}
       </ScrollView>
@@ -352,6 +355,17 @@ export default function OnboardingScreen({ navigation, onFinish }) {
 }
 
 // --- Upgraded Styles ---
+// 利用可能な画面高さを計算（SafeAreaとボタン領域を除く）
+const BUTTON_CONTAINER_HEIGHT = Platform.OS === 'ios' ? 140 : 130; // ボタン領域の高さ
+const AVAILABLE_HEIGHT = screenHeight - BUTTON_CONTAINER_HEIGHT;
+
+// 各セクションの高さを計算（画面サイズに応じて動的に調整）
+const TOP_SECTION_HEIGHT = Math.min(AVAILABLE_HEIGHT * 0.35, 280); // 上部セクション：35%（最大280px）
+const ANIMATION_HEIGHT = AVAILABLE_HEIGHT - TOP_SECTION_HEIGHT - 20; // アニメーション：残りのスペース（マージン20pxを引く）
+
+// アニメーションのサイズを計算（画面幅または利用可能な高さの小さい方）
+const ANIMATION_SIZE = Math.min(screenWidth * 0.85, ANIMATION_HEIGHT * 0.9);
+
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
@@ -359,62 +373,51 @@ const styles = StyleSheet.create({
   },
   slide: {
     width: screenWidth,
-    height: '100%', // 高さを固定
-    position: 'relative', // 絶対位置の基準
+    height: '100%',
+    flexDirection: 'column', // 縦方向のflexレイアウト
   },
-  topTextContainer: {
-    position: 'absolute',
-    top: 120, // 絶対位置で固定
-    left: 0,
-    right: 0,
+  topSection: {
+    height: TOP_SECTION_HEIGHT,
     paddingHorizontal: 30,
+    paddingTop: 40,
     alignItems: 'center',
-    justifyContent: 'center',
-    height: 200, // 固定高さ
+    justifyContent: 'flex-start',
   },
   iconContainer: {
-    position: 'absolute',
-    top: 0, // topTextContainer内での位置
-    left: 0,
-    right: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 80, // アイコンの高さ
+    marginBottom: 20,
   },
   kurukatsuIcon: {
     width: 80,
     height: 80,
-    borderRadius: 20, // 角丸にする
-    backgroundColor: '#fff', // 背景色（必要に応じて）
+    borderRadius: 20,
+    backgroundColor: '#fff',
   },
   textContentContainer: {
-    position: 'absolute',
-    top: 100, // アイコンの下に配置
-    left: 0,
-    right: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 100, // テキスト領域の固定高さ
+    paddingHorizontal: 10,
+    minHeight: 100, // 最小高さを確保
   },
   animationContainer: {
-    position: 'absolute',
-    top: 350, // 絶対位置で固定
-    left: screenWidth * 0.05, // 中央配置のための左マージン
-    width: screenWidth * 0.9, // 画面幅の90%
-    height: screenWidth * 0.9, // 正方形
+    flex: 1, // 残りのスペースを使用
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: screenWidth * 0.075, // 左右のマージン
+    paddingVertical: 10,
+    maxHeight: ANIMATION_HEIGHT, // 最大高さを制限
   },
   lottieAnimation: {
-    width: screenWidth * 0.9, // コンテナと同じサイズ
-    height: screenWidth * 0.9, // コンテナと同じサイズ
+    width: ANIMATION_SIZE,
+    height: ANIMATION_SIZE,
   },
   bellAnimation: {
-    width: screenWidth * 0.9, // コンテナと同じサイズ
-    height: screenWidth * 0.9, // コンテナと同じサイズ
-    alignSelf: 'center', // 中央配置を強制
-    marginLeft: 20, // 左寄りを補正
-    marginRight: 0, // 右寄りを補正
+    width: ANIMATION_SIZE,
+    height: ANIMATION_SIZE,
+  },
+  bottomSpacer: {
+    height: BUTTON_CONTAINER_HEIGHT, // ボタン領域分のスペースを確保
   },
   textPlaceholder: {
     alignItems: 'center',
@@ -450,78 +453,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 100,
+    height: BUTTON_CONTAINER_HEIGHT,
     paddingHorizontal: 24,
     paddingBottom: Platform.OS === 'ios' ? 40 : 30,
+    paddingTop: 10,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  // 汎用性を考慮した3Dボタンスタイル
-  kurukatsuButtonContainer: {
-    width: '100%',
-    position: 'relative',
-    marginBottom: 5,
-  },
-  kurukatsuButtonShadow: {
-    position: 'absolute',
-    bottom: -5,
-    left: 0,
-    right: 0,
-    width: '100%',
-    backgroundColor: '#2E6BC7', // デフォルトの影色（カスタマイズ可能）
-    borderRadius: 16,
-    paddingVertical: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  kurukatsuButtonMain: {
-    width: '100%', 
-    backgroundColor: '#3A82F7', // デフォルトの背景色（カスタマイズ可能）
-    borderRadius: 16,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    zIndex: 1,
-    minHeight: 48, // 最小高さを保証
-  },
-  kurukatsuButtonText: { 
-    color: '#FFFFFF', 
-    fontSize: 18, 
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  // 後方互換性のためのエイリアス
-  buttonContainer: {
-    width: '100%',
-    position: 'relative',
-    marginBottom: 5,
-  },
-  shadowLayer: {
-    position: 'absolute',
-    bottom: -5,
-    left: 0,
-    right: 0,
-    width: '100%',
-    backgroundColor: '#2E6BC7',
-    borderRadius: 16,
-    paddingVertical: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mainButton: {
-    width: '100%', 
-    backgroundColor: '#3A82F7', 
-    borderRadius: 16,
-    paddingVertical: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    zIndex: 1,
-  },
-  buttonText: { 
-    color: '#FFFFFF', 
-    fontSize: 18, 
-    fontWeight: '600',
+    backgroundColor: '#FFFFFF', // 背景色を設定して要素との重なりを防ぐ
   },
 }); 

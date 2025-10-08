@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Image, TouchableWithoutFeedback, Keyboard, ScrollView, Linking } from 'react-native';
 import { auth } from '../firebaseConfig';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import KurukatsuButton from '../components/KurukatsuButton';
 
 const LoginScreen = ({ navigation }) => {
@@ -73,20 +72,6 @@ const LoginScreen = ({ navigation }) => {
     });
   };
 
-  const resetOnboarding = async () => {
-    try {
-      await AsyncStorage.removeItem('seenOnboarding');
-      Alert.alert(
-        'オンボーディングをリセットしました',
-        '次回アプリを起動した際にオンボーディング画面が表示されます。',
-        [{ text: 'OK' }]
-      );
-    } catch (error) {
-      console.error('オンボーディングのリセットに失敗:', error);
-      Alert.alert('エラー', 'オンボーディングのリセットに失敗しました。');
-    }
-  };
-
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <View style={styles.container}>
@@ -97,7 +82,7 @@ const LoginScreen = ({ navigation }) => {
           />
         </View>
         
-        <View style={styles.cardContainer}>
+        <View style={styles.contentContainer}>
           <Text style={styles.welcomeTitle}>ようこそ</Text>
           <Text style={styles.welcomeSubtitle}>アカウントにログインしてください</Text>
           <View style={styles.inputContainer}>
@@ -166,16 +151,6 @@ const LoginScreen = ({ navigation }) => {
             に{'\n'}同意したことになります。
           </Text>
         </View>
-        
-        {/* 開発用オンボーディングリセットボタン */}
-        {__DEV__ && (
-          <TouchableOpacity
-            style={styles.devResetButton}
-            onPress={resetOnboarding}
-          >
-            <Text style={styles.devResetButtonText}>開発用: オンボーディングリセット</Text>
-          </TouchableOpacity>
-        )}
       </View>
     </TouchableWithoutFeedback>
   );
@@ -198,20 +173,10 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 16,
   },
-  cardContainer: {
+  contentContainer: {
     width: '100%',
     maxWidth: 400,
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 32,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    paddingHorizontal: 16,
   },
   welcomeTitle: {
     fontSize: 24,
@@ -271,18 +236,6 @@ const styles = StyleSheet.create({
     color: '#2563eb',
     fontSize: 12,
     textDecorationLine: 'underline',
-  },
-  devResetButton: {
-    marginTop: 16,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#ef4444',
-    borderRadius: 6,
-  },
-  devResetButtonText: {
-    color: '#ffffff',
-    fontSize: 12,
-    textAlign: 'center',
   },
 
 });

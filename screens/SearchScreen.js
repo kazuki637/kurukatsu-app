@@ -391,16 +391,12 @@ const SearchScreen = ({ navigation }) => {
               style={styles.clearButtonContainer}
             />
             <KurukatsuButton
+              title="この条件で検索"
               onPress={handleSearch}
               variant="primary"
               size="medium"
               style={styles.searchButtonContainer}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="search" size={20} color="#fff" style={{ marginRight: 5 }} />
-                <Text style={styles.searchButtonText}>この条件で検索</Text>
-              </View>
-            </KurukatsuButton>
+            />
           </View>
         </View>
       </SafeAreaView>
@@ -552,11 +548,6 @@ const styles = StyleSheet.create({
   },
   searchButtonContainer: {
     flex: 2,
-  },
-  searchButtonText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   // サークル種別選択関連のスタイル
   circleTypeContainer: {

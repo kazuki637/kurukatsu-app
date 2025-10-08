@@ -53,7 +53,7 @@ const PasswordResetScreen = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
       >
         
-        <View style={styles.cardContainer}>
+        <View style={styles.contentContainer}>
           <Text style={styles.welcomeTitle}>パスワードをリセット</Text>
           <Text style={styles.welcomeSubtitle}>
             登録済みのメールアドレスを入力してください
@@ -112,20 +112,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
   },
-  cardContainer: {
+  contentContainer: {
     width: '100%',
     maxWidth: 400,
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
-    padding: 32,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    paddingHorizontal: 16,
   },
   welcomeTitle: {
     fontSize: 24,
@@ -156,7 +146,7 @@ const styles = StyleSheet.create({
     color: '#1f2937',
   },
   resetButtonContainer: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   backButtonContainer: {
     width: '100%',

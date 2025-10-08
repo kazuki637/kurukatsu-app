@@ -3,11 +3,14 @@ import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Linking, A
 import { Ionicons } from '@expo/vector-icons';
 import { Image as RNImage } from 'react-native';
 import { db, auth } from '../firebaseConfig';
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot, increment, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot, increment, collection, addDoc, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import CommonHeader from '../components/CommonHeader';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'; // 追加済み
 import * as ImagePicker from 'expo-image-picker'; // 追加済み
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { Modalize } from 'react-native-modalize';
+import KurukatsuButton from '../components/KurukatsuButton';
 import useFirestoreDoc from '../hooks/useFirestoreDoc';
 import { compressHeaderImage, compressCircleImage, compressActivityImage, compressEventImage } from '../utils/imageCompression';
 
@@ -41,6 +44,9 @@ const deleteImageFromStorage = async (url) => {
 
 export default function CircleProfileEditScreen({ route, navigation }) {
   const { circleId } = route.params;
+  const { height } = Dimensions.get('window');
+  const SHEET_HEIGHT = height * 0.8;
+  
   // サークルデータ取得（キャッシュ30秒）
   const { data: circleData, loading, error } = useFirestoreDoc('circles', circleId);
   const [user, setUser] = useState(null);
@@ -50,16 +56,19 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   // const [routes] = useState(tabRoutes); // 削除
   const [activeTab, setActiveTab] = useState('top'); // 追加
   const [uploading, setUploading] = useState(false); // 追加
-  const [eventFormVisible, setEventFormVisible] = useState(false); // イベント追加フォーム表示
+  const [eventFormVisible, setEventFormVisible] = useState(false); // イベント追加フォーム表示（非推奨・Modalize移行）
   const [eventTitle, setEventTitle] = useState('');
   const [eventDetail, setEventDetail] = useState('');
   const [eventImage, setEventImage] = useState(null);
+  const [eventDate, setEventDate] = useState(new Date()); // 開催日
+  const [eventLocation, setEventLocation] = useState(''); // 開催場所
+  const [eventFee, setEventFee] = useState(''); // 参加費
+  const [eventSnsLink, setEventSnsLink] = useState(''); // SNSリンク
+  const [showDatePicker, setShowDatePicker] = useState(false); // DatePicker表示制御
   const [eventUploading, setEventUploading] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false); // 編集モード判定
   const [editingEventIndex, setEditingEventIndex] = useState(null); // 編集中のイベントindex
-  const [editEventTitle, setEditEventTitle] = useState('');
-  const [editEventDetail, setEditEventDetail] = useState('');
-  const [editEventImage, setEditEventImage] = useState(null);
-  const [editEventUploading, setEditEventUploading] = useState(false);
+  const eventModalizeRef = useRef(null); // Modalizeの参照
   const [description, setDescription] = useState(''); // サークル紹介編集用
   const [descSaving, setDescSaving] = useState(false); // 保存中状態
   const [recommendationsInput, setRecommendationsInput] = useState(''); // こんな人におすすめ編集用
@@ -80,7 +89,68 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   const [activityLocation, setActivityLocation] = useState(''); // 活動場所
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // 未保存の変更があるかどうか
   const [members, setMembers] = useState([]); // メンバーデータ
+  const horizontalScrollRef = useRef(null);
+  const indicatorAnim = useRef(new Animated.Value(0)).current;
+  const [scrollProgress, setScrollProgress] = useState(0);
   
+  // インジケーターアニメーション関数
+  const animateIndicator = (tabIndex) => {
+    Animated.timing(indicatorAnim, {
+      toValue: tabIndex,
+      duration: 250,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  // タブ切り替え関数
+  const handleTabChange = (tabName) => {
+    setActiveTab(tabName);
+    const tabIndex = ['top', 'events', 'welcome'].indexOf(tabName);
+    animateIndicator(tabIndex);
+    setScrollProgress(tabIndex);
+    if (horizontalScrollRef.current) {
+      horizontalScrollRef.current.scrollTo({
+        x: tabIndex * Dimensions.get('window').width,
+        animated: true,
+      });
+    }
+  };
+
+  // 水平スクロール完了時の最終同期
+  const handleHorizontalScroll = (event) => {
+    const scrollX = event.nativeEvent.contentOffset.x;
+    const screenWidth = Dimensions.get('window').width;
+    const tabIndex = Math.round(scrollX / screenWidth);
+    const tabs = ['top', 'events', 'welcome'];
+    if (tabIndex >= 0 && tabIndex < tabs.length) {
+      setActiveTab(tabs[tabIndex]);
+      // スクロール完了時は即座に最終位置に設定
+      indicatorAnim.setValue(tabIndex);
+      setScrollProgress(tabIndex);
+    }
+  };
+
+  // スクロール中のリアルタイム追従
+  const handleScrollMovement = (event) => {
+    const scrollX = event.nativeEvent.contentOffset.x;
+    const screenWidth = Dimensions.get('window').width;
+    const progress = scrollX / screenWidth;
+    
+    // インジケーターをリアルタイムで移動
+    indicatorAnim.setValue(progress);
+    // スクロールプログレスを更新
+    setScrollProgress(progress);
+  };
+
+  // タブテキストのハイライト状態を計算
+  const getTabTextStyle = (tabIndex) => {
+    const isActive = Math.round(scrollProgress) === tabIndex;
+    
+    return {
+      color: isActive ? '#2563eb' : '#666',
+      fontWeight: isActive ? 'bold' : 'normal',
+    };
+  };
 
   // 初期値セット
   useEffect(() => {
@@ -462,6 +532,17 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     }
   };
 
+  // URL形式チェック
+  const isValidUrl = (url) => {
+    if (!url) return false;
+    try {
+      new URL(url);
+      return url.startsWith('http://') || url.startsWith('https://');
+    } catch {
+      return false;
+    }
+  };
+
   // イベント画像選択
   const handlePickEventImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
@@ -474,7 +555,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       navigation.navigate('ImageCrop', {
         imageType: 'event',
         selectedImageUri: result.assets[0].uri,
-        circleName: circleData.name, // サークル名を渡す
+        circleName: circleData.name,
         onCropComplete: (croppedUri) => {
           setEventImage({ uri: croppedUri });
         }
@@ -482,27 +563,97 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     }
   };
 
-  // イベント追加処理
-  const handleAddEvent = async () => {
-    if (!eventTitle || !eventDetail) {
-      Alert.alert('エラー', 'タイトルと詳細を入力してください');
+  // 新規イベント追加モーダルを開く
+  const navigateToAddEvent = () => {
+    setIsEditMode(false);
+    setEditingEventIndex(null);
+    setEventTitle('');
+    setEventDetail('');
+    setEventImage(null);
+    setEventDate(new Date());
+    setEventLocation('');
+    setEventFee('');
+    setEventSnsLink('');
+    eventModalizeRef.current?.open();
+  };
+
+  // イベント編集モーダルを開く
+  const navigateToEditEvent = (idx) => {
+    const event = circleData.events[idx];
+    setIsEditMode(true);
+    setEditingEventIndex(idx);
+    setEventTitle(event.title || '');
+    setEventDetail(event.detail || '');
+    setEventImage(event.image ? { uri: event.image } : null);
+    
+    // eventDateの処理
+    if (event.eventDate) {
+      if (event.eventDate.toDate) {
+        setEventDate(event.eventDate.toDate());
+      } else if (event.eventDate instanceof Date) {
+        setEventDate(event.eventDate);
+      } else {
+        setEventDate(new Date());
+      }
+    } else {
+      setEventDate(new Date());
+    }
+    
+    setEventLocation(event.location || '');
+    setEventFee(event.fee || '');
+    setEventSnsLink(event.snsLink || '');
+    eventModalizeRef.current?.open();
+  };
+
+  // イベント保存処理（新規追加/編集共通）
+  const handleSaveEvent = async () => {
+    // バリデーション
+    if (!eventTitle.trim()) {
+      Alert.alert('入力エラー', 'タイトルを入力してください');
       return;
     }
     if (!eventImage) {
-      Alert.alert('エラー', '写真を選択してください');
+      Alert.alert('入力エラー', '写真を選択してください');
       return;
     }
+    if (!eventLocation.trim()) {
+      Alert.alert('入力エラー', '開催場所を入力してください');
+      return;
+    }
+    if (!eventFee.trim()) {
+      Alert.alert('入力エラー', '参加費を入力してください');
+      return;
+    }
+    if (!eventDetail.trim()) {
+      Alert.alert('入力エラー', '詳細を入力してください');
+      return;
+    }
+    if (!eventSnsLink.trim()) {
+      Alert.alert('入力エラー', 'SNSリンクを入力してください');
+      return;
+    }
+    if (!isValidUrl(eventSnsLink)) {
+      Alert.alert('入力エラー', 'SNSリンクは有効なURLを入力してください\n(http:// または https:// で始まる必要があります)');
+      return;
+    }
+
     setEventUploading(true);
     let imageUrl = '';
+    
     try {
-      if (eventImage) {
+      // 画像アップロード処理
+      if (eventImage.uri && !eventImage.uri.startsWith('http')) {
+        // 新規画像の場合
         try {
-          // 画像を圧縮
+          // 編集モードで既存画像があれば削除
+          if (isEditMode && circleData.events[editingEventIndex]?.image) {
+            await deleteImageFromStorage(circleData.events[editingEventIndex].image);
+          }
+          
           console.log('イベント画像圧縮開始...');
           const compressedUri = await compressEventImage(eventImage.uri);
           console.log('イベント画像圧縮完了');
           
-          // 圧縮された画像をアップロード
           const response = await fetch(compressedUri);
           const blob = await response.blob();
           const storage = getStorage();
@@ -518,115 +669,43 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           setEventUploading(false);
           return;
         }
+      } else if (eventImage.uri) {
+        // 既存画像をそのまま使用
+        imageUrl = eventImage.uri;
       }
-      // Firestoreのevents配列に追加
+
+      // イベントオブジェクト作成
       const eventObj = {
-        title: eventTitle,
-        detail: eventDetail,
+        title: eventTitle.trim(),
+        detail: eventDetail.trim(),
         image: imageUrl,
+        eventDate: Timestamp.fromDate(eventDate),
+        location: eventLocation.trim(),
+        fee: eventFee.trim(),
+        snsLink: eventSnsLink.trim(),
+        deadline: Timestamp.fromDate(eventDate), // 締切日＝開催日
       };
-      await updateDoc(doc(db, 'circles', circleId), {
-        events: arrayUnion(eventObj)
-      });
-      setEventFormVisible(false);
-      setEventTitle('');
-      setEventDetail('');
-      setEventImage(null);
+
+      if (isEditMode && editingEventIndex !== null) {
+        // 編集モード
+        const newEvents = [...circleData.events];
+        newEvents[editingEventIndex] = eventObj;
+        await updateDoc(doc(db, 'circles', circleId), { events: newEvents });
+        Alert.alert('成功', 'イベントを更新しました');
+      } else {
+        // 新規追加モード
+        await updateDoc(doc(db, 'circles', circleId), {
+          events: arrayUnion(eventObj)
+        });
+        Alert.alert('成功', 'イベントを追加しました');
+      }
+
+      eventModalizeRef.current?.close();
     } catch (e) {
-      Alert.alert('エラー', 'イベントの追加に失敗しました');
+      console.error('イベント保存エラー:', e);
+      Alert.alert('エラー', 'イベントの保存に失敗しました');
     } finally {
       setEventUploading(false);
-    }
-  };
-
-  // 編集モード開始
-  const handleEditEvent = (idx) => {
-    setEditingEventIndex(idx);
-    setEditEventTitle(circleData.events[idx].title);
-    setEditEventDetail(circleData.events[idx].detail);
-    setEditEventImage(circleData.events[idx].image ? { uri: circleData.events[idx].image } : null);
-  };
-  // 編集キャンセル
-  const handleCancelEditEvent = () => {
-    setEditingEventIndex(null);
-    setEditEventTitle('');
-    setEditEventDetail('');
-    setEditEventImage(null);
-  };
-  // 編集画像選択
-  const handlePickEditEventImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false,
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      // 選択された画像でクロップ画面に遷移
-      navigation.navigate('ImageCrop', {
-        imageType: 'event',
-        selectedImageUri: result.assets[0].uri,
-        circleName: circleData.name, // サークル名を渡す
-        onCropComplete: (croppedUri) => {
-          setEditEventImage({ uri: croppedUri });
-        }
-      });
-    }
-  };
-  // 編集保存
-  const handleSaveEditEvent = async () => {
-    if (!editEventTitle || !editEventDetail) {
-      Alert.alert('エラー', 'タイトルと詳細を入力してください');
-      return;
-    }
-    setEditEventUploading(true);
-    let imageUrl = editEventImage && editEventImage.uri ? editEventImage.uri : '';
-    try {
-      if (editEventImage && editEventImage.uri && !editEventImage.uri.startsWith('http')) {
-        try {
-          // 既存画像があればStorageから削除
-          if (circleData.events && circleData.events[editingEventIndex] && circleData.events[editingEventIndex].image) {
-            await deleteImageFromStorage(circleData.events[editingEventIndex].image);
-          }
-          
-          // 画像を圧縮
-          console.log('イベント編集画像圧縮開始...');
-          const compressedUri = await compressEventImage(editEventImage.uri);
-          console.log('イベント編集画像圧縮完了');
-          
-          // 圧縮された画像をアップロード
-          const response = await fetch(compressedUri);
-          const blob = await response.blob();
-          const storage = getStorage();
-          const fileName = `circle_images/${circleData.name}/events/${circleId}_${Date.now()}`;
-          const imgRef = storageRef(storage, fileName);
-          await uploadBytes(imgRef, blob);
-          imageUrl = await getDownloadURL(imgRef);
-          
-          console.log('イベント編集画像アップロード完了');
-        } catch (error) {
-          console.error('イベント編集画像アップロードエラー:', error);
-          Alert.alert('エラー', 'イベント画像のアップロードに失敗しました');
-          setEditEventUploading(false);
-          return;
-        }
-      }
-      // 既存イベント配列を編集
-      const newEvents = [...circleData.events];
-      newEvents[editingEventIndex] = {
-        ...newEvents[editingEventIndex],
-        title: editEventTitle,
-        detail: editEventDetail,
-        image: imageUrl,
-      };
-      await updateDoc(doc(db, 'circles', circleId), { events: newEvents });
-      setEditingEventIndex(null);
-      setEditEventTitle('');
-      setEditEventDetail('');
-      setEditEventImage(null);
-    } catch (e) {
-      Alert.alert('エラー', 'イベントの更新に失敗しました');
-    } finally {
-      setEditEventUploading(false);
     }
   };
   // イベント削除
@@ -880,14 +959,14 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       {/* 活動写真アップロード・表示 */}
       <View style={{marginBottom: 20, width: '100%'}}>
         {activityImages && activityImages.length > 0 ? (
-          <View style={{position: 'relative', width: '100%', aspectRatio: 16/9, alignSelf: 'center'}}>
+          <View style={{position: 'relative', width: '100%', aspectRatio: 16/9, alignSelf: 'center', marginBottom: 20}}>
             <TouchableOpacity onPress={() => handleReplaceActivityImage(0)} activeOpacity={0.7} style={{width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center'}}>
                 <Image 
                   source={{ 
                     uri: activityImages[0],
                     cache: 'force-cache'
                   }} 
-                  style={{width: '100%', aspectRatio: 16/9, borderRadius: 0, backgroundColor: '#eee', marginBottom: 20}}
+                  style={{width: '100%', aspectRatio: 16/9, borderRadius: 0, backgroundColor: '#eee'}}
                   resizeMode="cover"
                 />
             </TouchableOpacity>
@@ -1072,127 +1151,118 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     </View>
   );
 
+  // 締切チェック関数（編集画面では全イベント表示、期限切れは自動削除）
+  const isEventExpired = (event) => {
+    if (!event.eventDate && !event.deadline) return false;
+    
+    const deadline = event.deadline || event.eventDate;
+    let deadlineDate;
+    
+    if (deadline.toDate) {
+      deadlineDate = deadline.toDate();
+    } else if (deadline instanceof Date) {
+      deadlineDate = deadline;
+    } else {
+      return false;
+    }
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    deadlineDate.setHours(0, 0, 0, 0);
+    
+    return deadlineDate < today;
+  };
+
+  // 期限切れイベントを自動削除
+  const cleanupExpiredEvents = async () => {
+    if (!circleData.events || circleData.events.length === 0) return;
+    
+    const expiredEvents = circleData.events.filter(event => isEventExpired(event));
+    if (expiredEvents.length === 0) return;
+    
+    try {
+      // 期限切れイベントの画像をStorageから削除
+      for (const event of expiredEvents) {
+        if (event.image) {
+          await deleteImageFromStorage(event.image);
+        }
+      }
+      
+      // 有効なイベントのみ保持
+      const activeEvents = circleData.events.filter(event => !isEventExpired(event));
+      await updateDoc(doc(db, 'circles', circleId), {
+        events: activeEvents
+      });
+      
+      console.log(`${expiredEvents.length}件の期限切れイベントを削除しました`);
+    } catch (error) {
+      console.error('期限切れイベントの削除に失敗:', error);
+    }
+  };
+
+  // 画面表示時に期限切れイベントをクリーンアップ
+  useEffect(() => {
+    if (circleData && circleData.events) {
+      cleanupExpiredEvents();
+    }
+  }, [circleData?.events?.length]);
+
   const renderEventsTab = () => (
     <View style={styles.tabContent}>
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>イベント</Text>
+        <Text style={styles.sectionTitle}>新歓イベント</Text>
         {/* イベント追加ボタン */}
-        <TouchableOpacity style={{marginBottom: 16, alignSelf: 'center'}} onPress={() => setEventFormVisible(true)}>
-          <View style={{backgroundColor: '#007bff', borderRadius: 24, width: 48, height: 48, alignItems: 'center', justifyContent: 'center'}}>
-            <Text style={{color: '#fff', fontWeight: 'bold', fontSize: 32, lineHeight: 40}}>＋</Text>
-          </View>
-        </TouchableOpacity>
-        {/* イベント追加フォーム */}
-        {eventFormVisible && (
-          <View style={{marginBottom: 20, backgroundColor: '#f8f8f8', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#e0e0e0', position: 'relative'}}>
-            {/* 右上に閉じるボタン */}
-            <TouchableOpacity
-              style={{ position: 'absolute', top: 8, right: 8, zIndex: 2 }}
-              onPress={() => setEventFormVisible(false)}
-              disabled={eventUploading}
-            >
-              <Ionicons name="close-outline" size={24} color="#666" />
-            </TouchableOpacity>
-            <Text style={{fontWeight: 'bold', fontSize: 16, marginBottom: 8}}>イベント追加</Text>
-            <TextInput
-              placeholder="タイトル"
-              value={eventTitle}
-              onChangeText={setEventTitle}
-              style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginBottom: 8, backgroundColor: '#fff'}}
-            />
-            <TouchableOpacity onPress={handlePickEventImage} style={{marginBottom: 8}}>
-              {eventImage ? (
-                <Image source={{ uri: eventImage.uri }} style={{width: '100%', aspectRatio: 16/9, borderRadius: 8}} />
-              ) : (
-                <View style={{width: '100%', aspectRatio: 16/9, backgroundColor: '#eee', borderRadius: 8, justifyContent: 'center', alignItems: 'center'}}>
-                  <Ionicons name="camera-outline" size={48} color="#aaa" />
-                </View>
-              )}
-            </TouchableOpacity>
-            <TextInput
-              placeholder="詳細"
-              value={eventDetail}
-              onChangeText={setEventDetail}
-              multiline
-              style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginBottom: 8, backgroundColor: '#fff', minHeight: 60}}
-            />
-            <View style={{flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center'}}>
-              <TouchableOpacity onPress={() => setEventFormVisible(false)} style={{marginRight: 16}} disabled={eventUploading}>
-                <Text style={{color: '#666'}}>キャンセル</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={handleAddEvent} disabled={eventUploading}>
-                <View style={{backgroundColor: eventUploading ? '#aaa' : '#007bff', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18}}>
-                  <Text style={{color: '#fff', fontWeight: 'bold'}}>{eventUploading ? '追加中...' : '保存'}</Text>
-                </View>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-        {/* イベントリスト */}
+        <View style={styles.eventAddButtonContainer}>
+          <KurukatsuButton
+            title="新歓イベント追加"
+            onPress={navigateToAddEvent}
+            size="medium"
+            variant="primary"
+            hapticFeedback={true}
+            style={styles.eventAddButton}
+          />
+        </View>
+        
+        {/* イベントリスト（有効なイベントのみ表示） */}
         {circleData.events && circleData.events.length > 0 && (
-          circleData.events.slice(0, 4).map((event, idx) => (
-            <View key={idx} style={editingEventIndex === idx ? [styles.eventCard, {backgroundColor: 'transparent', padding: 0, borderWidth: 0, shadowOpacity: 0, elevation: 0}] : styles.eventCard}>
-              {/* 編集/削除ボタン */}
-              <TouchableOpacity
-                style={{ position: 'absolute', top: 8, right: 8, zIndex: 2 }}
-                onPress={() =>
-                  editingEventIndex === idx
-                    ? handleDeleteEvent(idx)
-                    : handleEditEvent(idx)
-                }
-              >
-                <Ionicons
-                  name={editingEventIndex === idx ? 'trash-outline' : 'create-outline'}
-                  size={24}
-                  color={editingEventIndex === idx ? '#e74c3c' : '#007bff'}
-                />
-              </TouchableOpacity>
-              {/* 編集モード */}
-              {editingEventIndex === idx ? (
-                <View style={{backgroundColor: '#f8f8f8', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#e0e0e0', marginBottom: 0, position: 'relative'}}>
-                  <Text style={{fontWeight: 'bold', fontSize: 16, marginBottom: 8}}>イベント編集</Text>
-                  <TextInput
-                    placeholder="タイトル"
-                    value={editEventTitle}
-                    onChangeText={setEditEventTitle}
-                    style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginBottom: 8, backgroundColor: '#fff'}}
-                  />
-                  <TouchableOpacity onPress={handlePickEditEventImage} style={{marginBottom: 8}}>
-                    {editEventImage ? (
-                      <Image source={{ uri: editEventImage.uri }} style={{width: '100%', aspectRatio: 16/9, borderRadius: 8}} />
-                    ) : (
-                      <View style={{width: '100%', aspectRatio: 16/9, backgroundColor: '#eee', borderRadius: 8, justifyContent: 'center', alignItems: 'center'}}>
-                        <Ionicons name="camera-outline" size={48} color="#aaa" />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                  <TextInput
-                    placeholder="詳細"
-                    value={editEventDetail}
-                    onChangeText={setEditEventDetail}
-                    multiline
-                    style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, marginBottom: 8, backgroundColor: '#fff', minHeight: 60}}
-                  />
-                  <View style={{flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center'}}>
-                    <TouchableOpacity onPress={handleCancelEditEvent} style={{marginRight: 16}} disabled={editEventUploading}>
-                      <Text style={{color: '#666'}}>キャンセル</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={handleSaveEditEvent} disabled={editEventUploading}>
-                      <View style={{backgroundColor: editEventUploading ? '#aaa' : '#007bff', borderRadius: 8, paddingVertical: 8, paddingHorizontal: 18}}>
-                        <Text style={{color: '#fff', fontWeight: 'bold'}}>{editEventUploading ? '保存中...' : '保存'}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ) : (
-                <>
-                  <Text style={styles.eventTitle}>{event.title}</Text>
-                  {event.image && (
-                    <Image source={{ uri: event.image }} style={styles.eventImage} resizeMode="cover" />
-                  )}
-                  <Text style={styles.eventDetail}>{event.detail}</Text>
-                </>
+          circleData.events.filter(event => !isEventExpired(event)).map((event, idx) => (
+            <View key={idx} style={styles.eventCard}>
+              {/* イベント画像 */}
+              {event.image && (
+                <Image source={{ uri: event.image }} style={styles.eventImage} resizeMode="cover" />
               )}
+              
+              {/* イベント情報 */}
+              <View style={styles.eventCardContent}>
+                <Text style={styles.eventTitle}>{event.title}</Text>
+                
+                {/* 編集・削除ボタン */}
+                <View style={styles.eventActionsRow}>
+                  <TouchableOpacity
+                    style={styles.eventEditButton}
+                    onPress={() => navigateToEditEvent(idx)}
+                  >
+                    <Ionicons name="create-outline" size={20} color="#007bff" />
+                    <Text style={styles.eventEditButtonText}>編集</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.eventDeleteButton}
+                    onPress={() => {
+                      Alert.alert(
+                        '確認',
+                        'このイベントを削除しますか？',
+                        [
+                          { text: 'キャンセル', style: 'cancel' },
+                          { text: '削除', style: 'destructive', onPress: () => handleDeleteEvent(idx) }
+                        ]
+                      );
+                    }}
+                  >
+                    <Ionicons name="trash-outline" size={20} color="#dc3545" />
+                    <Text style={styles.eventDeleteButtonText}>削除</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
           ))
         )}
@@ -1257,37 +1327,49 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     </View>
   );
 
-  // タブバー部分を元のactiveTab/setActiveTab方式に戻す
+  // タブバー部分（スワイプ遷移対応版）
   const renderTabBar = () => (
     <View style={styles.tabBarContainer}>
       <View style={styles.tabBar}>
         <TouchableOpacity
           style={[styles.tabItem, activeTab === 'top' && styles.activeTabItem]}
-          onPress={() => setActiveTab('top')}
+          onPress={() => handleTabChange('top')}
         >
-          <Text style={[styles.tabLabel, activeTab === 'top' && styles.activeTabLabel]}>
+          <Text style={[styles.tabLabel, getTabTextStyle(0)]}>
             トップ
           </Text>
-          {activeTab === 'top' && <View style={styles.activeIndicator} />}
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tabItem, activeTab === 'events' && styles.activeTabItem]}
-          onPress={() => setActiveTab('events')}
+          onPress={() => handleTabChange('events')}
         >
-          <Text style={[styles.tabLabel, activeTab === 'events' && styles.activeTabLabel]}>
-            イベント
+          <Text style={[styles.tabLabel, getTabTextStyle(1)]}>
+            新歓イベント
           </Text>
-          {activeTab === 'events' && <View style={styles.activeIndicator} />}
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.tabItem, activeTab === 'welcome' && styles.activeTabItem]}
-          onPress={() => setActiveTab('welcome')}
+          onPress={() => handleTabChange('welcome')}
         >
-          <Text style={[styles.tabLabel, activeTab === 'welcome' && styles.activeTabLabel]}>
+          <Text style={[styles.tabLabel, getTabTextStyle(2)]}>
             新歓情報
           </Text>
-          {activeTab === 'welcome' && <View style={styles.activeIndicator} />}
         </TouchableOpacity>
+        
+        {/* アニメーションするインジケーター */}
+        <Animated.View 
+          style={[
+            styles.animatedIndicator,
+            {
+              transform: [{
+                translateX: indicatorAnim.interpolate({
+                  inputRange: [0, 1, 2],
+                  outputRange: [0, Dimensions.get('window').width / 3, (Dimensions.get('window').width / 3) * 2],
+                })
+              }]
+            }
+          ]}
+        />
       </View>
     </View>
   );
@@ -1421,15 +1503,178 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           {renderTabBar()}
 
           {/* タブコンテンツ */}
-          <View style={styles.tabContentContainer}>
-            {activeTab === 'top' && renderTopTab()}
-            {activeTab === 'events' && renderEventsTab()}
-            {activeTab === 'welcome' && renderWelcomeTab()}
-          </View>
+          <ScrollView
+            ref={horizontalScrollRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={handleScrollMovement}
+            onMomentumScrollEnd={handleHorizontalScroll}
+            scrollEventThrottle={16}
+            style={styles.horizontalScrollView}
+            contentContainerStyle={styles.horizontalScrollContent}
+          >
+            <View style={styles.tabContentContainer}>
+              {renderTopTab()}
+            </View>
+            <View style={styles.tabContentContainer}>
+              {renderEventsTab()}
+            </View>
+            <View style={styles.tabContentContainer}>
+              {renderWelcomeTab()}
+            </View>
+          </ScrollView>
         </ScrollView>
 
         {/* アクションボタン完全削除済み */}
       </View>
+
+      {/* イベント追加/編集ボトムシート */}
+      <Modalize
+        ref={eventModalizeRef}
+        adjustToContentHeight={false}
+        modalHeight={SHEET_HEIGHT}
+        withHandle={false}
+        panGestureEnabled={false}
+        modalStyle={{ borderTopLeftRadius: 16, borderTopRightRadius: 16, backgroundColor: '#fff' }}
+        overlayStyle={{ backgroundColor: 'rgba(0,0,0,0.2)' }}
+        scrollViewProps={{ showsVerticalScrollIndicator: false }}
+        HeaderComponent={
+          <View style={styles.eventModalHeader}>
+            <TouchableOpacity 
+              style={styles.eventModalHeaderButton} 
+              onPress={() => eventModalizeRef.current?.close()}
+            >
+              <Text style={styles.eventModalHeaderButtonText}>キャンセル</Text>
+            </TouchableOpacity>
+            <View style={styles.eventModalHeaderTitleContainer}>
+              <Text style={styles.eventModalHeaderTitle}>{isEditMode ? 'イベント編集' : '新しいイベント'}</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.eventModalHeaderButton} 
+              onPress={handleSaveEvent}
+            >
+              <Text style={styles.eventModalHeaderButtonText}>保存</Text>
+            </TouchableOpacity>
+          </View>
+        }
+      >
+        <KeyboardAvoidingView 
+          style={styles.eventModalKeyboardView}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <ScrollView 
+            style={styles.eventModalForm} 
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.eventModalFormContent}
+          >
+            {/* タイトル */}
+            <View style={styles.eventModalFormRow}>
+              <Text style={styles.eventModalFormLabel}>タイトル</Text>
+              <TextInput 
+                style={styles.eventModalFormInput} 
+                value={eventTitle} 
+                onChangeText={setEventTitle}
+              />
+            </View>
+
+            {/* 写真 */}
+            <View style={styles.eventModalFormRow}>
+              <Text style={styles.eventModalFormLabel}>写真</Text>
+              <TouchableOpacity onPress={handlePickEventImage} style={styles.eventImagePickerButton}>
+                {eventImage ? (
+                  <Image source={{ uri: eventImage.uri }} style={styles.eventImagePreview} />
+                ) : (
+                  <View style={styles.eventImagePlaceholder}>
+                    <Ionicons name="camera-outline" size={48} color="#aaa" />
+                    <Text style={styles.eventImagePlaceholderText}>写真を選択</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {/* 開催日 */}
+            <View style={styles.eventModalFormRow}>
+              <Text style={styles.eventModalFormLabel}>開催日</Text>
+              <TouchableOpacity 
+                style={styles.eventDatePickerButton}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text style={styles.eventDateText}>
+                  {eventDate.getFullYear()}年{eventDate.getMonth() + 1}月{eventDate.getDate()}日
+                </Text>
+                <Ionicons name="calendar-outline" size={20} color="#666" />
+              </TouchableOpacity>
+              {showDatePicker && (
+                <View style={styles.datePickerContainer}>
+                  <DateTimePicker
+                    value={eventDate}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    locale="ja-JP"
+                    onChange={(event, selectedDate) => {
+                      setShowDatePicker(Platform.OS === 'ios');
+                      if (selectedDate) {
+                        setEventDate(selectedDate);
+                      }
+                    }}
+                    minimumDate={new Date()}
+                  />
+                </View>
+              )}
+            </View>
+
+            {/* 開催場所 */}
+            <View style={styles.eventModalFormRow}>
+              <Text style={styles.eventModalFormLabel}>開催場所</Text>
+              <TextInput 
+                style={styles.eventModalFormInput} 
+                value={eventLocation}
+                onChangeText={setEventLocation}
+              />
+            </View>
+
+            {/* 参加費 */}
+            <View style={styles.eventModalFormRow}>
+              <Text style={styles.eventModalFormLabel}>参加費</Text>
+              <TextInput 
+                style={styles.eventModalFormInput} 
+                value={eventFee}
+                onChangeText={setEventFee}
+              />
+            </View>
+
+            {/* SNSリンク */}
+            <View style={styles.eventModalFormRow}>
+              <Text style={styles.eventModalFormLabel}>SNSリンク</Text>
+              <TextInput 
+                style={styles.eventModalFormInput} 
+                value={eventSnsLink}
+                onChangeText={setEventSnsLink}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+              />
+            </View>
+
+            {/* 詳細 */}
+            <View style={styles.eventModalFormRow}>
+              <Text style={styles.eventModalFormLabel}>詳細</Text>
+              <View style={styles.eventModalDetailInputContainer}>
+                <TextInput 
+                  style={[styles.eventModalFormInput, styles.eventModalDetailInput]} 
+                  value={eventDetail} 
+                  onChangeText={setEventDetail} 
+                  placeholder="イベントの詳細を入力してください"
+                  multiline
+                />
+              </View>
+            </View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </Modalize>
     </KeyboardAvoidingView>
   );
 }
@@ -1556,6 +1801,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'stretch',
     width: '100%',
+    position: 'relative',
   },
   tabItem: {
     flex: 1,
@@ -1569,7 +1815,7 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: 16,
-    color: '#6b7280',
+    color: '#666',
   },
   activeTabLabel: {
     color: '#2563eb',
@@ -1583,9 +1829,23 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: '#2563eb',
   },
+  animatedIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    width: Dimensions.get('window').width / 3,
+    height: 2,
+    backgroundColor: '#2563eb',
+  },
   tabContentContainer: {
     flex: 1,
     backgroundColor: '#ffffff',
+    width: Dimensions.get('window').width,
+  },
+  horizontalScrollView: {
+    flex: 1,
+  },
+  horizontalScrollContent: {
+    flexDirection: 'row',
   },
   tabContent: {
     padding: 20,
@@ -1952,31 +2212,186 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    padding: 16,
     marginBottom: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 2,
     elevation: 2,
-  },
-  eventTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#333',
+    overflow: 'hidden',
   },
   eventImage: {
     width: '100%',
     aspectRatio: 16 / 9,
-    borderRadius: 8,
-    marginBottom: 10,
     backgroundColor: '#eee',
+  },
+  eventCardContent: {
+    padding: 16,
+  },
+  eventTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#333',
+  },
+  eventActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  eventEditButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e3f2fd',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 6,
+  },
+  eventEditButtonText: {
+    fontSize: 14,
+    color: '#007bff',
+    fontWeight: '600',
+  },
+  eventDeleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffebee',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    gap: 6,
+  },
+  eventDeleteButtonText: {
+    fontSize: 14,
+    color: '#dc3545',
+    fontWeight: '600',
   },
   eventDetail: {
     fontSize: 15,
     color: '#555',
     lineHeight: 22,
+  },
+  eventAddButtonContainer: {
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  eventAddButton: {
+    width: '100%',
+    maxWidth: 300,
+  },
+  // イベント編集Modal用スタイル
+  eventModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    overflow: 'hidden',
+  },
+  eventModalHeaderButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    minWidth: 100,
+  },
+  eventModalHeaderButtonText: {
+    fontSize: 14,
+    color: '#007bff',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  eventModalHeaderTitleContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  eventModalHeaderTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  eventModalKeyboardView: {
+    flex: 1,
+  },
+  eventModalForm: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  eventModalFormContent: {
+    paddingBottom: 20,
+  },
+  eventModalFormRow: {
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  eventModalFormLabel: {
+    fontSize: 16,
+    color: '#333',
+    fontWeight: '500',
+    marginBottom: 12,
+  },
+  eventModalFormInput: {
+    fontSize: 16,
+    color: '#333',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#fff',
+  },
+  eventImagePickerButton: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#f0f0f0',
+  },
+  eventImagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  eventImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
+  },
+  eventImagePlaceholderText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#999',
+  },
+  eventDatePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#fff',
+  },
+  eventDateText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  eventModalDetailInputContainer: {
+    flex: 1,
+  },
+  eventModalDetailInput: {
+    height: 120,
+    textAlignVertical: 'top',
+  },
+  datePickerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
   },
   calendarList: {
     marginTop: 8,

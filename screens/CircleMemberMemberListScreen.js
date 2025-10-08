@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, FlatList, ActivityIndicator, TextInput, Modal, Alert } from 'react-native';
+import { CommonActions } from '@react-navigation/native';
 import CommonHeader from '../components/CommonHeader';
 import { db } from '../firebaseConfig';
 import { doc, getDoc, getDocs, collection, deleteDoc, updateDoc, arrayRemove } from 'firebase/firestore';
@@ -159,13 +160,33 @@ export default function CircleMemberMemberListScreen({ route, navigation }) {
       });
       
       setLeaveModalVisible(false);
-      // Mainタブに遷移してからマイページタブに遷移
-      navigation.navigate('Main', {
-        screen: 'マイページ',
-        params: {
-          screen: 'MyPage'
-        }
-      });
+      
+      // ナビゲーションスタックをリセットして、前の画面履歴を完全に削除
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [
+            {
+              name: 'Main',
+              state: {
+                routes: [
+                  { name: 'ホーム' },
+                  { name: '検索' },
+                  { 
+                    name: 'マイページ',
+                    state: {
+                      index: 0,
+                      routes: [{ name: 'MyPage' }]
+                    }
+                  },
+                  { name: 'サークル運営' }
+                ],
+                index: 2, // マイページタブをアクティブに
+              },
+            },
+          ],
+        })
+      );
     } catch (e) {
       console.error('Error leaving circle:', e);
       Alert.alert('エラー', '脱退に失敗しました');
@@ -285,7 +306,6 @@ export default function CircleMemberMemberListScreen({ route, navigation }) {
                 size="medium"
                 variant="primary"
                 backgroundColor="#DC2626"
-                shadowColor="#B91C1C"
                 hapticFeedback={true}
                 style={styles.modalLeaveButtonContainer}
               />

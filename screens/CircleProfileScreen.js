@@ -726,26 +726,132 @@ export default function CircleProfileScreen({ route, navigation }) {
     </View>
   );
 
-  const renderEventsTab = () => (
+  // 日付フォーマット関数
+  const formatEventDate = (timestamp) => {
+    if (!timestamp) return '';
+    
+    let date;
+    if (timestamp.toDate) {
+      // Firestore Timestamp
+      date = timestamp.toDate();
+    } else if (timestamp instanceof Date) {
+      date = timestamp;
+    } else {
+      return '';
+    }
+    
+    const year = date.getFullYear();
+    const month = date.getMonth() + 1;
+    const day = date.getDate();
+    const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
+    const weekday = weekdays[date.getDay()];
+    
+    return `${year}年${month}月${day}日（${weekday}）`;
+  };
+
+  // イベント詳細画面への遷移
+  const handleEventDetailPress = (event) => {
+    navigation.navigate('共通', {
+      screen: 'CircleEventDetail',
+      params: {
+        event: event,
+        circleName: circleData.name
+      }
+    });
+  };
+
+  // 締切チェック関数
+  const isEventExpired = (event) => {
+    if (!event.eventDate && !event.deadline) return false;
+    
+    const deadline = event.deadline || event.eventDate;
+    let deadlineDate;
+    
+    if (deadline.toDate) {
+      deadlineDate = deadline.toDate();
+    } else if (deadline instanceof Date) {
+      deadlineDate = deadline;
+    } else {
+      return false;
+    }
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    deadlineDate.setHours(0, 0, 0, 0);
+    
+    return deadlineDate < today;
+  };
+
+  // 有効なイベントのみをフィルタ
+  const getActiveEvents = () => {
+    if (!circleData.events) return [];
+    return circleData.events.filter(event => !isEventExpired(event));
+  };
+
+  const renderEventsTab = () => {
+    const activeEvents = getActiveEvents();
+    
+    return (
     <View style={styles.tabContent}>
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>イベント</Text>
-        {circleData.events && circleData.events.length > 0 ? (
-          circleData.events.slice(0, 4).map((event, idx) => (
+        <Text style={styles.sectionTitle}>新歓イベント</Text>
+        {activeEvents && activeEvents.length > 0 ? (
+          activeEvents.map((event, idx) => (
             <View key={idx} style={styles.eventCard}>
-              <Text style={styles.eventTitle}>{event.title}</Text>
+              {/* イベント画像 */}
               {event.image && (
                 <Image source={{ uri: event.image }} style={styles.eventImage} contentFit="cover" />
               )}
-              <Text style={styles.eventDetail}>{event.detail}</Text>
+              
+              {/* イベント情報 */}
+              <View style={styles.eventCardContent}>
+                <Text style={styles.eventTitle}>{event.title}</Text>
+                
+                {/* 開催日時 */}
+                {event.eventDate && (
+                  <View style={styles.eventInfoRow}>
+                    <Ionicons name="calendar-outline" size={16} color="#666" />
+                    <Text style={styles.eventInfoText}>{formatEventDate(event.eventDate)}</Text>
+                  </View>
+                )}
+                
+                {/* 開催場所 */}
+                {event.location && (
+                  <View style={styles.eventInfoRow}>
+                    <Ionicons name="location-outline" size={16} color="#666" />
+                    <Text style={styles.eventInfoText} numberOfLines={1}>{event.location}</Text>
+                  </View>
+                )}
+                
+                {/* 参加費 */}
+                {event.fee && (
+                  <View style={styles.eventInfoRow}>
+                    <Ionicons name="cash-outline" size={16} color="#666" />
+                    <Text style={styles.eventInfoText}>{event.fee}</Text>
+                  </View>
+                )}
+                
+                {/* 詳細はこちらボタン */}
+                <View style={styles.eventButtonContainer}>
+                  <KurukatsuButton
+                    title="詳細はこちら"
+                    onPress={() => handleEventDetailPress(event)}
+                    size="small"
+                    variant="secondary"
+                    hapticFeedback={true}
+                    style={styles.eventDetailButton}
+                  />
+                </View>
+              </View>
             </View>
           ))
         ) : (
-          <Text style={styles.placeholderText}>イベント情報は準備中です</Text>
+          <Text style={styles.placeholderText}>新歓イベント情報は準備中です</Text>
         )}
       </View>
     </View>
   );
+  };
 
   const renderWelcomeTab = () => (
     <View style={styles.tabContent}>
@@ -812,7 +918,7 @@ export default function CircleProfileScreen({ route, navigation }) {
           onPress={() => handleTabChange('events')}
         >
           <Text style={[styles.tabLabel, getTabTextStyle(1)]}>
-            イベント
+            新歓イベント
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -1588,26 +1694,44 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    padding: 16,
     marginBottom: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 2,
     elevation: 2,
-  },
-  eventTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#333',
+    overflow: 'hidden',
   },
   eventImage: {
     width: '100%',
     aspectRatio: 16 / 9,
-    borderRadius: 8,
-    marginBottom: 10,
     backgroundColor: '#eee',
+  },
+  eventCardContent: {
+    padding: 16,
+  },
+  eventTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#333',
+  },
+  eventInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  eventInfoText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 6,
+    flex: 1,
+  },
+  eventButtonContainer: {
+    marginTop: 12,
+  },
+  eventDetailButton: {
+    width: '100%',
   },
   eventDetail: {
     fontSize: 15,

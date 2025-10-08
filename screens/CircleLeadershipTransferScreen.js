@@ -427,7 +427,6 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
                 size="medium"
                 variant="primary"
                 backgroundColor="#DC2626"
-                shadowColor="#B91C1C"
                 hapticFeedback={true}
                 style={styles.confirmModalButtonConfirmContainer}
               />
