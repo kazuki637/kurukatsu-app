@@ -270,40 +270,7 @@ const CircleRegistrationScreen = ({ navigation }) => {
     try {
       console.log('サークル登録開始 - トランザクション処理');
       
-      // 先に画像をアップロード（Firestore操作より前に）
       let imageUrl = null;
-      if (circleImage) {
-        try {
-          console.log('=== 画像アップロード開始 ===');
-          
-          // 画像を圧縮
-          console.log('サークル画像圧縮開始...');
-          const compressedUri = await compressCircleImage(circleImage);
-          console.log('サークル画像圧縮完了');
-          
-          // 圧縮された画像をアップロード
-          const response = await fetch(compressedUri);
-          const blob = await response.blob();
-          const timestamp = Date.now();
-          const storagePath = `circle_images/temp/${user.uid}_${timestamp}`;
-          console.log('Storage Path:', storagePath);
-          
-          const storageRef = ref(storage, storagePath);
-          console.log('アップロード開始...');
-          const uploadTask = uploadBytes(storageRef, blob);
-          await uploadTask;
-          console.log('アップロード完了、URL取得中...');
-          imageUrl = await getDownloadURL(storageRef);
-          
-          console.log('サークル画像アップロード完了:', imageUrl);
-          console.log('=== 画像アップロード完全終了 ===');
-        } catch (error) {
-          console.error("Error uploading image:", error);
-          Alert.alert('画像アップロードエラー', 'サークルアイコンのアップロード中にエラーが発生しました。');
-          setUploading(false);
-          return;
-        }
-      }
 
       // トランザクションですべてのFirestore操作を実行
       console.log('🔄 Firestoreトランザクション開始');
@@ -336,18 +303,13 @@ const CircleRegistrationScreen = ({ navigation }) => {
         console.log('📝 サークルドキュメントID:', circleDocRef.id);
 
         console.log('👥 2. membersサブコレクション作成開始');
-        // 2. membersサブコレクションに代表者を追加
+        // 2. membersサブコレクションに代表者を追加（正規化: 埋め込み情報は保存しない）
         const memberDocRef = doc(circleDocRef, 'members', user.uid);
         const memberData = {
           joinedAt: new Date(),
           role: 'leader',
           assignedAt: new Date(),
           assignedBy: user.uid,
-          gender: userProfile.gender || '',
-          university: userProfile.university || '',
-          name: userProfile.name || '氏名未設定',
-          grade: userProfile.grade || '',
-          profileImageUrl: userProfile.profileImageUrl || null
         };
         console.log('👥 メンバーデータ:', JSON.stringify(memberData, null, 2));
         transaction.set(memberDocRef, memberData);
@@ -367,6 +329,42 @@ const CircleRegistrationScreen = ({ navigation }) => {
       });
 
       console.log('🎉 サークル登録完了 - トランザクション成功:', result);
+
+      // 画像が選択されている場合、正しいパスにアップロード
+      if (circleImage) {
+        try {
+          console.log('🖼️ 画像アップロード開始...');
+          console.log('Circle ID (result):', result);
+          console.log('Circle Image exists:', !!circleImage);
+          
+          // 画像を圧縮
+          const compressedUri = await compressCircleImage(circleImage);
+          
+          // 圧縮された画像をアップロード
+          const response = await fetch(compressedUri);
+          const blob = await response.blob();
+          const timestamp = Date.now();
+          console.log('Timestamp:', timestamp);
+          
+          const storagePath = `circle_images/${result}/icons/${timestamp}`;
+          console.log('Circle ID:', result);
+          console.log('Storage Path:', storagePath);
+          
+          const storageRef = ref(storage, storagePath);
+          await uploadBytes(storageRef, blob);
+          const uploadedImageUrl = await getDownloadURL(storageRef);
+          
+          // Firestoreの画像URLを更新
+          await updateDoc(doc(db, 'circles', result), {
+            imageUrl: uploadedImageUrl
+          });
+          
+          console.log('🖼️ 画像アップロード完了');
+        } catch (error) {
+          console.error('画像アップロードエラー:', error);
+          Alert.alert('画像アップロードエラー', 'サークルアイコンのアップロード中にエラーが発生しました。');
+        }
+      }
 
       // サークル登録完了後、検索画面のキャッシュを無効化
       if (global.invalidateCirclesCache) {

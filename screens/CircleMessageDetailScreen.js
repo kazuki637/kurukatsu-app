@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, Modal, FlatList, Dimensions, Alert, ActivityIndicator } from 'react-native';
 import CommonHeader from '../components/CommonHeader';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,7 @@ import { collection, setDoc, doc, serverTimestamp, getDocs, getDoc, addDoc, dele
 import KurukatsuButton from '../components/KurukatsuButton';
 // import { updateUnreadCounts } from '../hooks/useNotificationBadge'; // リアルタイムリスナーが自動更新するため不要
 import { startTransition } from 'react';
+import useUsersMap from '../hooks/useUsersMap';
 
 export default function CircleMessageDetailScreen({ route, navigation }) {
   const { message, userUid } = route.params;
@@ -27,11 +28,14 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
   const [readUsers, setReadUsers] = useState([]);
   const [unreadUsers, setUnreadUsers] = useState([]);
   const [loadingReadStatus, setLoadingReadStatus] = useState(true);
+  const [memberUids, setMemberUids] = useState([]);
+  const [readMap, setReadMap] = useState({});
   
   // 出席確認のstate
   const [attendanceStatus, setAttendanceStatus] = useState(null); // 'attending', 'absent', 'pending', null
   const [attendanceCounts, setAttendanceCounts] = useState({ attending: 0, absent: 0, pending: 0 });
   const [loadingAttendanceStatus, setLoadingAttendanceStatus] = useState(true);
+  const [attendanceRaw, setAttendanceRaw] = useState({ attending: [], absent: [], pendingExplicit: [], respondedAtByUid: {} });
   
   // 回答状況確認用のstate
   const [attendanceUsers, setAttendanceUsers] = useState({ attending: [], absent: [], pending: [] });
@@ -66,60 +70,26 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
       const attendanceRef = collection(db, 'circles', message.circleId, 'messages', messageId, 'attendance');
       const attendanceSnap = await getDocs(attendanceRef);
       
-      let attendingCount = 0;
-      let absentCount = 0;
-      let pendingCount = 0;
+      let attendingUIDs = [];
+      let absentUIDs = [];
+      let pendingExplicitUIDs = [];
+      let respondedAtByUid = {};
       let currentUserStatus = null;
-      
-      // 回答者一覧を取得
-      const attendingUsers = [];
-      const absentUsers = [];
-      const pendingUsers = [];
-      
+
       for (const docSnapshot of attendanceSnap.docs) {
         const data = docSnapshot.data();
-        const userDocRef = doc(db, 'users', docSnapshot.id);
-        const userDocSnap = await getDoc(userDocRef);
-        const userData = userDocSnap.exists() ? userDocSnap.data() : {};
-        const userName = userData.name || userData.nickname || '未設定';
-        
-        if (data.status === 'attending') {
-          attendingCount++;
-          attendingUsers.push({
-            uid: docSnapshot.id,
-            name: userName,
-            respondedAt: data.respondedAt ? data.respondedAt.toDate() : null,
-          });
-        } else if (data.status === 'absent') {
-          absentCount++;
-          absentUsers.push({
-            uid: docSnapshot.id,
-            name: userName,
-            respondedAt: data.respondedAt ? data.respondedAt.toDate() : null,
-          });
-        } else if (data.status === 'pending') {
-          pendingCount++;
-          pendingUsers.push({
-            uid: docSnapshot.id,
-            name: userName,
-            respondedAt: data.respondedAt ? data.respondedAt.toDate() : null,
-          });
-        }
-        
-        // 現在のユーザーの出席状況を取得
+        const uid = docSnapshot.id;
+        if (data.status === 'attending') attendingUIDs.push(uid);
+        else if (data.status === 'absent') absentUIDs.push(uid);
+        else if (data.status === 'pending') pendingExplicitUIDs.push(uid);
+        if (data.respondedAt && data.respondedAt.toDate) respondedAtByUid[uid] = data.respondedAt.toDate();
+
         const currentUser = auth.currentUser;
-        if (currentUser && docSnapshot.id === currentUser.uid) {
-          currentUserStatus = data.status;
-        }
+        if (currentUser && uid === currentUser.uid) currentUserStatus = data.status;
       }
-      
-      setAttendanceCounts({ attending: attendingCount, absent: absentCount, pending: pendingCount });
+
       setAttendanceStatus(currentUserStatus);
-      setAttendanceUsers({
-        attending: attendingUsers,
-        absent: absentUsers,
-        pending: pendingUsers
-      });
+      setAttendanceRaw({ attending: attendingUIDs, absent: absentUIDs, pendingExplicit: pendingExplicitUIDs, respondedAtByUid });
     } catch (error) {
       console.error('Error fetching attendance data:', error);
     } finally {
@@ -291,40 +261,27 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
     }
   };
 
-  // 既読・未読ユーザー取得
+  // 既読・未読ユーザー取得（ベースライン: members）
   const fetchReadUsers = async () => {
     if (!message.circleId || !message.id) return;
     // 1. サークルメンバー一覧取得
     const membersRef = collection(db, 'circles', message.circleId, 'members');
     const membersSnap = await getDocs(membersRef);
-    const memberUids = membersSnap.docs.map(doc => doc.id);
+    const uids = membersSnap.docs.map(doc => doc.id);
+    setMemberUids(uids);
     
     // 2. サークルレベルでの既読情報取得
     const messageId = message.messageId || message.id; // messageIdを優先、なければidを使用
     const readStatusRef = collection(db, 'circles', message.circleId, 'messages', messageId, 'readStatus');
     const readStatusSnap = await getDocs(readStatusRef);
-    const readMap = {};
-    readStatusSnap.forEach(doc => {
-      const d = doc.data();
-      readMap[doc.id] = d.readAt ? d.readAt.toDate() : null;
+    const rm = {};
+    readStatusSnap.forEach(docSnap => {
+      const d = docSnap.data();
+      rm[docSnap.id] = d.readAt ? d.readAt.toDate() : null;
     });
-    
-    // 3. プロフィール取得
-    const users = [];
-    for (const uid of memberUids) {
-      const userDoc = await getDoc(doc(db, 'users', uid));
-      const d = userDoc.exists() ? userDoc.data() : {};
-      users.push({
-        uid,
-        name: d.name || d.nickname || '未設定',
-        profileImageUrl: d.profileImageUrl || '',
-        readAt: readMap[uid] || null,
-      });
-    }
-    // 4. 既読・未読で分割
-    const readUsers = users.filter(u => u.readAt);
-    const unreadUsers = users.filter(u => !u.readAt);
-    return { readUsers, unreadUsers };
+    setReadMap(rm);
+    // プロフィール解決はフックで別effectが担当
+    return { readUsers: [], unreadUsers: [] };
   };
 
   // 送信者情報を取得（CircleMemberContactScreenから受け取ったsenderInfoを使用）
@@ -362,41 +319,14 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
         
         // 未読数の更新はuseNotificationBadgeフックのリアルタイムリスナーが自動的に処理
         
-        // 2. サークルメンバー一覧取得
-        const membersRef = collection(db, 'circles', message.circleId, 'members');
-        const membersSnap = await getDocs(membersRef);
-        const memberUids = membersSnap.docs.map(doc => doc.id);
-        
-        // 3. サークルレベルでの既読情報取得
-        const readStatusCollectionRef = collection(db, 'circles', message.circleId, 'messages', messageId, 'readStatus');
-        const readStatusCollectionSnap = await getDocs(readStatusCollectionRef);
-        const readMap = {};
-        readStatusCollectionSnap.forEach(doc => {
-          const d = doc.data();
-          readMap[doc.id] = d.readAt ? d.readAt.toDate() : null;
-        });
-        
-        // 4. プロフィール取得
-        const users = [];
-        for (const uid of memberUids) {
-          const userDoc = await getDoc(doc(db, 'users', uid));
-          const d = userDoc.exists() ? userDoc.data() : {};
-          users.push({
-            uid,
-            name: d.name || d.nickname || '未設定',
-            profileImageUrl: d.profileImageUrl || '',
-            readAt: readMap[uid] || null,
+        // メンバーと既読情報を取得（プロフィールは別effectで処理）
+        const { readUsers, unreadUsers } = await fetchReadUsers();
+        if (readUsers || unreadUsers) {
+          startTransition(() => {
+            setReadUsers(readUsers || []);
+            setUnreadUsers(unreadUsers || []);
           });
         }
-        // 5. 状態更新を一括で行う
-        const readUsers = users.filter(u => u.readAt);
-        const unreadUsers = users.filter(u => !u.readAt);
-        
-        // React 18のバッチ更新を使用
-        startTransition(() => {
-          setReadUsers(readUsers);
-          setUnreadUsers(unreadUsers);
-        });
         
         // 6. 出欠確認データの取得
         if (message.type === 'attendance') {
@@ -410,6 +340,57 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
     };
     registerAndFetch();
   }, [message]);
+
+  // プロフィール購読
+  const userIdToProfile = useUsersMap(memberUids);
+
+  // 既読・未読リストをプロフィール付きで再構築
+  useEffect(() => {
+    if (memberUids.length === 0) return;
+    const users = memberUids.map(uid => ({
+      uid,
+      name: (userIdToProfile[uid]?.name || userIdToProfile[uid]?.nickname || '未設定'),
+      profileImageUrl: userIdToProfile[uid]?.profileImageUrl || '',
+      readAt: readMap[uid] || null,
+    }));
+    const rUsers = users.filter(u => u.readAt);
+    const uUsers = users.filter(u => !u.readAt);
+    setReadUsers(rUsers);
+    setUnreadUsers(uUsers);
+  }, [memberUids, userIdToProfile, readMap]);
+
+  // 出欠: プロフィールと未回答を含むpendingを再構築
+  useEffect(() => {
+    if (memberUids.length === 0 || message.type !== 'attendance') return;
+    const attendingSet = new Set(attendanceRaw.attending);
+    const absentSet = new Set(attendanceRaw.absent);
+    const pendingExplicitSet = new Set(attendanceRaw.pendingExplicit);
+    const respondedSet = new Set([...attendingSet, ...absentSet, ...pendingExplicitSet]);
+
+    const attendingList = attendanceRaw.attending.map(uid => ({
+      uid,
+      name: (userIdToProfile[uid]?.name || userIdToProfile[uid]?.nickname || '未設定'),
+      respondedAt: attendanceRaw.respondedAtByUid[uid] || null,
+    }));
+    const absentList = attendanceRaw.absent.map(uid => ({
+      uid,
+      name: (userIdToProfile[uid]?.name || userIdToProfile[uid]?.nickname || '未設定'),
+      respondedAt: attendanceRaw.respondedAtByUid[uid] || null,
+    }));
+    // 未回答ユーザーもpendingに含める
+    const pendingUIDsFinal = Array.from(new Set([
+      ...attendanceRaw.pendingExplicit,
+      ...memberUids.filter(uid => !respondedSet.has(uid))
+    ]));
+    const pendingList = pendingUIDsFinal.map(uid => ({
+      uid,
+      name: (userIdToProfile[uid]?.name || userIdToProfile[uid]?.nickname || '未設定'),
+      respondedAt: attendanceRaw.respondedAtByUid[uid] || null,
+    }));
+
+    setAttendanceCounts({ attending: attendingList.length, absent: absentList.length, pending: pendingList.length });
+    setAttendanceUsers({ attending: attendingList, absent: absentList, pending: pendingList });
+  }, [memberUids, userIdToProfile, attendanceRaw, message.type]);
 
   // 既読・未読ボタン押下時の処理
   const handleShowSheet = (type) => {

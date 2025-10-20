@@ -459,19 +459,8 @@ export default function ProfileEditScreen(props) {
         const joinedCircleIds = userData.joinedCircleIds || [];
         const adminCircleIds = userData.adminCircleIds || [];
         
-        // 各サークルのメンバーデータを更新
-        const updatePromises = joinedCircleIds.map(async (circleId) => {
-          try {
-            await setDoc(doc(db, 'circles', circleId, 'members', user.uid), {
-              name: name,
-              university: university,
-              grade: grade,
-              profileImageUrl: imageUrl
-            }, { merge: true });
-          } catch (error) {
-            console.error(`Error updating member data for circle ${circleId}:`, error);
-          }
-        });
+        // 各サークルのメンバーデータは正規化によりユーザープロフィールを参照するため、埋め込み更新は行わない
+        const updatePromises = [];
         
         // 代表者（leaderId）が所属するサークルのuniversityNameも更新
         const leaderUpdatePromises = adminCircleIds.map(async (circleId) => {

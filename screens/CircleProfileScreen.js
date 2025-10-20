@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Linking, ActivityIndicator, Alert, SafeAreaView, StatusBar, Dimensions, Modal, Animated } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,6 +10,7 @@ import CommonHeader from '../components/CommonHeader';
 import KurukatsuButton from '../components/KurukatsuButton';
 import { checkStudentIdVerification } from '../utils/permissionUtils';
 import useFirestoreDoc from '../hooks/useFirestoreDoc';
+import useUsersMap from '../hooks/useUsersMap';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getUserNotificationTokens, sendPushNotification } from '../utils/notificationUtils';
 import { useFocusEffect } from '@react-navigation/native';
@@ -315,22 +316,21 @@ export default function CircleProfileScreen({ route, navigation }) {
     fetchUserBlocks();
   }, [user]);
 
-  // 大学データを処理する関数
-  const generateUniversityData = (members) => {
+  // メンバーのプロフィールを購読
+  const memberIds = useMemo(() => members.map(m => m.id), [members]);
+  const userIdToProfile = useUsersMap(memberIds);
+
+  // 大学データを処理する関数（正規化後: users/{uid} から大学名を取得）
+  const generateUniversityData = (memberList) => {
     const universityCount = {};
-    members.forEach(member => {
-      const university = member.university || '大学名未設定';
+    memberList.forEach(member => {
+      const profile = userIdToProfile[member.id] || null;
+      const university = (profile?.university) || '大学名未設定';
       universityCount[university] = (universityCount[university] || 0) + 1;
     });
-    
-    // データを降順にソート
     const sortedData = Object.entries(universityCount)
       .sort(([, a], [, b]) => b - a)
-      .map(([university, count]) => ({
-        university,
-        count
-      }));
-
+      .map(([university, count]) => ({ university, count }));
     return sortedData;
   };
 
@@ -374,10 +374,6 @@ export default function CircleProfileScreen({ route, navigation }) {
       const requestsRef = collection(db, 'circles', circleId, 'joinRequests');
       await addDoc(requestsRef, {
         userId: user.uid,
-        name: userData.name || '',
-        university: userData.university || '',
-        grade: userData.grade || '',
-        email: user.email || '',
         requestedAt: new Date(),
       });
       setHasRequested(true);
@@ -417,15 +413,15 @@ export default function CircleProfileScreen({ route, navigation }) {
       
       // 管理者の通知トークンを取得
       if (members.length > 0) {
-        console.log('全メンバー:', members.map(m => ({ id: m.id, role: m.role, name: m.name })));
+        console.log('全メンバー:', members.map(m => ({ id: m.id, role: m.role })));
         const adminMembers = members.filter(member => member.role === 'admin');
         console.log('管理者メンバー数:', adminMembers.length);
-        console.log('管理者詳細:', adminMembers.map(m => ({ id: m.id, role: m.role, name: m.name })));
+        console.log('管理者詳細:', adminMembers.map(m => ({ id: m.id, role: m.role })));
         
         for (const adminMember of adminMembers) {
-          console.log(`管理者 ${adminMember.name} (${adminMember.id}) の通知トークンを取得中...`);
+          console.log(`管理者 (${adminMember.id}) の通知トークンを取得中...`);
           const adminTokens = await getUserNotificationTokens(adminMember.id, 'joinRequest');
-          console.log(`管理者 ${adminMember.name} の通知トークン数:`, adminTokens.length);
+          console.log(`管理者 (${adminMember.id}) の通知トークン数:`, adminTokens.length);
           leaderAndAdminTokens.push(...adminTokens);
         }
       } else {

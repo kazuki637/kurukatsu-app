@@ -96,8 +96,8 @@ service cloud.firestore {
         get(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid)).data.role in ['leader', 'admin'];
     }
 
-    // サークルのイベント
-    match /circles/{circleId}/events/{eventId} {
+    // サークルのスケジュール
+    match /circles/{circleId}/schedule/{eventId} {
       allow read: if request.auth != null && 
         exists(/databases/$(database)/documents/circles/$(circleId)/members/$(request.auth.uid));
       allow create, update, delete: if request.auth != null && 
@@ -215,7 +215,7 @@ service cloud.firestore {
     }
 
     // ユーザーのスレッド設定（投稿形式の固定用）
-    match /userThreadSettings/{userId}/threads/{threadId} {
+    match /users/{userId}/threadSettings/{threadId} {
       allow read, write: if request.auth != null && 
         request.auth.uid == userId;
     }

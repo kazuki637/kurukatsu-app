@@ -361,7 +361,7 @@ export default function CircleMemberScheduleScreen({ route, navigation }) {
   // 出席状況データの取得
   const fetchAttendanceData = async (eventId) => {
     try {
-      const attendanceRef = collection(db, 'circles', circleId, 'events', eventId, 'attendance');
+      const attendanceRef = collection(db, 'circles', circleId, 'schedule', eventId, 'attendance');
       const attendanceSnap = await getDocs(attendanceRef);
       
       let attendingCount = 0;
@@ -443,7 +443,7 @@ export default function CircleMemberScheduleScreen({ route, navigation }) {
       // 同じステータスを押した場合は取り消し
       if (currentStatus === status) {
         // ドキュメントを削除
-        const attendanceRef = doc(db, 'circles', circleId, 'events', eventId, 'attendance', user.uid);
+        const attendanceRef = doc(db, 'circles', circleId, 'schedule', eventId, 'attendance', user.uid);
         await deleteDoc(attendanceRef);
         
         // 現在のユーザーの出席状況を即座に更新
@@ -460,11 +460,10 @@ export default function CircleMemberScheduleScreen({ route, navigation }) {
       }
 
       // 新しいステータスを登録
-      const attendanceRef = doc(db, 'circles', circleId, 'events', eventId, 'attendance', user.uid);
+      const attendanceRef = doc(db, 'circles', circleId, 'schedule', eventId, 'attendance', user.uid);
       await setDoc(attendanceRef, {
         status: status,
         respondedAt: new Date(),
-        userName: user.displayName || '未設定',
       });
 
       // 現在のユーザーの出席状況を即座に更新

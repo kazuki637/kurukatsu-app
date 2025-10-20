@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, FlatList, ActivityIndicator, TextInput, Modal, Alert } from 'react-native';
 import { Image } from 'expo-image';
 import { CommonActions } from '@react-navigation/native';
@@ -9,6 +9,7 @@ import { auth } from '../firebaseConfig';
 import { Ionicons } from '@expo/vector-icons';
 import { getRoleDisplayName } from '../utils/permissionUtils';
 import KurukatsuButton from '../components/KurukatsuButton';
+import useUsersMap from '../hooks/useUsersMap';
 
 export default function CircleMemberMemberListScreen({ route, navigation }) {
   const { circleId } = route.params;
@@ -65,11 +66,6 @@ export default function CircleMemberMemberListScreen({ route, navigation }) {
           const data = doc.data();
           return {
             id: doc.id,
-            name: data.name || '氏名未設定',
-            university: data.university || '',
-            grade: data.grade || '',
-            email: data.email || '',
-            profileImageUrl: data.profileImageUrl || null,
             role: data.role || 'member',
             joinedAt: data.joinedAt
           };
@@ -124,12 +120,30 @@ export default function CircleMemberMemberListScreen({ route, navigation }) {
     });
   };
 
+  // ユーザープロフィールを購読
+  const memberIds = useMemo(() => members.map(m => m.id), [members]);
+  const userIdToProfile = useUsersMap(memberIds);
+
+  // ユーザープロフィールの取得状況をチェック
+  const isProfileLoading = useMemo(() => {
+    if (members.length === 0) return false;
+    return members.some(member => !userIdToProfile[member.id]);
+  }, [members, userIdToProfile]);
+
+  // 表示用の結合データ作成＆フィルタ
   const filteredMembers = sortMembersByRole(
-    members.filter(member =>
-      member.name.toLowerCase().includes(memberSearchText.toLowerCase()) ||
-      member.university.toLowerCase().includes(memberSearchText.toLowerCase()) ||
-      member.grade.toLowerCase().includes(memberSearchText.toLowerCase())
-    )
+    members
+      .map(m => ({
+        ...m,
+        profile: userIdToProfile[m.id] || null,
+      }))
+      .filter(({ profile }) => {
+        const name = (profile?.name || '').toLowerCase();
+        const university = (profile?.university || '').toLowerCase();
+        const grade = (profile?.grade || '').toLowerCase();
+        const q = memberSearchText.toLowerCase();
+        return name.includes(q) || university.includes(q) || grade.includes(q);
+      })
   );
 
   // 脱退処理
@@ -222,14 +236,14 @@ export default function CircleMemberMemberListScreen({ route, navigation }) {
               clearButtonMode="while-editing"
             />
           </View>
-          {membersLoading ? (
+          {membersLoading || isProfileLoading ? (
             <ActivityIndicator size="small" color="#999" style={{ marginTop: 40 }} />
           ) : (
             <FlatList
               data={filteredMembers}
               keyExtractor={item => item.id}
               renderItem={({ item }) => {
-                const hasImage = item.profileImageUrl && item.profileImageUrl.trim() !== '' && !imageErrorMap[item.id];
+                const hasImage = item.profile?.profileImageUrl && item.profile.profileImageUrl.trim() !== '' && !imageErrorMap[item.id];
                 const isLeader = item.role === 'leader';
                 const isAdmin = item.role === 'admin';
                 const isMember = item.role === 'member';
@@ -242,7 +256,7 @@ export default function CircleMemberMemberListScreen({ route, navigation }) {
                    >
                      {hasImage ? (
                        <Image
-                         source={{ uri: item.profileImageUrl }}
+                         source={{ uri: item.profile.profileImageUrl }}
                          style={styles.memberAvatar}
                          onError={() => setImageErrorMap(prev => ({ ...prev, [item.id]: true }))}
                        />
@@ -252,8 +266,8 @@ export default function CircleMemberMemberListScreen({ route, navigation }) {
                        </View>
                      )}
                      <View style={styles.memberInfoContainer}>
-                       <Text style={styles.memberName}>{item.name || '氏名未設定'}</Text>
-                       <Text style={styles.memberDetails}>{item.university || ''} {item.grade || ''}</Text>
+                       <Text style={styles.memberName}>{(item.profile?.name) || '氏名未設定'}</Text>
+                       <Text style={styles.memberDetails}>{item.profile?.university || ''} {item.profile?.grade || ''}</Text>
                      </View>
                      <View style={[
                        styles.roleBadge,

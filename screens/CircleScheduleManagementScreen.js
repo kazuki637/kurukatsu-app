@@ -565,7 +565,7 @@ export default function CircleScheduleManagementScreen({ route, navigation }) {
   // 出席状況データの取得
   const fetchAttendanceData = async (eventId) => {
     try {
-      const attendanceRef = collection(db, 'circles', circleId, 'events', eventId, 'attendance');
+      const attendanceRef = collection(db, 'circles', circleId, 'schedule', eventId, 'attendance');
       const attendanceSnap = await getDocs(attendanceRef);
       
       let attendingCount = 0;

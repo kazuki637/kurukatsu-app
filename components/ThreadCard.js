@@ -6,19 +6,15 @@ import { Image } from 'expo-image';
 const ThreadCard = ({ 
   thread, 
   onPress, 
-  style
+  style,
+  creatorProfile,
 }) => {
   const {
     title,
     category,
-    creatorName,
     postCount,
     updatedAt,
     isAnonymous,
-    creatorId,
-    creatorProfileImageUrl,
-    creatorUniversity,
-    creatorGrade
   } = thread;
 
   // カテゴリの表示名マッピング
@@ -78,9 +74,9 @@ const ThreadCard = ({
 
       <View style={styles.footer}>
         <View style={styles.creatorContainer}>
-          {!isAnonymous && creatorProfileImageUrl ? (
+          {!isAnonymous && creatorProfile?.profileImageUrl ? (
             <Image
-              source={{ uri: creatorProfileImageUrl }}
+              source={{ uri: creatorProfile.profileImageUrl }}
               style={styles.creatorImage}
               contentFit="cover"
             />
@@ -95,11 +91,11 @@ const ThreadCard = ({
           )}
           <View style={styles.creatorDetails}>
             <Text style={styles.creatorText}>
-              {isAnonymous ? '匿名ユーザー' : creatorName}
+              {isAnonymous ? '匿名ユーザー' : (creatorProfile?.name || 'ユーザー')}
             </Text>
-            {!isAnonymous && (creatorUniversity || creatorGrade) ? (
+            {!isAnonymous && (creatorProfile?.university || creatorProfile?.grade) ? (
               <Text style={styles.creatorMeta}>
-                {[creatorUniversity, creatorGrade].filter(Boolean).join(' ')}
+                {[creatorProfile?.university, creatorProfile?.grade].filter(Boolean).join(' ')}
               </Text>
             ) : null}
           </View>

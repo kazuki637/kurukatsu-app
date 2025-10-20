@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert, TextInput, Modal, ScrollView, Platform } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,12 +9,14 @@ import CommonHeader from '../components/CommonHeader';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { getUserNotificationTokens, sendPushNotification } from '../utils/notificationUtils';
 import KurukatsuButton from '../components/KurukatsuButton';
+import useUsersMap from '../hooks/useUsersMap';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function CircleContactScreen({ route, navigation }) {
   const { circleId } = route.params;
-  const [members, setMembers] = useState([]); // メンバー一覧
+  const [members, setMembers] = useState([]); // メンバー一覧（プロフィール派生）
+  const [memberUids, setMemberUids] = useState([]); // メンバーのUID集合
   const [selectedUids, setSelectedUids] = useState([]); // 選択されたuid
   const [selectAll, setSelectAll] = useState(false);
   const [isLoadingMembers, setIsLoadingMembers] = useState(true); // メンバー情報取得中フラグ
@@ -70,27 +72,11 @@ export default function CircleContactScreen({ route, navigation }) {
 
         const membersRef = collection(db, 'circles', circleId, 'members');
         const membersSnap = await getDocs(membersRef);
-        const memberUids = membersSnap.docs.map(doc => doc.id);
-        // 各uidからユーザープロフィール取得
-        const memberProfiles = [];
-        for (const uid of memberUids) {
-          const userDoc = await getDoc(doc(db, 'users', uid));
-          if (userDoc.exists()) {
-            const d = userDoc.data();
-            memberProfiles.push({
-              uid,
-              name: d.name || d.nickname || '未設定',
-              profileImageUrl: d.profileImageUrl || '',
-              university: d.university || '',
-              grade: d.grade || '',
-              isCurrentUser: uid === currentUser.uid, // 自分自身かどうかのフラグ
-            });
-          }
-        }
-        setMembers(memberProfiles);
+        const uids = membersSnap.docs.map(doc => doc.id);
+        setMemberUids(uids);
         
         // グローバルメンバー数を更新
-        global.updateMemberCount(circleId, memberProfiles.length);
+        global.updateMemberCount(circleId, uids.length);
         
         // 自分自身を強制選択
         setSelectedUids([currentUser.uid]);
@@ -104,6 +90,24 @@ export default function CircleContactScreen({ route, navigation }) {
     };
     fetchMembers();
   }, [circleId]);
+
+  // 正規化: プロフィールの購読と合成
+  const userIdToProfile = useUsersMap(memberUids);
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    const profiles = memberUids.map(uid => {
+      const d = userIdToProfile[uid] || {};
+      return {
+        uid,
+        name: d.name || d.nickname || '未設定',
+        profileImageUrl: d.profileImageUrl || '',
+        university: d.university || '',
+        grade: d.grade || '',
+        isCurrentUser: currentUser ? uid === currentUser.uid : false,
+      };
+    });
+    setMembers(profiles);
+  }, [memberUids, userIdToProfile]);
 
   // 宛先選択（全選択・個別選択）
   const handleSelectAll = () => {

@@ -17,6 +17,7 @@ import { collection, query, orderBy, limit, getDocs, where } from 'firebase/fire
 import { db } from '../firebaseConfig';
 import CommonHeader from '../components/CommonHeader';
 import ThreadCard from '../components/ThreadCard';
+import useUsersMap from '../hooks/useUsersMap';
 import CategoryTabBar from '../components/CategoryTabBar';
 import KurukatsuButton from '../components/KurukatsuButton';
 
@@ -110,6 +111,14 @@ const ThreadListScreen = ({ navigation }) => {
     );
   }, [threads, searchQuery]);
 
+  // 表示中のスレッドに関わるcreatorId一覧を抽出
+  const creatorIds = useMemo(() => {
+    return Array.from(new Set((filteredThreads || []).map(t => t.creatorId).filter(Boolean)));
+  }, [filteredThreads]);
+
+  // ユーザープロフィールのマップを購読
+  const userIdToProfile = useUsersMap(creatorIds);
+
   // 初回読み込み
   useEffect(() => {
     fetchThreads();
@@ -155,12 +164,16 @@ const ThreadListScreen = ({ navigation }) => {
   };
 
   // スレッドカードのレンダリング
-  const renderThreadCard = ({ item }) => (
-    <ThreadCard
-      thread={item}
-      onPress={() => handleThreadPress(item)}
-    />
-  );
+  const renderThreadCard = ({ item }) => {
+    const creatorProfile = item.isAnonymous ? null : userIdToProfile[item.creatorId] || null;
+    return (
+      <ThreadCard
+        thread={item}
+        onPress={() => handleThreadPress(item)}
+        creatorProfile={creatorProfile}
+      />
+    );
+  };
 
   // 空の状態のレンダリング
   const renderEmptyState = () => (
@@ -180,6 +193,8 @@ const ThreadListScreen = ({ navigation }) => {
     <View style={styles.container}>
       <CommonHeader
         title="掲示板"
+        showBackButton={true}
+        onBack={() => navigation.goBack()}
         rightButton={
           <TouchableOpacity onPress={() => setShowHelpModal(true)}>
             <Ionicons name="help-circle-outline" size={24} color="#007bff" />

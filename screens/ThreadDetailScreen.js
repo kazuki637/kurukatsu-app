@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -33,6 +33,7 @@ import {
 import { auth, db } from '../firebaseConfig';
 import CommonHeader from '../components/CommonHeader';
 import PostItem from '../components/PostItem';
+import useUsersMap from '../hooks/useUsersMap';
 import KurukatsuButton from '../components/KurukatsuButton';
 import anonymousIdManager from '../utils/anonymousIdGenerator';
 
@@ -111,7 +112,7 @@ const ThreadDetailScreen = ({ navigation, route }) => {
       const user = auth.currentUser;
       if (!user) return;
 
-      const userModeDoc = await getDoc(doc(db, 'userThreadSettings', user.uid, 'threads', threadId));
+      const userModeDoc = await getDoc(doc(db, 'users', user.uid, 'threadSettings', threadId));
       if (userModeDoc.exists()) {
         const mode = userModeDoc.data();
         setUserThreadMode(mode.isAnonymous);
@@ -361,7 +362,7 @@ const ThreadDetailScreen = ({ navigation, route }) => {
       }
 
       // 投稿形式を固定
-      await setDoc(doc(db, 'userThreadSettings', user.uid, 'threads', threadId), {
+      await setDoc(doc(db, 'users', user.uid, 'threadSettings', threadId), {
         isAnonymous: tempIsAnonymous,
         createdAt: serverTimestamp()
       });
@@ -403,20 +404,41 @@ const ThreadDetailScreen = ({ navigation, route }) => {
     }
   };
 
+  // 表示中の投稿のuserId集合を抽出し、ユーザープロフィールを購読
+  const postUserIds = useMemo(() => {
+    return Array.from(new Set(posts.map(p => p.userId).filter(Boolean)));
+  }, [posts]);
+
+  const userIdToProfile = useUsersMap(postUserIds);
+
+  // ユーザープロフィールの取得状況をチェック
+  const isProfileLoading = useMemo(() => {
+    if (posts.length === 0) return false;
+    const nonAnonymousPosts = posts.filter(p => !p.isAnonymous);
+    if (nonAnonymousPosts.length === 0) return false;
+    return nonAnonymousPosts.some(post => !userIdToProfile[post.userId]);
+  }, [posts, userIdToProfile]);
+
   // 投稿アイテムのレンダリング
-  const renderPostItem = ({ item }) => (
-    <PostItem
-      post={item}
-      onReaction={handleReaction}
-      onReport={handleReport}
-      currentUserId={auth.currentUser?.uid}
-      isLiked={userReactions[item.id] || false}
-      onUserPress={handleUserPress}
-      onReply={handleReply}
-      replyToPostNumber={item.replyToPostNumber}
-      onReplyTargetPress={handleReplyTargetPress}
-    />
-  );
+  const renderPostItem = ({ item, index }) => {
+    const userProfile = item.isAnonymous ? null : userIdToProfile[item.userId] || null;
+    const isLastPost = index === posts.length - 1;
+    return (
+      <PostItem
+        post={item}
+        onReaction={handleReaction}
+        onReport={handleReport}
+        currentUserId={auth.currentUser?.uid}
+        isLiked={userReactions[item.id] || false}
+        onUserPress={handleUserPress}
+        onReply={handleReply}
+        replyToPostNumber={item.replyToPostNumber}
+        onReplyTargetPress={handleReplyTargetPress}
+        userProfile={userProfile}
+        isLastPost={isLastPost}
+      />
+    );
+  };
 
   if (loading) {
     return (
@@ -474,15 +496,21 @@ const ThreadDetailScreen = ({ navigation, route }) => {
         </View>
 
         {/* 投稿一覧 */}
-        <FlatList
-          ref={flatListRef}
-          data={posts}
-          renderItem={renderPostItem}
-          keyExtractor={(item) => item.id}
-          style={styles.postsList}
-          contentContainerStyle={styles.postsContainer}
-          showsVerticalScrollIndicator={true}
-        />
+        {isProfileLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#999" />
+          </View>
+        ) : (
+          <FlatList
+            ref={flatListRef}
+            data={posts}
+            renderItem={renderPostItem}
+            keyExtractor={(item) => item.id}
+            style={styles.postsList}
+            contentContainerStyle={styles.postsContainer}
+            showsVerticalScrollIndicator={true}
+          />
+        )}
 
         {/* 投稿入力フォーム */}
         <View style={styles.inputContainer}>
@@ -759,12 +787,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   postsContainer: {
-    paddingVertical: 8,
+    paddingVertical: 0,
   },
   inputContainer: {
     backgroundColor: '#FFFFFF',
     padding: 16,
-    paddingBottom: 24,
+    paddingBottom: 32,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
   },

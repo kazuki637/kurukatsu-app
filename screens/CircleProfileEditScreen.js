@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, ActivityIndicator, SafeAreaView, StatusBar, Dimensions, TextInput, KeyboardAvoidingView, Platform, Animated, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -12,6 +12,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { Modalize } from 'react-native-modalize';
 import KurukatsuButton from '../components/KurukatsuButton';
 import useFirestoreDoc from '../hooks/useFirestoreDoc';
+import useUsersMap from '../hooks/useUsersMap';
 import { compressHeaderImage, compressCircleImage, compressActivityImage, compressEventImage } from '../utils/imageCompression';
 
 const { width } = Dimensions.get('window');
@@ -233,7 +234,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     };
   }, [circleId]);
 
-  // 初回ロード時にメンバーデータを取得
+  // 初回ロード時にメンバーデータを取得（メンバー固有情報のみ）
   useEffect(() => {
     if (!circleId) return;
 
@@ -241,26 +242,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       try {
         const membersRef = collection(db, 'circles', circleId, 'members');
         const membersSnapshot = await getDocs(membersRef);
-        const membersData = [];
-        
-        for (const memberDoc of membersSnapshot.docs) {
-          const memberId = memberDoc.id;
-          const memberData = memberDoc.data();
-          
-          // メンバードキュメントから直接性別と大学情報を取得
-          // ユーザー情報も取得（名前など他の情報のため）
-          const userDoc = await getDoc(doc(db, 'users', memberId));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            membersData.push({
-              id: memberId,
-              gender: memberData.gender || userData.gender || null,
-              university: memberData.university || userData.university || null,
-              ...memberData,
-              ...userData
-            });
-          }
-        }
+        const membersData = membersSnapshot.docs.map(memberDoc => ({ id: memberDoc.id, ...memberDoc.data() }));
         
         setMembers(membersData);
         
@@ -270,11 +252,11 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         // テスト用のダミーデータ（メンバーが0人の場合）
         if (membersData.length === 0) {
           const dummyMembers = [
-            { id: '1', gender: '男性', university: '東京大学' },
-            { id: '2', gender: '男性', university: '東京大学' },
-            { id: '3', gender: '男性', university: '早稲田大学' },
-            { id: '4', gender: '女性', university: '東京大学' },
-            { id: '5', gender: '女性', university: '慶應義塾大学' },
+            { id: '1' },
+            { id: '2' },
+            { id: '3' },
+            { id: '4' },
+            { id: '5' },
           ];
           setMembers(dummyMembers);
           // ダミーデータの場合もグローバル更新
@@ -288,22 +270,21 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     fetchMembers();
   }, [circleId]);
 
-  // 大学データを処理する関数
-  const generateUniversityData = (members) => {
+  // メンバーのプロフィールを購読（正規化）
+  const memberIds = useMemo(() => members.map(m => m.id), [members]);
+  const userIdToProfile = useUsersMap(memberIds);
+
+  // 大学データを処理する関数（users/{uid}から大学名を参照）
+  const generateUniversityData = (memberList) => {
     const universityCount = {};
-    members.forEach(member => {
-      const university = member.university || '大学名未設定';
+    memberList.forEach(member => {
+      const profile = userIdToProfile[member.id] || null;
+      const university = (profile?.university) || '大学名未設定';
       universityCount[university] = (universityCount[university] || 0) + 1;
     });
-    
-    // データを降順にソート
     const sortedData = Object.entries(universityCount)
       .sort(([, a], [, b]) => b - a)
-      .map(([university, count]) => ({
-        university,
-        count
-      }));
-
+      .map(([university, count]) => ({ university, count }));
     return sortedData;
   };
 
@@ -346,10 +327,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       const requestsRef = collection(db, 'circles', circleId, 'joinRequests');
       await addDoc(requestsRef, {
         userId: user.uid,
-        name: userData.name || '',
-        university: userData.university || '',
-        grade: userData.grade || '',
-        email: user.email || '',
         requestedAt: new Date(),
       });
       setHasRequested(true);

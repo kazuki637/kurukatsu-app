@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -20,6 +20,7 @@ import { doc, getDoc, getDocs, collection, updateDoc, arrayUnion, arrayRemove } 
 import { onAuthStateChanged } from 'firebase/auth';
 import CommonHeader from '../components/CommonHeader';
 import KurukatsuButton from '../components/KurukatsuButton';
+import useUsersMap from '../hooks/useUsersMap';
 
 const { width } = Dimensions.get('window');
 
@@ -75,19 +76,10 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
         // メンバーリストを取得
         const membersSnapshot = await getDocs(collection(db, 'circles', circleId, 'members'));
         
-        const membersList = membersSnapshot.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            name: data.name || '氏名未設定',
-            university: data.university || '',
-            grade: data.grade || '',
-            email: data.email || '',
-            profileImageUrl: data.profileImageUrl || null,
-            role: data.role || 'member',
-            joinedAt: data.joinedAt
-          };
-        });
+        const membersList = membersSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
         setMembers(membersList);
 
         // データ取得完了
@@ -152,7 +144,7 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
       // サークルデータの代表者情報を更新（新しい代表者の情報で更新）
       await updateDoc(doc(db, 'circles', circleId), {
         leaderId: selectedMember.id,
-        leaderName: selectedMember.name || selectedMember.nickname || 'Unknown',
+        leaderName: newLeaderUserData.name || 'Unknown',
         contactInfo: newLeaderUserData.email || '', // 新しい代表者の連絡先
         universityName: newLeaderUserData.university || '' // 新しい代表者の大学名
       });
@@ -201,12 +193,19 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
     }
   };
 
-  // 検索フィルタリング
-  const filteredMembers = members.filter(member =>
-    member.name.toLowerCase().includes(searchText.toLowerCase()) ||
-    member.university.toLowerCase().includes(searchText.toLowerCase()) ||
-    member.grade.toLowerCase().includes(searchText.toLowerCase())
-  );
+  // 正規化: プロフィール購読と検索・表示
+  const memberIds = useMemo(() => members.map(m => m.id), [members]);
+  const userIdToProfile = useUsersMap(memberIds);
+
+  const filteredMembers = members
+    .map(m => ({ ...m, profile: userIdToProfile[m.id] || null }))
+    .filter(({ profile }) => {
+      const name = (profile?.name || '').toLowerCase();
+      const university = (profile?.university || '').toLowerCase();
+      const grade = (profile?.grade || '').toLowerCase();
+      const q = searchText.toLowerCase();
+      return name.includes(q) || university.includes(q) || grade.includes(q);
+    });
 
   // 役割別にソート（代表者 → 管理者 → メンバー）
   const sortedMembers = filteredMembers.sort((a, b) => {
@@ -224,6 +223,7 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
   const renderMemberItem = (member) => {
     const isSelected = selectedMember?.id === member.id;
     const isCurrentUser = user && member.id === user.uid;
+    const profile = member.profile || {};
 
     return (
       <Animated.View
@@ -240,8 +240,8 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
           disabled={isCurrentUser}
         >
           <View style={styles.memberIconContainer}>
-            {member.profileImageUrl ? (
-              <Image source={{ uri: member.profileImageUrl }} style={styles.memberIcon} />
+            {profile.profileImageUrl ? (
+              <Image source={{ uri: profile.profileImageUrl }} style={styles.memberIcon} />
             ) : (
               <View style={styles.memberIconPlaceholder}>
                 <Ionicons name="person-outline" size={24} color="#9ca3af" />
@@ -250,7 +250,7 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
           </View>
           <View style={styles.memberInfo}>
             <Text style={styles.memberName}>
-              {member.name || member.nickname || 'Unknown'}
+              {profile.name || profile.nickname || 'Unknown'}
               {isCurrentUser && ' (あなた)'}
             </Text>
             <Text style={styles.memberSubtitle}>
@@ -406,7 +406,7 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
           <View style={styles.confirmModal}>
             <Text style={styles.confirmModalTitle}>確認</Text>
             <Text style={styles.confirmModalText}>
-              {selectedMember?.name || selectedMember?.nickname || 'Unknown'} さんに{'\n'}
+              {(userIdToProfile[selectedMember?.id]?.name) || 'Unknown'} さんに{'\n'}
               代表者権限を引き継ぎますか？
             </Text>
             <Text style={styles.confirmModalWarning}>
@@ -449,7 +449,7 @@ export default function CircleLeadershipTransferScreen({ route, navigation }) {
             </View>
             <Text style={styles.completionModalTitle}>引き継ぎ完了</Text>
             <Text style={styles.completionModalText}>
-              {selectedMember?.name || selectedMember?.nickname || 'Unknown'}さんに
+              {(userIdToProfile[selectedMember?.id]?.name) || 'Unknown'}さんに
               引き継ぎました。
             </Text>
             <Text style={styles.completionModalSubText}>

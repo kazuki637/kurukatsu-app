@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert, TextInput, Modal, Animated, Dimensions, ScrollView } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc, setDoc,
 import CommonHeader from '../components/CommonHeader';
 import KurukatsuButton from '../components/KurukatsuButton';
 import { checkUserPermission, getUserRole, getRoleDisplayName } from '../utils/permissionUtils';
+import useUsersMap from '../hooks/useUsersMap';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -159,19 +160,10 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
         const membersRef = collection(db, 'circles', circleId, 'members');
         const membersSnap = await getDocs(membersRef);
         
-        const membersList = membersSnap.docs.map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            name: data.name || '氏名未設定',
-            university: data.university || '',
-            grade: data.grade || '',
-            email: data.email || '',
-            profileImageUrl: data.profileImageUrl || null,
-            role: data.role || 'member',
-            joinedAt: data.joinedAt
-          };
-        });
+        const membersList = membersSnap.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
         setMembers(membersList);
         setMembersLoading(false);
         
@@ -323,17 +315,12 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
       const userDoc = await getDoc(doc(db, 'users', request.userId));
       const userData = userDoc.exists() ? userDoc.data() : {};
       
-      // ユーザーIDをドキュメントIDとして使用してメンバーを追加
+      // ユーザーIDをドキュメントIDとして使用してメンバーを追加（正規化: 埋め込み情報は保存しない）
       await setDoc(doc(db, 'circles', circleId, 'members', request.userId), {
         joinedAt: new Date(),
         role: 'member',
         assignedAt: new Date(),
         assignedBy: user.uid,
-        gender: userData.gender || '',
-        university: userData.university || '',
-        name: userData.name || '氏名未設定',
-        grade: userData.grade || '',
-        profileImageUrl: userData.profileImageUrl || null
       });
       
       // ユーザーのjoinedCircleIdsにサークルIDを追加
@@ -447,12 +434,29 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
     });
   };
 
+  // ユーザープロフィールの購読（正規化）
+  const memberIds = useMemo(() => members.map(m => m.id), [members]);
+  const userIdToProfile = useUsersMap(memberIds);
+
+  // ユーザープロフィールの取得状況をチェック
+  const isProfileLoading = useMemo(() => {
+    if (members.length === 0) return false;
+    return members.some(member => !userIdToProfile[member.id]);
+  }, [members, userIdToProfile]);
+
   const filteredMembers = sortMembersByRole(
-    members.filter(member =>
-      member.name.toLowerCase().includes(searchText.toLowerCase()) ||
-      member.university.toLowerCase().includes(searchText.toLowerCase()) ||
-      member.grade.toLowerCase().includes(searchText.toLowerCase())
-    )
+    members
+      .map(m => ({
+        ...m,
+        profile: userIdToProfile[m.id] || null,
+      }))
+      .filter(({ profile }) => {
+        const name = (profile?.name || '').toLowerCase();
+        const university = (profile?.university || '').toLowerCase();
+        const grade = (profile?.grade || '').toLowerCase();
+        const q = searchText.toLowerCase();
+        return name.includes(q) || university.includes(q) || grade.includes(q);
+      })
   );
 
   const filteredRequests = joinRequests.filter(request =>
@@ -534,14 +538,14 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
                  clearButtonMode="while-editing"
                />
              </View>
-             {membersLoading ? (
+             {membersLoading || isProfileLoading ? (
                <ActivityIndicator size="small" color="#999" style={{ marginTop: 40 }} />
              ) : (
                <FlatList
                  data={filteredMembers}
                  keyExtractor={item => item.id}
                  renderItem={({ item }) => {
-                   const hasImage = item.profileImageUrl && item.profileImageUrl.trim() !== '' && !imageErrorMap[item.id];
+                   const hasImage = item.profile?.profileImageUrl && item.profile.profileImageUrl.trim() !== '' && !imageErrorMap[item.id];
                    const isLeader = item.role === 'leader';
                    const isAdmin = item.role === 'admin';
                    const isMember = item.role === 'member';
@@ -555,7 +559,7 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
                        >
                          {hasImage ? (
                            <Image
-                             source={{ uri: item.profileImageUrl }}
+                             source={{ uri: item.profile.profileImageUrl }}
                              style={styles.memberAvatar}
                              onError={() => setImageErrorMap(prev => ({ ...prev, [item.id]: true }))}
                            />
@@ -565,8 +569,8 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
                            </View>
                          )}
                          <View style={styles.memberInfoContainer}>
-                           <Text style={styles.memberName}>{item.name || '氏名未設定'}</Text>
-                           <Text style={styles.memberDetails}>{item.university || ''} {item.grade || ''}</Text>
+                           <Text style={styles.memberName}>{(item.profile?.name) || '氏名未設定'}</Text>
+                           <Text style={styles.memberDetails}>{item.profile?.university || ''} {item.profile?.grade || ''}</Text>
                          </View>
                          <View style={[
                            styles.roleBadge,
@@ -676,7 +680,7 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>役割を変更</Text>
             <Text style={styles.modalSubtitle}>
-              {selectedMember?.name} の役割を選択してください
+              {(userIdToProfile[selectedMember?.id]?.name) || '氏名未設定'} の役割を選択してください
             </Text>
             <KurukatsuButton
               title="メンバー"
@@ -721,9 +725,9 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
          <View style={styles.modalOverlay}>
            <View style={styles.modalContent}>
              <Text style={styles.modalTitle}>メンバー削除</Text>
-             <Text style={styles.modalSubtitle}>
-               {memberToDelete?.name || 'メンバー'} を削除しますか？
-             </Text>
+            <Text style={styles.modalSubtitle}>
+              {(userIdToProfile[memberToDelete?.id]?.name) || 'メンバー'} を削除しますか？
+            </Text>
              <Text style={styles.modalWarning}>
                削除後は元に戻すことができません。
              </Text>

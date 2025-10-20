@@ -348,10 +348,10 @@ const HomeScreen = ({ navigation }) => {
           </View>
 
           {/* 所属しているサークル */}
-          {joinedCircles.length > 0 && (
-            <View style={styles.joinedCirclesSection}>
-              <Text style={styles.sectionTitle}>所属しているサークル</Text>
-              {joinedCircles.map((circle) => (
+          <View style={styles.joinedCirclesSection}>
+            <Text style={styles.sectionTitle}>所属しているサークル</Text>
+            {joinedCircles.length > 0 ? (
+              joinedCircles.map((circle) => (
                 <TouchableOpacity 
                   key={circle.id} 
                   style={styles.circleCardContainer}
@@ -395,9 +395,19 @@ const HomeScreen = ({ navigation }) => {
                     )}
                   </View>
                 </TouchableOpacity>
-              ))}
-            </View>
-          )}
+              ))
+            ) : (
+              <View style={styles.emptyJoinedCirclesContainer}>
+                <View style={styles.emptyJoinedCirclesCard}>
+                  <Ionicons name="people-outline" size={48} color="#d1d5db" />
+                  <Text style={styles.emptyJoinedCirclesTitle}>所属しているサークルがありません</Text>
+                  <Text style={styles.emptyJoinedCirclesSubtitle}>
+                    サークルに参加して、大学生活を充実させよう！
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
           {/* 記事カード（横スクロール） */}
           <View style={styles.articleSectionContainer}>
             {/* 記事セクションヘッダー */}
@@ -1069,6 +1079,43 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     lineHeight: 14,
+  },
+  
+  // 空の所属サークル状態のスタイル
+  emptyJoinedCirclesContainer: {
+    marginBottom: 12,
+  },
+  emptyJoinedCirclesCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderStyle: 'dashed',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  emptyJoinedCirclesTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginTop: 8,
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  emptyJoinedCirclesSubtitle: {
+    fontSize: 14,
+    color: '#6b7280',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 0,
   },
 });
 

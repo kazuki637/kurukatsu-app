@@ -97,50 +97,36 @@ const ThreadCreateScreen = ({ navigation }) => {
       console.log('ThreadCreate - User profile fetched:', userProfile);
       console.log('ThreadCreate - Is anonymous:', isAnonymous);
 
-      // スレッド作成
+      // スレッド作成（ユーザー情報は埋め込まず、creatorIdのみ）
       const threadData = {
         title: title.trim(),
         category,
         creatorId: user.uid,
-        creatorName: isAnonymous ? '匿名ユーザー' : (userProfile?.name || user.displayName || 'ユーザー'),
         isAnonymous,
         content: content.trim(),
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         postCount: 1,
         viewCount: 0,
-        // 公開投稿の場合、作成者の詳細情報を追加
-        ...(userProfile && !isAnonymous && {
-          creatorProfileImageUrl: userProfile.profileImageUrl,
-          creatorUniversity: userProfile.university,
-          creatorGrade: userProfile.grade
-        })
       };
 
       const threadRef = await addDoc(collection(db, 'threads'), threadData);
 
-      // 最初の投稿を作成
+      // 最初の投稿を作成（ユーザー情報は埋め込まず、userIdのみ）
       const postData = {
         postNumber: 1,
         userId: user.uid,
-        userName: isAnonymous ? '匿名ユーザー' : (userProfile?.name || user.displayName || 'ユーザー'),
         isAnonymous,
         anonymousId: isAnonymous ? anonymousIdManager.getOrCreateAnonymousId(user.uid, threadRef.id) : null,
         content: content.trim(),
         createdAt: serverTimestamp(),
         reactions: 0,
-        // 公開投稿の場合、ユーザーの詳細情報を追加
-        ...(userProfile && !isAnonymous && {
-          userProfileImageUrl: userProfile.profileImageUrl,
-          userUniversity: userProfile.university,
-          userGrade: userProfile.grade
-        })
       };
 
       await addDoc(collection(db, 'threads', threadRef.id, 'posts'), postData);
 
-      // 作成者の投稿形式をuserThreadSettingsに保存
-      await setDoc(doc(db, 'userThreadSettings', user.uid, 'threads', threadRef.id), {
+      // 作成者の投稿形式をユーザー配下に保存
+      await setDoc(doc(db, 'users', user.uid, 'threadSettings', threadRef.id), {
         isAnonymous,
         createdAt: serverTimestamp()
       });

@@ -13,20 +13,18 @@ const PostItem = ({
   onUserPress,
   onReply,
   replyToPostNumber,
-  onReplyTargetPress
+  onReplyTargetPress,
+  userProfile,
+  isLastPost = false,
 }) => {
   const {
     postNumber,
-    userName,
     isAnonymous,
     anonymousId,
     content,
     createdAt,
     reactions,
     userId,
-    userProfileImageUrl,
-    userUniversity,
-    userGrade
   } = post;
 
   // 日時のフォーマット
@@ -84,14 +82,15 @@ const PostItem = ({
     if (isAnonymous) {
       return '匿名ユーザー';
     }
-    return userName || 'ユーザー';
+    return (userProfile?.name) || 'ユーザー';
   };
 
   return (
     <View style={[
       styles.container, 
       style,
-      postNumber === 1 && styles.firstPostContainer
+      postNumber === 1 && styles.firstPostContainer,
+      isLastPost && styles.lastPostContainer
     ]}>
       <View style={styles.header}>
         <View style={styles.leftSection}>
@@ -164,9 +163,9 @@ const PostItem = ({
           activeOpacity={isAnonymous ? 1.0 : 0.7}
           disabled={isAnonymous}
         >
-          {!isAnonymous && userProfileImageUrl ? (
+          {!isAnonymous && userProfile?.profileImageUrl ? (
             <Image
-              source={{ uri: userProfileImageUrl }}
+              source={{ uri: userProfile.profileImageUrl }}
               style={styles.profileImage}
               contentFit="cover"
             />
@@ -183,9 +182,9 @@ const PostItem = ({
             <Text style={styles.userName}>
               {getDisplayName()}
             </Text>
-            {!isAnonymous && (userUniversity || userGrade) ? (
+            {!isAnonymous && (userProfile?.university || userProfile?.grade) ? (
               <Text style={styles.userMeta}>
-                {[userUniversity, userGrade].filter(Boolean).join(' ')}
+                {[userProfile?.university, userProfile?.grade].filter(Boolean).join(' ')}
               </Text>
             ) : isAnonymous && anonymousId ? (
               <Text style={styles.userMeta}>
@@ -217,19 +216,11 @@ const PostItem = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
+    backgroundColor: 'transparent',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
   header: {
     flexDirection: 'row',
@@ -320,9 +311,9 @@ const styles = StyleSheet.create({
   },
   // #1投稿用の特別なスタイル
   firstPostContainer: {
-    borderWidth: 2,
-    borderColor: '#1380ec',
     backgroundColor: '#f8fafc',
+    borderLeftWidth: 4,
+    borderLeftColor: '#1380ec',
   },
   firstPostNumberContainer: {
     backgroundColor: '#1380ec',
@@ -347,6 +338,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#007bff',
     fontWeight: '600',
+  },
+  lastPostContainer: {
+    borderBottomWidth: 0,
   },
 });
 
