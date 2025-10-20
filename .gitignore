@@ -30,8 +30,6 @@ yarn-error.*
 # Firebase config (contains sensitive API keys)
 serviceAccountKey.json
 firebaseConfig.js
-
-# Notion config (contains sensitive API keys)
 config/notionConfig.js
 
 # Build outputs

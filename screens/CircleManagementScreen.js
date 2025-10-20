@@ -1,44 +1,44 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, StatusBar, ActivityIndicator, Image, Alert, FlatList, Modal, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, StatusBar, ActivityIndicator, Alert, Modal, ScrollView, Dimensions, Linking } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { db, auth } from '../firebaseConfig';
 import { collection, getDocs, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import CommonHeader from '../components/CommonHeader';
 import KurukatsuButton from '../components/KurukatsuButton';
-import { getUserRole, checkStudentIdVerification } from '../utils/permissionUtils';
 
 export default function CircleManagementScreen({ navigation }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [adminCircles, setAdminCircles] = useState([]);
-  const [isModalVisible, setModalVisible] = useState(false);
+  const [selectedCircleId, setSelectedCircleId] = useState(null);
+  const [isRegisterModalVisible, setRegisterModalVisible] = useState(false);
+  const [isSwitchModalVisible, setSwitchModalVisible] = useState(false);
   const [totalJoinRequestsCount, setTotalJoinRequestsCount] = useState(0);
+  const [imageError, setImageError] = useState(false);
 
+  // 認証状態の監視
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      // 認証状態が確定したら、ユーザーがいるかどうかに関わらずローディングを継続
-      // 実際のデータ取得完了時にsetLoading(false)が呼ばれる
     });
     return unsubscribeAuth;
   }, []);
 
+  // 管理サークルの取得
   useEffect(() => {
     if (user === null) {
-      // 認証状態がまだ確定していない場合は何もしない
       return;
     }
     
     if (!user) {
-      // ユーザーがログアウトした場合はグローバル変数をリセット
       global.totalJoinRequestsCount = 0;
       return;
     }
 
-    // ユーザードキュメントから管理サークルIDを取得
     const fetchAdminCircles = async () => {
       try {
         const userDoc = await getDoc(doc(db, 'users', user.uid));
@@ -53,6 +53,7 @@ export default function CircleManagementScreen({ navigation }) {
         
         if (adminCircleIds.length === 0) {
           setAdminCircles([]);
+          setSelectedCircleId(null);
           setTotalJoinRequestsCount(0);
           global.totalJoinRequestsCount = 0;
           setLoading(false);
@@ -105,6 +106,7 @@ export default function CircleManagementScreen({ navigation }) {
       } catch (error) {
         console.error('Error fetching admin circles:', error);
         setAdminCircles([]);
+        setSelectedCircleId(null);
         setTotalJoinRequestsCount(0);
         global.totalJoinRequestsCount = 0;
       } finally {
@@ -114,10 +116,7 @@ export default function CircleManagementScreen({ navigation }) {
 
     fetchAdminCircles();
 
-    // 管理サークルの変更を監視（個別監視）
-    const unsubscribeListeners = [];
-    
-    // ユーザードキュメントの変更を監視して、管理サークルIDの変更を検知
+    // ユーザードキュメントの変更を監視
     const userDocUnsubscribe = onSnapshot(doc(db, 'users', user.uid), (userDoc) => {
       if (userDoc.exists()) {
         const userData = userDoc.data();
@@ -130,24 +129,52 @@ export default function CircleManagementScreen({ navigation }) {
       }
     });
 
-    unsubscribeListeners.push(userDocUnsubscribe);
-
     return () => {
-      unsubscribeListeners.forEach(unsubscribe => unsubscribe());
+      userDocUnsubscribe();
     };
   }, [user?.uid]);
+
+  // selectedCircleIdの初期化
+  useEffect(() => {
+    const initializeSelectedCircle = async () => {
+      if (adminCircles.length === 0) {
+        setSelectedCircleId(null);
+        return;
+      }
+      
+      if (!user) return;
+
+      // AsyncStorageから最後に選択したサークルIDを取得
+      const savedCircleId = await AsyncStorage.getItem(`lastSelectedCircleId_${user.uid}`);
+      
+      // 保存されたIDが管理サークルに存在するかチェック
+      const validCircle = adminCircles.find(c => c.id === savedCircleId);
+      
+      if (validCircle) {
+        setSelectedCircleId(savedCircleId);
+      } else {
+        // なければ配列の先頭
+        setSelectedCircleId(adminCircles[0].id);
+        await AsyncStorage.setItem(`lastSelectedCircleId_${user.uid}`, adminCircles[0].id);
+      }
+    };
+    
+    initializeSelectedCircle();
+  }, [adminCircles.length, user?.uid]);
 
   // 画面がフォーカスされた際にデータを再取得
   useFocusEffect(
     React.useCallback(() => {
+      // 画像エラーをリセット
+      setImageError(false);
+      
       if (user) {
-        // 画面がフォーカスされた際に管理サークルデータを再取得
-        // これにより代表者引き継ぎ後の最新状態が反映される
         const fetchAdminCircles = async () => {
           try {
             const userDoc = await getDoc(doc(db, 'users', user.uid));
             if (!userDoc.exists()) {
               setAdminCircles([]);
+              setSelectedCircleId(null);
               setTotalJoinRequestsCount(0);
               global.totalJoinRequestsCount = 0;
               return;
@@ -158,25 +185,23 @@ export default function CircleManagementScreen({ navigation }) {
             
             if (adminCircleIds.length === 0) {
               setAdminCircles([]);
+              setSelectedCircleId(null);
               setTotalJoinRequestsCount(0);
               global.totalJoinRequestsCount = 0;
               return;
             }
 
-            // 管理サークルの詳細情報を並列取得
             const circlePromises = adminCircleIds.map(async (circleId) => {
               try {
                 const circleDoc = await getDoc(doc(db, 'circles', circleId));
                 if (!circleDoc.exists()) return null;
 
-                // ユーザーの役割を取得
                 const memberDoc = await getDoc(doc(db, 'circles', circleId, 'members', user.uid));
                 if (!memberDoc.exists()) return null;
 
                 const role = memberDoc.data().role || 'member';
                 if (role !== 'leader' && role !== 'admin') return null;
 
-                // 入会申請数を取得
                 let joinRequestsCount = 0;
                 try {
                   const requestsSnapshot = await getDocs(collection(db, 'circles', circleId, 'joinRequests'));
@@ -209,6 +234,7 @@ export default function CircleManagementScreen({ navigation }) {
           } catch (error) {
             console.error('Error fetching admin circles on focus:', error);
             setAdminCircles([]);
+            setSelectedCircleId(null);
             setTotalJoinRequestsCount(0);
             global.totalJoinRequestsCount = 0;
           }
@@ -219,12 +245,10 @@ export default function CircleManagementScreen({ navigation }) {
     }, [user?.uid])
   );
 
-
   // 入会申請数のイベントベース更新
   useEffect(() => {
     if (!user) return;
 
-    // グローバル入会申請数更新関数を登録
     global.updateCircleManagementJoinRequests = (circleId, delta) => {
       setAdminCircles(prev => {
         const updated = prev.map(c => {
@@ -235,7 +259,6 @@ export default function CircleManagementScreen({ navigation }) {
           return c;
         });
         
-        // 全体の入会申請数を再計算
         const totalRequests = updated.reduce((sum, c) => sum + c.joinRequestsCount, 0);
         setTotalJoinRequestsCount(totalRequests);
         global.totalJoinRequestsCount = totalRequests;
@@ -249,44 +272,106 @@ export default function CircleManagementScreen({ navigation }) {
     };
   }, [user?.uid]);
 
+  // 新規登録ボタン
   const handleRegisterCirclePress = async () => {
     if (!user) {
       Alert.alert('ログインが必要です', 'サークル登録にはログインが必要です。');
       return;
     }
 
-    // 学生証認証状態を確認 - 一時的に無効化
-    /*
-    const isStudentIdVerified = await checkStudentIdVerification(user.uid);
-    if (!isStudentIdVerified) {
-      Alert.alert(
-        '学生証認証が必要です',
-        'サークル登録には学生証の認証が必要です。\nプロフィール編集画面で学生証を認証してください。',
-        [
-          { text: 'キャンセル', style: 'cancel' },
-          { 
-            text: 'プロフィール編集へ', 
-            onPress: () => navigation.navigate('共通', { screen: 'ProfileEdit' })
-          }
-        ]
-      );
-      return;
-    }
-    */
-
-    setModalVisible(true);
+    setRegisterModalVisible(true);
   };
 
-  const handleAgree = () => {
-    setModalVisible(false);
-    // RootStackのCircleRegistrationに遷移
+  const handleRegisterAgree = () => {
+    setRegisterModalVisible(false);
     navigation.getParent()?.navigate('CircleRegistration');
   };
 
-  const handleDisagree = () => {
-    setModalVisible(false);
+  const handleRegisterDisagree = () => {
+    setRegisterModalVisible(false);
   };
 
+  // サークル切り替え
+  const handleSwitchCircle = async (circleId) => {
+    setSelectedCircleId(circleId);
+    setSwitchModalVisible(false);
+    
+    if (user) {
+      await AsyncStorage.setItem(`lastSelectedCircleId_${user.uid}`, circleId);
+    }
+  };
+
+  // 選択中のサークルデータ
+  const selectedCircle = adminCircles.find(c => c.id === selectedCircleId);
+
+  // 選択中のサークルが変更されたとき、または画像URLが変更されたときに画像エラーをリセット
+  useEffect(() => {
+    setImageError(false);
+  }, [selectedCircleId, selectedCircle?.imageUrl]);
+
+  // 管理ボタンのリスト
+  const getManagementButtonsGrid = () => {
+    if (!selectedCircle) return [];
+    
+    const currentJoinRequestsCount = selectedCircle.joinRequestsCount || 0;
+    
+    return [
+      {
+        label: '新歓プロフィールを\n編集する',
+        iconSource: require('../assets/Button-icons/Profile.png'),
+        onPress: () => navigation.navigate('CircleProfileEdit', { circleId: selectedCircleId })
+      },
+      {
+        label: 'メンバーを\n管理する',
+        iconSource: require('../assets/Button-icons/Member.png'),
+        onPress: () => navigation.navigate('CircleMemberManagement', { circleId: selectedCircleId }),
+        hasNotification: currentJoinRequestsCount > 0,
+        notificationCount: currentJoinRequestsCount
+      },
+      {
+        label: '連絡を\n送信する',
+        iconSource: require('../assets/Button-icons/Message.png'),
+        onPress: () => navigation.navigate('CircleContact', { circleId: selectedCircleId })
+      },
+      {
+        label: 'カレンダーを\n作成する',
+        iconSource: require('../assets/Button-icons/Calendar.png'),
+        onPress: () => navigation.navigate('CircleScheduleManagement', { circleId: selectedCircleId })
+      },
+      {
+        label: '代表者を\n引き継ぐ',
+        iconSource: require('../assets/Button-icons/Leader.png'),
+        onPress: () => {
+          if (selectedCircle.role === 'leader') {
+            navigation.navigate('CircleLeadershipTransfer', { circleId: selectedCircleId, circleName: selectedCircle.name });
+          } else {
+            Alert.alert(
+              'アクセス権限がありません',
+              '代表者のみが利用できる機能です。',
+              [{ text: 'OK' }]
+            );
+          }
+        }
+      },
+      {
+        label: 'サークル設定を\n変更する',
+        iconSource: require('../assets/Button-icons/Setting.png'),
+        onPress: () => {
+          if (selectedCircle.role === 'leader') {
+            navigation.navigate('CircleSettings', { circleId: selectedCircleId });
+          } else {
+            Alert.alert(
+              'アクセス権限がありません',
+              '代表者のみが利用できる機能です。',
+              [{ text: 'OK' }]
+            );
+          }
+        }
+      }
+    ];
+  };
+
+  // ローディング画面
   if (loading) {
     return (
       <View style={styles.modernContainer}>
@@ -300,8 +385,8 @@ export default function CircleManagementScreen({ navigation }) {
     );
   }
 
+  // 認証状態未確定
   if (user === null) {
-    // 認証状態がまだ確定していない場合はローディング画面を表示
     return (
       <View style={styles.modernContainer}>
         <CommonHeader title="サークル運営" />
@@ -314,6 +399,7 @@ export default function CircleManagementScreen({ navigation }) {
     );
   }
 
+  // サークル0件の案内画面
   if (adminCircles.length === 0) {
     return (
       <View style={styles.modernContainer}>
@@ -328,11 +414,12 @@ export default function CircleManagementScreen({ navigation }) {
                     メンバーの管理やイベントの企画など{"\n"}あなたのサークル運営をサポートします
                   </Text>
                 </View>
-                <Image 
-                  source={require('../assets/CircleManagement.png')} 
-                  style={styles.modernManagementImage}
-                  resizeMode="contain"
-                />
+                  <Image 
+                    source={require('../assets/CircleManagement.png')} 
+                    style={styles.modernManagementImage}
+                    contentFit="contain"
+                    cachePolicy="memory-disk"
+                  />
                 <Text style={styles.modernCardNote}>
                   ※これはサークル代表者向けの機能です
                 </Text>
@@ -355,11 +442,12 @@ export default function CircleManagementScreen({ navigation }) {
           </View>
         </SafeAreaView>
 
+        {/* 新規登録同意モーダル */}
         <Modal
           animationType="slide"
           transparent={true}
-          visible={isModalVisible}
-          onRequestClose={() => setModalVisible(false)}
+          visible={isRegisterModalVisible}
+          onRequestClose={() => setRegisterModalVisible(false)}
         >
           <View style={styles.centeredView}>
             <View style={styles.modalView}>
@@ -390,7 +478,7 @@ export default function CircleManagementScreen({ navigation }) {
               <View style={styles.modalButtonContainer}>
                 <KurukatsuButton
                   title="同意しない"
-                  onPress={handleDisagree}
+                  onPress={handleRegisterDisagree}
                   size="medium"
                   variant="secondary"
                   hapticFeedback={true}
@@ -398,7 +486,7 @@ export default function CircleManagementScreen({ navigation }) {
                 />
                 <KurukatsuButton
                   title="同意する"
-                  onPress={handleAgree}
+                  onPress={handleRegisterAgree}
                   size="medium"
                   variant="primary"
                   hapticFeedback={true}
@@ -412,68 +500,214 @@ export default function CircleManagementScreen({ navigation }) {
     );
   }
 
-  const renderCircleItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.circleCard}
-      onPress={() => navigation.navigate('CircleManagementDetail', { circleId: item.id, circleName: item.name })}
-      activeOpacity={1}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-        {item.imageUrl ? (
-          <Image source={{ uri: item.imageUrl }} style={styles.circleImage} />
-        ) : (
-          <View style={[styles.circleImage, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
-            <Ionicons name="people-outline" size={40} color="#aaa" />
-          </View>
-        )}
-        <View style={{ marginLeft: 16, flex: 1 }}>
-          <Text style={styles.circleName}>{item.name}</Text>
-          <Text style={styles.circleRole}>{item.role === 'leader' ? '代表者' : '管理者'}</Text>
-        </View>
-        
-        {/* 入会申請がある場合に数字付き赤丸を表示 */}
-        {item.joinRequestsCount > 0 && (
-          <View style={styles.notificationBadge}>
-            <Text style={styles.notificationBadgeText}>{item.joinRequestsCount}</Text>
-          </View>
-        )}
-      </View>
-    </TouchableOpacity>
-  );
+  // 詳細表示（1件以上）
+  const managementButtonsGrid = getManagementButtonsGrid();
 
   return (
-    <View style={styles.modernContainer}>
-      <CommonHeader title="サークル運営" />
+    <View style={styles.fullScreenContainer}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>サークル運営</Text>
+      </View>
       <SafeAreaView style={styles.contentSafeArea}>
-        <View style={{ flex: 1 }}>
-          <FlatList
-            data={adminCircles}
-            keyExtractor={item => item.id}
-            renderItem={renderCircleItem}
-            contentContainerStyle={{ paddingTop: 16, paddingBottom: 100 }}
-          />
-          <View style={styles.modernButtonContainer}>
+        <ScrollView style={styles.circleDetailContainer} showsVerticalScrollIndicator={false}>
+          {/* サークル情報 */}
+          <View style={styles.circleInfoRow}>
+            <View style={styles.circleImageLargeContainer}>
+              <View style={styles.circleImageWrapper}>
+                {selectedCircle?.imageUrl && !imageError ? (
+                  <Image 
+                    source={{ uri: selectedCircle.imageUrl }} 
+                    style={styles.circleImageLarge}
+                    onError={() => setImageError(true)}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                  />
+                ) : (
+                  <View style={[styles.circleImageLarge, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
+                    <Ionicons name="people-outline" size={64} color="#aaa" />
+                  </View>
+                )}
+              </View>
+            </View>
+            <View style={styles.circleInfoTextCol}>
+              <Text style={styles.circleInfoName}>{selectedCircle?.name}</Text>
+              <Text style={styles.circleInfoSub}>
+                {selectedCircle?.universityName}
+                {selectedCircle?.genre ? `・${selectedCircle.genre}` : ''}
+              </Text>
+            </View>
+          </View>
+
+          {/* 管理ボタン（3行×2列） */}
+          <View style={styles.managementGridSection}>
+            {Array.from({ length: 3 }).map((_, rowIdx) => (
+              <View style={[styles.managementRow2col, rowIdx === 2 && styles.managementRow2colLast]} key={rowIdx}>
+                {managementButtonsGrid.slice(rowIdx * 2, rowIdx * 2 + 2).map((btn, colIdx) => (
+                  btn ? (
+                    <TouchableOpacity
+                      key={btn.label}
+                      style={styles.managementGridItem2col}
+                      onPress={btn.onPress}
+                      activeOpacity={1}
+                    >
+                      <View style={styles.buttonBackground}>
+                        <View style={styles.buttonContent2}>
+                          <Text style={styles.managementGridItemText}>{btn.label}</Text>
+                          <View style={styles.buttonIconContainer}>
+                            <Image 
+                              source={btn.iconSource} 
+                              style={styles.buttonIcon}
+                              contentFit="contain"
+                              cachePolicy="memory-disk"
+                            />
+                          </View>
+                          {btn.hasNotification && (
+                            <View style={styles.notificationBadge}>
+                              <Text style={styles.notificationBadgeText}>{btn.notificationCount}</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  ) : (
+                    <View key={`empty-${colIdx}`} style={styles.managementGridItem2col} />
+                  )
+                ))}
+              </View>
+            ))}
+          </View>
+
+          {/* サークル切り替えボタン */}
+          <View style={styles.switchButtonSection}>
             <KurukatsuButton
-              onPress={handleRegisterCirclePress}
+              onPress={() => setSwitchModalVisible(true)}
               size="medium"
-              variant="primary"
+              variant="secondary"
               hapticFeedback={true}
-              style={styles.kurukatsuButtonStyle}
+              style={styles.switchButton}
             >
-              <View style={styles.buttonContent}>
-                <Ionicons name="add-circle-outline" size={24} color="#ffffff" />
-                <Text style={styles.kurukatsuButtonText}>新しいサークルを登録する</Text>
+              <View style={styles.switchButtonContent}>
+                <Ionicons name="swap-horizontal" size={20} color="#2563eb" />
+                <Text style={styles.switchButtonText}>サークルを切り替える</Text>
+                {totalJoinRequestsCount > 0 && (
+                  <View style={styles.switchNotificationBadge}>
+                    <Text style={styles.notificationBadgeText}>{totalJoinRequestsCount}</Text>
+                  </View>
+                )}
               </View>
             </KurukatsuButton>
           </View>
-        </View>
+
+          {/* Instagram案内 */}
+          <View style={styles.promotionSection}>
+            <TouchableOpacity 
+              style={styles.promotionCard}
+              onPress={() => {
+                Linking.openURL('https://www.instagram.com/kurukatsu_app?igsh=bmRhcTk3bWsyYmVj&utm_source=qr');
+              }}
+              activeOpacity={1}
+            >
+              <View style={styles.promotionContent}>
+                <View style={styles.promotionIconContainer}>
+                  <Image 
+                    source={require('../assets/icon.png')} 
+                    style={styles.promotionIcon}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                  />
+                </View>
+                <View style={styles.promotionTextContainer}>
+                  <View style={styles.promotionTitleContainer}>
+                    <Text style={styles.promotionTitle}>クルカツ公式Instagram</Text>
+                    <Ionicons name="logo-instagram" size={16} color="#E4405F" style={styles.instagramLogo} />
+                  </View>
+                  <Text style={styles.promotionSubtitle}>アプリの感想や要望はDMまで！</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color="#666" />
+              </View>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </SafeAreaView>
 
+      {/* サークル切り替えモーダル */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={isSwitchModalVisible}
+        onRequestClose={() => setSwitchModalVisible(false)}
+      >
+        <View style={styles.switchModalOverlay}>
+          <View style={styles.switchModalView}>
+            <View style={styles.switchModalHeader}>
+              <Text style={styles.switchModalTitle}>管理しているサークル</Text>
+              <TouchableOpacity onPress={() => setSwitchModalVisible(false)}>
+                <Ionicons name="close" size={28} color="#666" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.switchModalContent}>
+              {adminCircles.map((circle) => (
+                <TouchableOpacity
+                  key={circle.id}
+                  style={[
+                    styles.switchCircleCard,
+                    circle.id === selectedCircleId && styles.switchCircleCardSelected
+                  ]}
+                  onPress={() => handleSwitchCircle(circle.id)}
+                  activeOpacity={1}
+                >
+                  <View style={styles.circleCardContent}>
+                    {circle.imageUrl ? (
+                      <Image source={{ uri: circle.imageUrl }} style={styles.circleImage} />
+                    ) : (
+                      <View style={[styles.circleImage, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
+                        <Ionicons name="people-outline" size={40} color="#aaa" />
+                      </View>
+                    )}
+                    <View style={{ marginLeft: 16, flex: 1 }}>
+                      <Text style={styles.circleName}>{circle.name}</Text>
+                      <Text style={styles.circleRole}>
+                        {circle.universityName}
+                        {circle.genre ? `・${circle.genre}` : ''}
+                      </Text>
+                    </View>
+                    
+                    {circle.joinRequestsCount > 0 && (
+                      <View style={styles.modalNotificationBadge}>
+                        <Text style={styles.notificationBadgeText}>{circle.joinRequestsCount}</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+
+              {/* 新規登録ボタン */}
+              <KurukatsuButton
+                onPress={() => {
+                  setSwitchModalVisible(false);
+                  handleRegisterCirclePress();
+                }}
+                size="medium"
+                variant="secondary"
+                hapticFeedback={true}
+                style={styles.newCircleButton}
+              >
+                <View style={styles.newCircleButtonContent}>
+                  <Ionicons name="add-circle-outline" size={24} color="#2563eb" />
+                  <Text style={styles.newCircleButtonText}>新しいサークルを登録</Text>
+                </View>
+              </KurukatsuButton>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* 新規登録同意モーダル */}
       <Modal
         animationType="slide"
         transparent={true}
-        visible={isModalVisible}
-        onRequestClose={() => setModalVisible(false)}
+        visible={isRegisterModalVisible}
+        onRequestClose={() => setRegisterModalVisible(false)}
       >
         <View style={styles.centeredView}>
           <View style={styles.modalView}>
@@ -504,7 +738,7 @@ export default function CircleManagementScreen({ navigation }) {
             <View style={styles.modalButtonContainer}>
               <KurukatsuButton
                 title="同意しない"
-                onPress={handleDisagree}
+                onPress={handleRegisterDisagree}
                 size="medium"
                 variant="secondary"
                 hapticFeedback={true}
@@ -512,7 +746,7 @@ export default function CircleManagementScreen({ navigation }) {
               />
               <KurukatsuButton
                 title="同意する"
-                onPress={handleAgree}
+                onPress={handleRegisterAgree}
                 size="medium"
                 variant="primary"
                 hapticFeedback={true}
@@ -522,38 +756,350 @@ export default function CircleManagementScreen({ navigation }) {
           </View>
         </View>
       </Modal>
-      </View>
-    );
-  }
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   modernContainer: {
     flex: 1,
     backgroundColor: '#f0f2f5',
   },
-  contentSafeArea: { flex: 1 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  circleCard: { 
-    backgroundColor: '#ffffff', 
-    borderRadius: 12, 
-    padding: 16, 
-    marginBottom: 12, 
-    marginHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000', 
+  fullScreenContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  header: {
+    width: '100%',
+    height: 100,
+    paddingTop: StatusBar.currentHeight,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    position: 'absolute',
+    bottom: 10,
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+  },
+  contentSafeArea: { 
+    flex: 1 
+  },
+  loadingContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  circleDetailContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  circleInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 20,
+    marginBottom: 0,
+    paddingHorizontal: 20,
+  },
+  circleImageLargeContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#e0e0e0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  circleImageWrapper: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    overflow: 'hidden',
+  },
+  circleImageLarge: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    resizeMode: 'cover',
+  },
+  circleInfoTextCol: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  circleInfoName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  circleInfoSub: {
+    fontSize: 13,
+    color: '#666',
+    marginTop: 4,
+  },
+  managementGridSection: {
+    marginTop: 25,
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    marginBottom: 0,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  managementRow2col: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  managementRow2colLast: {
+    marginBottom: 0,
+  },
+  managementGridItem2col: {
+    width: (Dimensions.get('window').width - 55) / 2,
+    height: 120,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  buttonBackground: {
+    flex: 1,
+    borderRadius: 12,
+    backgroundColor: '#d9effe',
+  },
+  managementGridItemText: {
+    fontSize: 16,
+    color: '#333',
+    textAlign: 'left',
+    fontWeight: '500',
+    alignSelf: 'flex-start',
+  },
+  buttonContent2: {
+    flex: 1,
+    padding: 12,
+    position: 'relative',
+  },
+  buttonIconContainer: {
+    position: 'absolute',
+    right: 8,
+    bottom: 8,
+    width: 60,
+    height: 60,
+  },
+  buttonIcon: {
+    width: 60,
+    height: 60,
+    resizeMode: 'contain',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#DC2626',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  modalNotificationBadge: {
+    backgroundColor: '#DC2626',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    marginLeft: 12,
+  },
+  // サークル切り替えボタン
+  switchButtonSection: {
+    marginTop: 20,
+    paddingHorizontal: 20,
+  },
+  switchButton: {
+    width: '100%',
+  },
+  switchButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  switchButtonText: {
+    color: '#2563eb',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  switchNotificationBadge: {
+    backgroundColor: '#DC2626',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    marginLeft: 8,
+  },
+  // Instagram案内
+  promotionSection: {
+    marginTop: 20,
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  promotionCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 1,
     },
-    shadowOpacity: 0.05, 
-    shadowRadius: 2, 
-    elevation: 1 
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  circleImage: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#e0e0e0' },
-  circleName: { fontSize: 16, fontWeight: 'bold', color: '#1f2937' },
-  circleRole: { fontSize: 14, color: '#6b7280', marginTop: 4 },
-  // Modal styles
+  promotionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  promotionIconContainer: {
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  promotionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  promotionTextContainer: {
+    flex: 1,
+  },
+  promotionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  promotionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginRight: 6,
+  },
+  instagramLogo: {
+    marginLeft: 4,
+  },
+  promotionSubtitle: {
+    fontSize: 14,
+    color: '#666',
+  },
+  // サークル切り替えモーダル
+  switchModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  switchModalView: {
+    margin: 20,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 0,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+    width: '90%',
+    maxHeight: '70%',
+  },
+  switchModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  switchModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1f2937',
+  },
+  switchModalContent: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  switchCircleCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 2,
+    borderColor: '#e5e7eb',
+  },
+  switchCircleCardSelected: {
+    borderColor: '#2563eb',
+    backgroundColor: '#eff6ff',
+  },
+  circleCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    position: 'relative',
+  },
+  circleImage: { 
+    width: 60, 
+    height: 60, 
+    borderRadius: 30, 
+    backgroundColor: '#e0e0e0' 
+  },
+  circleName: { 
+    fontSize: 16, 
+    fontWeight: 'bold', 
+    color: '#1f2937' 
+  },
+  circleRole: { 
+    fontSize: 14, 
+    color: '#6b7280', 
+    marginTop: 4 
+  },
+  newCircleButton: {
+    marginTop: 8,
+  },
+  newCircleButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  newCircleButtonText: {
+    color: '#2563eb',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  // 新規登録モーダル
   centeredView: {
     flex: 1,
     justifyContent: 'center',
@@ -602,23 +1148,7 @@ const styles = StyleSheet.create({
   modalButtonKurukatsu: {
     flex: 1,
   },
-  // 入会申請通知バッジ（数字付き）
-  notificationBadge: {
-    backgroundColor: '#dc2626',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
-    paddingHorizontal: 4,
-  },
-  notificationBadgeText: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-  // モダンスタイル
+  // 0件案内画面
   modernMainContent: {
     flex: 1,
     paddingHorizontal: 16,
@@ -701,3 +1231,4 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 });
+

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert, ActivityIndicator, Image, Platform, KeyboardAvoidingView, Animated, Dimensions, Switch } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert, ActivityIndicator, Platform, KeyboardAvoidingView, Animated, Dimensions, Switch } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { db, storage } from '../firebaseConfig';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import * as ImagePicker from 'expo-image-picker';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import CommonHeader from '../components/CommonHeader';
 import KurukatsuButton from '../components/KurukatsuButton';
@@ -22,6 +23,24 @@ const GENDER_RATIO_OPTIONS = ['男性多め', '女性多め', '半々'];
 const MEMBERS_OPTIONS = ['1-10人', '11-30人', '31-50人', '51-100人', '100人以上'];
 
 const { width } = Dimensions.get('window');
+
+// Firebase StorageのdownloadURLからストレージパスを抽出し削除する共通関数
+const deleteImageFromStorage = async (url) => {
+  if (!url) return;
+  try {
+    // downloadURLからパスを抽出
+    // 例: https://firebasestorage.googleapis.com/v0/b/xxx.appspot.com/o/circle_images%2Fxxx%2Ficons%2Fxxxx.jpg?alt=media&token=...
+    const matches = url.match(/\/o\/([^?]+)\?/);
+    if (!matches || !matches[1]) return;
+    const path = decodeURIComponent(matches[1]);
+    const imgRef = ref(storage, path);
+    await deleteObject(imgRef);
+    console.log('サークル設定画面: 旧画像削除成功:', path);
+  } catch (e) {
+    // 削除に失敗しても致命的でないのでconsoleに出すだけ
+    console.warn('サークル設定画面: 旧画像のStorage削除に失敗:', e);
+  }
+};
 
 export default function CircleSettingsScreen({ route, navigation }) {
   const { circleId } = route.params;
@@ -207,6 +226,11 @@ export default function CircleSettingsScreen({ route, navigation }) {
       let imageUrl = circleImageUrl;
       if (circleImage) {
         try {
+          // 既存画像があればStorageから削除
+          if (circleImageUrl) {
+            await deleteImageFromStorage(circleImageUrl);
+          }
+          
           // 画像を圧縮
           console.log('サークル設定画面: 画像圧縮開始...');
           const compressedUri = await compressCircleImage(circleImage);
@@ -215,7 +239,7 @@ export default function CircleSettingsScreen({ route, navigation }) {
           // 圧縮された画像をアップロード
           const response = await fetch(compressedUri);
           const blob = await response.blob();
-          const storageRef = ref(storage, `circle_images/${name}/icons/${circleId}`);
+          const storageRef = ref(storage, `circle_images/${circleId}/icons/${Date.now()}`);
           await uploadBytes(storageRef, blob);
           imageUrl = await getDownloadURL(storageRef);
           
@@ -262,6 +286,8 @@ export default function CircleSettingsScreen({ route, navigation }) {
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
       <CommonHeader 
         title="サークル設定" 
+        showBackButton
+        onBack={() => navigation.goBack()}
         rightButtonLabel="保存" 
         onRightButtonPress={handleSave}
         rightButtonDisabled={isSaving || saveCompleted}
@@ -341,7 +367,6 @@ export default function CircleSettingsScreen({ route, navigation }) {
                   setName(text);
                   checkForChanges();
                 }} 
-                placeholder="サークル名を入力してください"
                 placeholderTextColor="#a1a1aa"
               />
             </View>
@@ -352,7 +377,6 @@ export default function CircleSettingsScreen({ route, navigation }) {
                 value={universityName} 
                 onChangeText={setUniversityName}
                 editable={false}
-                placeholder="登録時に設定された大学名"
                 placeholderTextColor="#a1a1aa"
               />
             </View>
@@ -363,7 +387,6 @@ export default function CircleSettingsScreen({ route, navigation }) {
                 value={contactInfo} 
                 onChangeText={setContactInfo}
                 editable={false}
-                placeholder="登録時に設定された連絡先"
                 placeholderTextColor="#a1a1aa"
               />
             </View>

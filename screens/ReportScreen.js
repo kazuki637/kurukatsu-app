@@ -77,7 +77,7 @@ const ReportScreen = ({ route, navigation }) => {
       };
 
       // Firestoreに保存
-      await addDoc(collection(db, 'reports'), reportData);
+      await addDoc(collection(db, 'circle_reports'), reportData);
 
       Alert.alert(
         '報告完了', 

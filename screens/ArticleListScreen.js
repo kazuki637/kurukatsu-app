@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, ActivityIndicator, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, FlatList } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Image } from 'expo-image';
 import CommonHeader from '../components/CommonHeader';
 import { Ionicons } from '@expo/vector-icons';
 import { getArticles } from '../services/notionService';
@@ -114,7 +116,7 @@ const ArticleListScreen = ({ navigation }) => {
         showBackButton={true}
         onBack={() => navigation.goBack()}
       />
-      <SafeAreaView style={styles.contentSafeArea}>
+      <SafeAreaView style={styles.contentSafeArea} edges={['bottom']}>
         {loading ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color="#999" />

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert, Image, TextInput, Modal, Animated, Dimensions, ScrollView } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert, TextInput, Modal, Animated, Dimensions, ScrollView } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { db, auth } from '../firebaseConfig';
 import { collection, getDocs, doc, updateDoc, deleteDoc, addDoc, getDoc, setDoc, arrayRemove, arrayUnion } from 'firebase/firestore';
@@ -383,8 +384,6 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
       
       // 申請者本人に承認通知を送信（通知設定に関係なく常に送信）
       console.log('通知送信処理は一時的に無効化されています');
-      
-      Alert.alert('許可完了', '入会申請を許可しました');
     } catch (e) {
       console.error('Error approving request:', e);
       Alert.alert('エラー', '申請の許可に失敗しました');
@@ -549,36 +548,42 @@ export default function CircleMemberManagementScreen({ route, navigation }) {
                    
                    return (
                      <View style={styles.memberItem}>
-                       {hasImage ? (
-                         <Image
-                           source={{ uri: item.profileImageUrl }}
-                           style={styles.memberAvatar}
-                           onError={() => setImageErrorMap(prev => ({ ...prev, [item.id]: true }))}
-                         />
-                       ) : (
-                         <View style={styles.memberAvatarPlaceholder}>
-                           <Ionicons name="person" size={28} color="#9CA3AF" />
+                       <TouchableOpacity 
+                         style={styles.memberInfoTouchable}
+                         onPress={() => navigation.navigate('共通', { screen: 'Profile', params: { userId: item.id } })}
+                         activeOpacity={0.7}
+                       >
+                         {hasImage ? (
+                           <Image
+                             source={{ uri: item.profileImageUrl }}
+                             style={styles.memberAvatar}
+                             onError={() => setImageErrorMap(prev => ({ ...prev, [item.id]: true }))}
+                           />
+                         ) : (
+                           <View style={styles.memberAvatarPlaceholder}>
+                             <Ionicons name="person" size={28} color="#9CA3AF" />
+                           </View>
+                         )}
+                         <View style={styles.memberInfoContainer}>
+                           <Text style={styles.memberName}>{item.name || '氏名未設定'}</Text>
+                           <Text style={styles.memberDetails}>{item.university || ''} {item.grade || ''}</Text>
                          </View>
-                       )}
-                       <View style={styles.memberInfoContainer}>
-                         <Text style={styles.memberName}>{item.name || '氏名未設定'}</Text>
-                         <Text style={styles.memberDetails}>{item.university || ''} {item.grade || ''}</Text>
-                       </View>
-                       <View style={[
-                         styles.roleBadge,
-                         isLeader && styles.roleBadgeLeader,
-                         isAdmin && styles.roleBadgeAdmin,
-                         isMember && styles.roleBadgeMember
-                       ]}>
-                         <Text style={[
-                           styles.roleBadgeText,
-                           isLeader && styles.roleBadgeTextLeader,
-                           isAdmin && styles.roleBadgeTextAdmin,
-                           isMember && styles.roleBadgeTextMember
+                         <View style={[
+                           styles.roleBadge,
+                           isLeader && styles.roleBadgeLeader,
+                           isAdmin && styles.roleBadgeAdmin,
+                           isMember && styles.roleBadgeMember
                          ]}>
-                           {getRoleDisplayName(item.role)}
-                         </Text>
-                       </View>
+                           <Text style={[
+                             styles.roleBadgeText,
+                             isLeader && styles.roleBadgeTextLeader,
+                             isAdmin && styles.roleBadgeTextAdmin,
+                             isMember && styles.roleBadgeTextMember
+                           ]}>
+                             {getRoleDisplayName(item.role)}
+                           </Text>
+                         </View>
+                       </TouchableOpacity>
                        {canManageRoles && item.role !== 'leader' && (
                          <TouchableOpacity 
                            style={styles.roleButton} 
@@ -885,6 +890,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 1,
+  },
+  memberInfoTouchable: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
   memberAvatar: { 
     width: 56, 

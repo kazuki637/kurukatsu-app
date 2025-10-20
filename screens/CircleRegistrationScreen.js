@@ -20,7 +20,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { db, storage, auth } from '../firebaseConfig';
-import { collection, addDoc, doc, getDoc, updateDoc, arrayUnion, setDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, updateDoc, arrayUnion, setDoc, runTransaction } from 'firebase/firestore';
 import { useNavigation, CommonActions } from '@react-navigation/native';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { compressCircleImage } from '../utils/imageCompression';
@@ -235,8 +235,13 @@ const CircleRegistrationScreen = ({ navigation }) => {
 
   // サークル登録処理
   const handleRegister = async () => {
+    console.log('=== サークル登録開始 ===');
+    console.log('ユーザーID:', auth.currentUser?.uid);
+    console.log('ユーザー名:', auth.currentUser?.email);
+    
     // 全項目の入力完了を確認
     if (!isAllDataComplete()) {
+      console.log('❌ 入力不完了で終了');
       Alert.alert('入力不完了', 'すべての項目を入力してください。');
       return;
     }
@@ -244,22 +249,33 @@ const CircleRegistrationScreen = ({ navigation }) => {
     // ユーザー情報の確認
     const user = auth.currentUser;
     if (!user) {
+      console.log('❌ ユーザー情報なしで終了');
       Alert.alert('エラー', 'ユーザー情報が取得できませんでした。');
       return;
     }
 
     if (!userProfile) {
+      console.log('❌ ユーザープロフィール情報なしで終了');
       Alert.alert('エラー', 'ユーザープロフィール情報が取得できませんでした。');
       return;
     }
 
+    console.log('✅ 入力データ検証完了');
+    console.log('サークル名:', circleName);
+    console.log('大学名:', universityName);
+    console.log('代表者名:', representativeName);
+
     setUploading(true);
-    let imageUrl = null;
     
     try {
-      // 画像アップロード処理
+      console.log('サークル登録開始 - トランザクション処理');
+      
+      // 先に画像をアップロード（Firestore操作より前に）
+      let imageUrl = null;
       if (circleImage) {
         try {
+          console.log('=== 画像アップロード開始 ===');
+          
           // 画像を圧縮
           console.log('サークル画像圧縮開始...');
           const compressedUri = await compressCircleImage(circleImage);
@@ -268,12 +284,19 @@ const CircleRegistrationScreen = ({ navigation }) => {
           // 圧縮された画像をアップロード
           const response = await fetch(compressedUri);
           const blob = await response.blob();
-          const storageRef = ref(storage, `circle_images/${circleName}/icons/${Date.now()}_${circleName}`);
+          const timestamp = Date.now();
+          const storagePath = `circle_images/temp/${user.uid}_${timestamp}`;
+          console.log('Storage Path:', storagePath);
+          
+          const storageRef = ref(storage, storagePath);
+          console.log('アップロード開始...');
           const uploadTask = uploadBytes(storageRef, blob);
           await uploadTask;
+          console.log('アップロード完了、URL取得中...');
           imageUrl = await getDownloadURL(storageRef);
           
-          console.log('サークル画像アップロード完了');
+          console.log('サークル画像アップロード完了:', imageUrl);
+          console.log('=== 画像アップロード完全終了 ===');
         } catch (error) {
           console.error("Error uploading image:", error);
           Alert.alert('画像アップロードエラー', 'サークルアイコンのアップロード中にエラーが発生しました。');
@@ -282,56 +305,73 @@ const CircleRegistrationScreen = ({ navigation }) => {
         }
       }
 
-      // サークルデータの一括保存（全てのデータが揃った時点で実行）
-      console.log('サークル登録開始 - 全データ一括保存');
-      
-      // サークルを登録
-      const circleDocRef = await addDoc(collection(db, 'circles'), {
-        name: circleName,
-        universityName,
-        features,
-        frequency,
-        activityDays,
-        genderratio: genderRatio,
-        genre,
-        members,
-        contactInfo,
-        imageUrl,
-        circleType,
-        welcome: {
-          isRecruiting,
-        },
-        createdAt: new Date(),
-        leaderId: user.uid,
-        leaderName: representativeName,
+      // トランザクションですべてのFirestore操作を実行
+      console.log('🔄 Firestoreトランザクション開始');
+      const result = await runTransaction(db, async (transaction) => {
+        console.log('📝 1. サークルメインドキュメント作成開始');
+        // 1. サークルメインドキュメントを作成
+        const circleDocRef = doc(collection(db, 'circles'));
+        const circleData = {
+          name: circleName,
+          universityName,
+          features,
+          frequency,
+          activityDays,
+          genderratio: genderRatio,
+          genre,
+          members,
+          contactInfo,
+          imageUrl: imageUrl, // 事前にアップロードした画像URL
+          circleType,
+          welcome: {
+            isRecruiting,
+          },
+          createdAt: new Date(),
+          leaderId: user.uid,
+          leaderName: representativeName,
+          createdBy: user.uid,
+        };
+        console.log('📝 サークルデータ:', JSON.stringify(circleData, null, 2));
+        transaction.set(circleDocRef, circleData);
+        console.log('📝 サークルドキュメントID:', circleDocRef.id);
+
+        console.log('👥 2. membersサブコレクション作成開始');
+        // 2. membersサブコレクションに代表者を追加
+        const memberDocRef = doc(circleDocRef, 'members', user.uid);
+        const memberData = {
+          joinedAt: new Date(),
+          role: 'leader',
+          assignedAt: new Date(),
+          assignedBy: user.uid,
+          gender: userProfile.gender || '',
+          university: userProfile.university || '',
+          name: userProfile.name || '氏名未設定',
+          grade: userProfile.grade || '',
+          profileImageUrl: userProfile.profileImageUrl || null
+        };
+        console.log('👥 メンバーデータ:', JSON.stringify(memberData, null, 2));
+        transaction.set(memberDocRef, memberData);
+
+        console.log('👤 3. ユーザードキュメント更新開始');
+        // 3. ユーザードキュメントを更新
+        const userDocRef = doc(db, 'users', user.uid);
+        const userUpdateData = {
+          joinedCircleIds: arrayUnion(circleDocRef.id),
+          adminCircleIds: arrayUnion(circleDocRef.id)
+        };
+        console.log('👤 ユーザー更新データ:', JSON.stringify(userUpdateData, null, 2));
+        transaction.update(userDocRef, userUpdateData);
+
+        console.log('✅ トランザクション内の処理完了');
+        return circleDocRef.id;
       });
 
-      // 作成者をmembersサブコレクションに追加（代表者として）
-      await setDoc(doc(db, 'circles', circleDocRef.id, 'members', user.uid), { 
-        joinedAt: new Date(),
-        role: 'leader',
-        assignedAt: new Date(),
-        assignedBy: user.uid,
-        gender: userProfile.gender || '',
-        university: userProfile.university || '',
-        name: userProfile.name || '氏名未設定',
-        grade: userProfile.grade || '',
-        profileImageUrl: userProfile.profileImageUrl || null
-      });
-
-      // ユーザーのjoinedCircleIdsとadminCircleIdsに新しいサークルIDを追加
-      const userDocRef = doc(db, 'users', user.uid);
-      await updateDoc(userDocRef, {
-        joinedCircleIds: arrayUnion(circleDocRef.id),
-        adminCircleIds: arrayUnion(circleDocRef.id)
-      });
+      console.log('🎉 サークル登録完了 - トランザクション成功:', result);
 
       // サークル登録完了後、検索画面のキャッシュを無効化
       if (global.invalidateCirclesCache) {
         global.invalidateCirclesCache();
       }
-
-      console.log('サークル登録完了 - 全データ一括保存成功');
 
       // サークル運営画面に直接遷移
       navigation.dispatch(
@@ -349,9 +389,13 @@ const CircleRegistrationScreen = ({ navigation }) => {
         })
       );
     } catch (error) {
-      console.error('Error registering circle:', error);
+      console.error('❌ サークル登録エラー:', error);
+      console.error('❌ エラー詳細:', JSON.stringify(error, null, 2));
+      console.error('❌ エラーメッセージ:', error.message);
+      console.error('❌ エラーコード:', error.code);
       Alert.alert('登録エラー', 'サークル情報の登録中にエラーが発生しました。');
     } finally {
+      console.log('=== サークル登録処理終了 ===');
       setUploading(false);
     }
   };

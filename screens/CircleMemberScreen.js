@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, ActivityIndicator, ScrollView } from 'react-native';
+import { Image } from 'expo-image';
 import CommonHeader from '../components/CommonHeader';
 import { db } from '../firebaseConfig';
 import { doc, getDoc } from 'firebase/firestore';
@@ -109,13 +110,11 @@ export default function CircleMemberScreen({ route, navigation }) {
               <View style={styles.circleImageWrapper}>
                 {circleData.imageUrl && !imageError ? (
                   <Image
-                    source={{ 
-                      uri: circleData.imageUrl,
-                      cache: 'force-cache'
-                    }} 
+                    source={{ uri: circleData.imageUrl }} 
                     style={styles.circleImageLarge}
                     onError={() => setImageError(true)}
-                    resizeMode="cover"
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
                   />
                 ) : (
                   <View style={[styles.circleImageLarge, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 

@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Image,
   StatusBar,
   ScrollView,
   ActivityIndicator,
@@ -12,19 +11,20 @@ import {
   Alert,
   Linking, // Import Linking
   SafeAreaView, // Import SafeAreaView
+  TextInput,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, CommonActions } from '@react-navigation/native';
 import { auth, db, storage } from '../firebaseConfig';
-import { doc, onSnapshot, updateDoc, collection, query, where, getDocs, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, updateDoc, getDoc } from 'firebase/firestore';
 import imagePreloader from '../utils/imagePreloader';
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { signOut } from 'firebase/auth';
 import * as ImagePicker from 'expo-image-picker';
 import CommonHeader from '../components/CommonHeader';
+import KurukatsuButton from '../components/KurukatsuButton';
 import useFirestoreDoc from '../hooks/useFirestoreDoc';
-import { useNotificationBadge } from '../hooks/useNotificationBadge';
 
 const { width } = Dimensions.get('window');
 const gridItemSize = (width - 20 * 3) / 2;
@@ -41,15 +41,14 @@ export default function MyPageScreen({ navigation, route }) {
   // ユーザープロフィール取得
   const { data: userProfile, loading, error } = useFirestoreDoc('users', userId);
   
-  // プロフィール編集画面から渡された更新データを処理（削除）
-
-  const [joinedCircles, setJoinedCircles] = useState([]);
   const [imageError, setImageError] = useState(false);
-  // 通知バッジフックを使用
-  const { unreadCounts, isLoading: notificationLoading } = useNotificationBadge();
+  const [activeTab, setActiveTab] = useState('profile');
+  const [selfIntroduction, setSelfIntroduction] = useState('');
+  const [joinedCircles, setJoinedCircles] = useState([]);
+  const [favoriteCircles, setFavoriteCircles] = useState([]);
+  const [circlesLoading, setCirclesLoading] = useState(false);
+  const [imageErrors, setImageErrors] = useState({});
 
-  
-  // グローバル関数は削除（useNotificationBadgeフックで管理）
   
   // プロフィール編集完了時のイベントベース更新
   React.useEffect(() => {
@@ -64,49 +63,88 @@ export default function MyPageScreen({ navigation, route }) {
   }, []);
 
 
-
-  // サークル情報を取得（CircleManagementScreenと同じシンプルなアプローチ）
+  // 所属サークルといいね！したサークルのデータを取得
   useEffect(() => {
-    if (!userProfile) {
-      setJoinedCircles([]);
-      return;
-    }
+    if (!userId) return;
 
-    const fetchCircles = async () => {
+    const fetchCirclesData = async () => {
+      setCirclesLoading(true);
       try {
-        if (userProfile.joinedCircleIds && Array.isArray(userProfile.joinedCircleIds) && userProfile.joinedCircleIds.length > 0) {
-          const circlesRef = collection(db, 'circles');
-          const q = query(circlesRef, where('__name__', 'in', userProfile.joinedCircleIds));
-          const circlesSnapshot = await getDocs(q);
-          const joined = circlesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          setJoinedCircles(joined);
+        // 所属サークルの取得
+        if (userProfile?.joinedCircleIds && userProfile.joinedCircleIds.length > 0) {
+          const joinedCirclesPromises = userProfile.joinedCircleIds.map(async (circleId) => {
+            try {
+              const circleDoc = await getDoc(doc(db, 'circles', circleId));
+              if (circleDoc.exists()) {
+                return { id: circleId, ...circleDoc.data() };
+              }
+              return null;
+            } catch (error) {
+              console.error(`Error fetching circle ${circleId}:`, error);
+              return null;
+            }
+          });
+          
+          const joinedCirclesData = await Promise.all(joinedCirclesPromises);
+          const validJoinedCircles = joinedCirclesData.filter(circle => circle !== null);
+          console.log('Joined circles data:', validJoinedCircles);
+          console.log('Joined circles imageUrls:', validJoinedCircles.map(c => ({ id: c.id, imageUrl: c.imageUrl })));
+          setJoinedCircles(validJoinedCircles);
         } else {
           setJoinedCircles([]);
         }
+
+        // いいね！したサークルの取得（新しい順にソート）
+        if (userProfile?.favoriteCircleIds && userProfile.favoriteCircleIds.length > 0) {
+          // 配列を反転させて新しいものが上に来るようにする
+          const reversedFavoriteCircleIds = [...userProfile.favoriteCircleIds].reverse();
+          const favoriteCirclesPromises = reversedFavoriteCircleIds.map(async (circleId) => {
+            try {
+              const circleDoc = await getDoc(doc(db, 'circles', circleId));
+              if (circleDoc.exists()) {
+                return { id: circleId, ...circleDoc.data() };
+              }
+              return null;
+            } catch (error) {
+              console.error(`Error fetching favorite circle ${circleId}:`, error);
+              return null;
+            }
+          });
+          
+          const favoriteCirclesData = await Promise.all(favoriteCirclesPromises);
+          const validFavoriteCircles = favoriteCirclesData.filter(circle => circle !== null);
+          console.log('Favorite circles data:', validFavoriteCircles);
+          console.log('Favorite circles imageUrls:', validFavoriteCircles.map(c => ({ id: c.id, imageUrl: c.imageUrl })));
+          setFavoriteCircles(validFavoriteCircles);
+        } else {
+          setFavoriteCircles([]);
+        }
       } catch (error) {
-        console.error('Error fetching circles:', error);
-        setJoinedCircles([]);
+        console.error('Error fetching circles data:', error);
+      } finally {
+        setCirclesLoading(false);
       }
     };
 
-    fetchCircles();
-  }, [userProfile]);
+    fetchCirclesData();
+  }, [userId, userProfile?.joinedCircleIds, userProfile?.favoriteCircleIds]);
   
-  // 統合ローディング条件：CircleManagementScreenと同じシンプルなロジック
-  const isInitialLoading = loading || notificationLoading;
+  // ローディング条件
+  const isInitialLoading = loading;
   
   if (isInitialLoading) {
     return (
       <View style={styles.container}>
         <CommonHeader 
           title="マイページ" 
+          showBackButton={false}
           rightButton={
             <TouchableOpacity 
-              onPress={() => navigation.navigate('Settings')}
+              onPress={() => navigation.navigate('共通', { screen: 'Settings' })}
               style={styles.settingsButton}
               activeOpacity={1}
             >
-              <Ionicons name="settings-outline" size={24} color="#374151" />
+              <Ionicons name="settings-outline" size={24} color="#333" />
             </TouchableOpacity>
           }
         />
@@ -123,13 +161,14 @@ export default function MyPageScreen({ navigation, route }) {
       <View style={styles.container}>
         <CommonHeader 
           title="マイページ" 
+          showBackButton={false}
           rightButton={
             <TouchableOpacity 
-              onPress={() => navigation.navigate('Settings')}
+              onPress={() => navigation.navigate('共通', { screen: 'Settings' })}
               style={styles.settingsButton}
               activeOpacity={1}
             >
-              <Ionicons name="settings-outline" size={24} color="#374151" />
+              <Ionicons name="settings-outline" size={24} color="#333" />
             </TouchableOpacity>
           }
         />
@@ -155,220 +194,605 @@ export default function MyPageScreen({ navigation, route }) {
     <View style={styles.container}>
       <CommonHeader 
         title="マイページ" 
+        showBackButton={false}
         rightButton={
           <TouchableOpacity 
-            onPress={() => navigation.navigate('Settings')}
+            onPress={() => navigation.navigate('共通', { screen: 'Settings' })}
             style={styles.settingsButton}
+            activeOpacity={1}
           >
-            <Ionicons name="settings-outline" size={24} color="#333" />
+            <Ionicons name="settings-outline" size={24} color="#666" />
           </TouchableOpacity>
         }
       />
-      <View style={styles.mainContent}>
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <View style={styles.profileSection}>
-            <View style={styles.profileContent}>
-              <View style={styles.profileImageContainer}>
-                <View style={styles.profileImageWrapper}>
-                  {userProfile?.profileImageUrl && !imageError ? (
-                    <Image
-                      source={{ 
-                        uri: userProfile.profileImageUrl,
-                        cache: 'force-cache'
-                      }}
-                      style={styles.profileImage}
-                      onError={() => setImageError(true)}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={[styles.profileImage, {backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
-                      <Ionicons name="person-outline" size={50} color="#9ca3af" />
-                    </View>
+
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* プロフィールセクション */}
+        <View style={styles.profileSection}>
+          {/* プロフィール画像とユーザー情報（横並び） */}
+          <View style={styles.profileContentContainer}>
+            {/* プロフィール画像（左側） */}
+            <View style={styles.profileImageContainer}>
+              <View style={styles.profileImageWrapper}>
+                {userProfile?.profileImageUrl && !imageError ? (
+                  <Image
+                    source={{ uri: userProfile.profileImageUrl }}
+                    style={styles.profileImage}
+                    onError={() => setImageError(true)}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                  />
+                ) : (
+                  <View style={[styles.profileImage, {backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
+                    <Ionicons name="person-outline" size={60} color="#9ca3af" />
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* ユーザー情報（右側、縦並び左寄せ） */}
+            <View style={styles.userInfoContainer}>
+              <Text style={styles.displayName}>{userProfile?.name || 'ユーザー名'}</Text>
+              
+              {userProfile?.grade && (
+                <Text style={styles.infoText}>{userProfile.grade}</Text>
+              )}
+              
+              {userProfile?.university && (
+                <Text style={styles.infoText}>{userProfile.university}</Text>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* プロフィール編集ボタン */}
+        <View style={styles.editButtonSection}>
+          <KurukatsuButton
+            title="プロフィールを編集する"
+            onPress={() => navigation.navigate('共通', { screen: 'ProfileEdit' })}
+            size="small"
+            variant="secondary"
+            hapticFeedback={true}
+            style={styles.editButton}
+          />
+        </View>
+
+        {/* 統計セクション */}
+        <View style={styles.statsSection}>
+          <View style={styles.statCard}>
+            <Ionicons name="people-outline" size={24} color="#22c55e" />
+            {circlesLoading ? (
+              <ActivityIndicator size="small" color="#22c55e" style={styles.statLoading} />
+            ) : (
+              <Text style={styles.statNumber}>{joinedCircles.length}</Text>
+            )}
+            <Text style={styles.statLabel}>所属サークル</Text>
+          </View>
+          
+          <View style={styles.statDivider} />
+          
+          <View style={styles.statCard}>
+            <Ionicons name="heart-outline" size={24} color="#ef4444" />
+            {circlesLoading ? (
+              <ActivityIndicator size="small" color="#ef4444" style={styles.statLoading} />
+            ) : (
+              <Text style={styles.statNumber}>{favoriteCircles.length}</Text>
+            )}
+            <Text style={styles.statLabel}>いいね！したサークル</Text>
+          </View>
+        </View>
+
+        {/* タブナビゲーション */}
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.tabScrollView}
+          contentContainerStyle={styles.tabContainer}
+        >
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'profile' && styles.activeTab]}
+            onPress={() => setActiveTab('profile')}
+            activeOpacity={1}
+          >
+            <Ionicons 
+              name="person-outline" 
+              size={20} 
+              color={activeTab === 'profile' ? '#fff' : '#6b7280'} 
+            />
+            <Text style={[styles.tabText, activeTab === 'profile' && styles.activeTabText]} numberOfLines={1}>
+              プロフィール
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'circles' && styles.activeTab]}
+            onPress={() => setActiveTab('circles')}
+            activeOpacity={1}
+          >
+            <Ionicons 
+              name="people-outline" 
+              size={20} 
+              color={activeTab === 'circles' ? '#fff' : '#6b7280'} 
+            />
+            <Text style={[styles.tabText, activeTab === 'circles' && styles.activeTabText]} numberOfLines={1}>
+              所属しているサークル
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.tab, activeTab === 'favorites' && styles.activeTab]}
+            onPress={() => setActiveTab('favorites')}
+            activeOpacity={1}
+          >
+            <Ionicons 
+              name="heart-outline" 
+              size={20} 
+              color={activeTab === 'favorites' ? '#fff' : '#6b7280'} 
+            />
+            <Text style={[styles.tabText, activeTab === 'favorites' && styles.activeTabText]} numberOfLines={1}>
+              いいね！したサークル
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+
+        {/* タブコンテンツ */}
+        {activeTab === 'profile' && (
+          <>
+            {/* 自己紹介セクション */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>自己紹介</Text>
+              <Text style={styles.selfIntroductionText}>
+                {userProfile?.selfIntroduction || '自己紹介が設定されていません'}
+              </Text>
+            </View>
+
+            {/* SNSリンクセクション */}
+            {(userProfile?.snsLink || userProfile?.xLink) && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>SNSリンク</Text>
+                <View style={styles.snsLinksContainer}>
+                  {userProfile?.snsLink && (
+                    <TouchableOpacity 
+                      style={styles.snsLinkItem}
+                      onPress={() => Linking.openURL(userProfile.snsLink)}
+                      activeOpacity={1}
+                    >
+                      <Image 
+                        source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} 
+                        style={styles.snsLinkIcon}
+                        cachePolicy="memory-disk"
+                      />
+                      <Text style={styles.snsLinkText}>Instagram</Text>
+                      <Ionicons name="chevron-forward" size={16} color="#6b7280" />
+                    </TouchableOpacity>
+                  )}
+                  
+                  {userProfile?.xLink && (
+                    <TouchableOpacity 
+                      style={styles.snsLinkItem}
+                      onPress={() => Linking.openURL(userProfile.xLink)}
+                      activeOpacity={1}
+                    >
+                      <Image 
+                        source={require('../assets/SNS-icons/X_logo-black.png')} 
+                        style={styles.snsLinkIcon}
+                        cachePolicy="memory-disk"
+                      />
+                      <Text style={styles.snsLinkText}>X（旧Twitter）</Text>
+                      <Ionicons name="chevron-forward" size={16} color="#6b7280" />
+                    </TouchableOpacity>
                   )}
                 </View>
               </View>
-              
-              <View style={styles.userInfo}>
-                <Text style={styles.userName}>{userProfile?.name || 'ユーザー名'}</Text>
-                {(userProfile?.university || userProfile?.grade) && (
-                  <View style={styles.universityInfo}>
-                    <Ionicons name="school-outline" size={16} color="#666" />
-                    <Text style={styles.userUniversity}>
-                      {userProfile?.university || ''}
-                      {userProfile?.university && userProfile?.grade ? '・' : ''}
-                      {userProfile?.grade || ''}
-                    </Text>
-                  </View>
-                )}
-                <TouchableOpacity style={styles.editProfileButton} onPress={() => navigation.navigate('共通', { screen: 'ProfileEdit' })} activeOpacity={1}>
-                  <Text style={styles.editProfileButtonText}>プロフィールを編集</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-          <View style={styles.contentArea}>
+            )}
+          </>
+        )}
+
+        {activeTab === 'circles' && (
+          <View style={styles.section}>
             <Text style={styles.sectionTitle}>所属しているサークル</Text>
-            {joinedCircles.length > 0 ? (
-              joinedCircles.map((circle, index) => (
-                <TouchableOpacity 
-                  key={circle.id} 
-                  style={styles.circleCardContainer}
-                  onPress={() => navigation.navigate('共通', { screen: 'CircleMember', params: { circleId: circle.id } })}
-                  activeOpacity={1}
-                >
-                  <View style={styles.circleCard}>
-                    <View style={styles.circleImageContainer}>
-                      {circle.imageUrl ? (
-                        <Image 
-                          source={{ 
-                            uri: circle.imageUrl,
-                            cache: 'force-cache' // プリロード済みキャッシュを強制使用
-                          }} 
-                          style={styles.circleImage}
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <View style={[styles.circleImage, { backgroundColor: '#f8f9fa', justifyContent: 'center', alignItems: 'center' }]}> 
-                          <Ionicons name="people-outline" size={32} color="#6c757d" />
-                        </View>
-                      )}
-                    </View>
-                    
-                    <View style={styles.circleInfo}>
-                      <View style={styles.circleCategoryContainer}>
-                        <View style={styles.categoryBadge}>
-                          <Text style={styles.circleCategory}>{circle.genre || 'その他'}</Text>
-                        </View>
-                      </View>
-                      <Text style={styles.circleName}>{circle.name}</Text>
-                      <View style={styles.circleUniversityContainer}>
-                        <Ionicons name="school-outline" size={14} color="#6c757d" />
-                        <Text style={styles.circleEvent}>{circle.universityName || '大学名未設定'}</Text>
-                      </View>
-                    </View>
-                    
-                    {/* 未読通知バッジ */}
-                    {unreadCounts[circle.id] > 0 && (
-                      <View style={styles.unreadBadge}>
-                        <Text style={styles.unreadBadgeText}>{unreadCounts[circle.id]}</Text>
+            {circlesLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#1380ec" />
+              </View>
+            ) : joinedCircles.length > 0 ? (
+              <View style={styles.circlesList}>
+                {joinedCircles.map((circle) => (
+                  <TouchableOpacity
+                    key={circle.id}
+                    style={styles.circleItem}
+                    onPress={() => navigation.navigate('共通', { screen: 'CircleDetail', params: { circleId: circle.id } })}
+                    activeOpacity={1}
+                  >
+                    {circle.imageUrl && circle.imageUrl.trim() !== '' && !imageErrors[circle.id] ? (
+                      <Image
+                        source={{ uri: circle.imageUrl }}
+                        style={styles.circleImage}
+                        onError={(error) => {
+                          console.log(`Image load error for circle ${circle.id}:`, error);
+                          console.log(`Failed URL: ${circle.imageUrl}`);
+                          setImageErrors(prev => ({ ...prev, [circle.id]: true }));
+                        }}
+                        onLoad={() => {
+                          console.log(`Image loaded successfully for circle ${circle.id}: ${circle.imageUrl}`);
+                        }}
+                        cachePolicy="memory-disk"
+                      />
+                    ) : (
+                      <View style={[styles.circleImage, styles.defaultCircleImage]}>
+                        <Ionicons name="people-outline" size={24} color="#9ca3af" />
                       </View>
                     )}
-                  </View>
-                </TouchableOpacity>
-              ))
-            ) : (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>所属しているサークルはありません</Text>
-                <Text style={styles.emptySubText}>サークルに参加して活動を始めましょう</Text>
+                    <View style={styles.circleInfo}>
+                      <Text style={styles.circleName}>{circle.name}</Text>
+                      <Text style={styles.circleUniversity}>{circle.universityName}</Text>
+                      <Text style={styles.circleGenre}>{circle.genre}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+                  </TouchableOpacity>
+                ))}
               </View>
+            ) : (
+              <Text style={styles.emptyText}>所属しているサークルはありません</Text>
             )}
           </View>
+        )}
+
+        {activeTab === 'favorites' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>いいね！したサークル</Text>
+            {circlesLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color="#1380ec" />
+              </View>
+            ) : favoriteCircles.length > 0 ? (
+              <View style={styles.circlesList}>
+                {favoriteCircles.map((circle) => (
+                  <TouchableOpacity
+                    key={circle.id}
+                    style={styles.circleItem}
+                    onPress={() => navigation.navigate('共通', { screen: 'CircleDetail', params: { circleId: circle.id } })}
+                    activeOpacity={1}
+                  >
+                    {circle.imageUrl && circle.imageUrl.trim() !== '' && !imageErrors[circle.id] ? (
+                      <Image
+                        source={{ uri: circle.imageUrl }}
+                        style={styles.circleImage}
+                        onError={(error) => {
+                          console.log(`Image load error for circle ${circle.id}:`, error);
+                          console.log(`Failed URL: ${circle.imageUrl}`);
+                          setImageErrors(prev => ({ ...prev, [circle.id]: true }));
+                        }}
+                        onLoad={() => {
+                          console.log(`Image loaded successfully for circle ${circle.id}: ${circle.imageUrl}`);
+                        }}
+                        cachePolicy="memory-disk"
+                      />
+                    ) : (
+                      <View style={[styles.circleImage, styles.defaultCircleImage]}>
+                        <Ionicons name="people-outline" size={24} color="#9ca3af" />
+                      </View>
+                    )}
+                    <View style={styles.circleInfo}>
+                      <Text style={styles.circleName}>{circle.name}</Text>
+                      <Text style={styles.circleUniversity}>{circle.universityName}</Text>
+                      <Text style={styles.circleGenre}>{circle.genre}</Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : (
+              <Text style={styles.emptyText}>いいね！したサークルはありません</Text>
+            )}
+          </View>
+        )}
 
 
-        </ScrollView>
-      </View>
+        <View style={styles.bottomSpacer} />
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f0f2f5' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  mainContent: { flex: 1 },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#ffffff' 
+  },
+  loadingContainer: { 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
   
+  // ヘッダーボタンスタイル
+  settingsButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   
-  // プロフィールセクションのスタイル
+  // スクロールビュー
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingTop: 0, // ヘッダーの下の余白
+  },
+  
+  // プロフィールセクション
   profileSection: { 
     paddingVertical: 24,
     paddingHorizontal: 20,
-    marginTop: 0,
+    backgroundColor: '#ffffff',
   },
-  profileContent: {
+  profileContentContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 20,
   },
   profileImageContainer: {
-    position: 'relative',
-    marginRight: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   profileImageWrapper: { 
     position: 'relative',
-    alignItems: 'center',
   },
   profileImage: { 
     width: 120, 
     height: 120, 
     borderRadius: 60,
     borderWidth: 4,
-    borderColor: '#e0e0e0',
+    borderColor: '#ffffff',
   },
-  profileImageBorder: {
-    position: 'absolute',
-    top: -8,
-    left: -8,
-    right: -8,
-    bottom: -8,
-    borderRadius: 68,
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
-  },
-  editIconButton: {
-    position: 'absolute',
-    bottom: 5,
-    right: 5,
-    backgroundColor: '#fff',
-    borderRadius: 20,
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  userInfo: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  userName: { 
-    fontSize: 22, 
-    fontWeight: 'bold', 
-    color: '#1f2937', 
+  
+   // ユーザー情報コンテナ
+   userInfoContainer: {
+     flex: 1,
+     alignItems: 'flex-start',
+     justifyContent: 'center',
+     minHeight: 120, // プロフィール画像の高さと合わせる
+   },
+  displayName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1f2937',
     marginBottom: 8,
     textAlign: 'left',
   },
-  universityInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-  },
-  userUniversity: { 
-    fontSize: 16, 
-    color: '#6b7280', 
-    marginLeft: 6,
-  },
-  editProfileButton: { 
-    backgroundColor: '#ffffff',
-    borderRadius: 8, 
-    paddingVertical: 10, 
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#d1d5db',
-    alignSelf: 'flex-start',
-    marginTop: 12,
-  },
-  editProfileButtonText: { 
-    color: '#2563eb', 
-    fontWeight: 'bold', 
+  infoText: {
     fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 4,
+    textAlign: 'left',
   },
-  settingsButton: {
-    padding: 0,
+  editButtonSection: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 16,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
   },
+  editButton: {
+    alignSelf: 'center',
+  },
+  
+  // 統計セクション
+  statsSection: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 4,
+    backgroundColor: '#ffffff',
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+  },
+  statDivider: {
+    width: 1,
+    backgroundColor: '#e5e7eb',
+    marginVertical: 8,
+  },
+  statNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginTop: 4,
+    marginBottom: 2,
+    minHeight: 24,
+  },
+  statLoading: {
+    marginTop: 4,
+    marginBottom: 2,
+    minHeight: 24,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  kpIcon: {
+    width: 24,
+    height: 24,
+  },
+  
+  // タブナビゲーション
+  tabScrollView: {
+    backgroundColor: '#ffffff',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    borderWidth: 1.5,
+    borderColor: '#e5e7eb',
+    gap: 4,
+    minWidth: 120,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  activeTab: {
+    backgroundColor: '#1380ec',
+    borderColor: '#1380ec',
+    shadowColor: '#1380ec',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  tabText: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+  activeTabText: {
+    color: '#ffffff',
+  },
+  
+  // セクション
+  section: {
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f3f4f6',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 12,
+  },
+  textInput: {
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: '#374151',
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  selfIntroductionText: {
+    fontSize: 16,
+    color: '#374151',
+    lineHeight: 24,
+    paddingVertical: 8,
+  },
+  snsLinksContainer: {
+    gap: 12,
+  },
+  snsLinkItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  snsLinkIcon: {
+    width: 24,
+    height: 24,
+    marginRight: 12,
+  },
+  snsLinkText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  noSnsText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    fontStyle: 'italic',
+    paddingVertical: 8,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#9ca3af',
+    textAlign: 'center',
+    paddingVertical: 20,
+  },
+  circlesList: {
+    gap: 12,
+  },
+  circleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  circleImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 12,
+  },
+  defaultCircleImage: {
+    backgroundColor: '#f3f4f6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  circleInfo: {
+    flex: 1,
+  },
+  circleName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 4,
+  },
+  circleUniversity: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginBottom: 2,
+  },
+  circleGenre: {
+    fontSize: 12,
+    color: '#9ca3af',
+    fontWeight: '500',
+  },
+  
+  // ボトムスペーサー
+  bottomSpacer: {
+    height: 20,
+  },
+  
+  // エラーハンドリング
   errorText: {
     fontSize: 16,
     color: '#6b7280',
@@ -392,254 +816,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     textAlign: 'center',
-  },
-  contentArea: { 
-    paddingHorizontal: 20, 
-    paddingTop: 20, 
-    paddingBottom: 20,
-    backgroundColor: '#f0f2f5',
-  },
-  contentTitle: { 
-    fontSize: 20, 
-    fontWeight: 'bold', 
-    marginBottom: 15,
-    color: '#2c3e50',
-  },
-  sectionTitle: { 
-    fontSize: 18, 
-    fontWeight: '500', 
-    color: '#1f2937', 
-    marginBottom: 16,
-    marginLeft: 4,
-  },
-  gridContainer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  gridItem: { width: (Dimensions.get('window').width - 20 * 3) / 2, marginBottom: 20 },
-  gridImage: { width: '100%', height: (Dimensions.get('window').width - 20 * 3) / 2, borderRadius: 12, backgroundColor: '#e0e0e0' },
-  gridItemText: { marginTop: 8, fontSize: 14, fontWeight: '600', textAlign: 'center' },
-  emptyMessage: { textAlign: 'center', color: '#666', marginTop: 20 },
-  // 人気のサークル（横スクロール）
-  popularCirclesScrollView: {
-    marginHorizontal: -20,
-  },
-  popularCirclesScrollContainer: {
-    paddingLeft: 20,
-    paddingRight: 20,
-  },
-  popularCircleCard: {
-    alignItems: 'center',
-    width: 100,
-    marginRight: 15,
-  },
-  popularCircleImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 8,
-  },
-  popularCircleName: {
-    fontSize: 12,
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-
-  // サークルカードスタイル（設定項目と統一）
-  circleCardContainer: {
-    marginBottom: 12,
-  },
-  circleCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  circleImageContainer: {
-    position: 'relative',
-    marginRight: 16,
-  },
-  circleImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-  },
-  circleInfo: {
-    flex: 1,
-  },
-  circleCategoryContainer: {
-    marginBottom: 8,
-  },
-  categoryBadge: {
-    backgroundColor: '#dbeafe',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    alignSelf: 'flex-start',
-  },
-  circleCategory: {
-    fontSize: 11,
-    color: '#2563eb',
-    fontWeight: '600',
-    letterSpacing: 0.3,
-  },
-  circleName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1f2937',
-    marginBottom: 6,
-    lineHeight: 22,
-  },
-  circleUniversityContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  circleEvent: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginLeft: 6,
-  },
-  bookmarkButton: {
-    alignItems: 'center',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 48,
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#6b7280',
-    marginBottom: 8,
-    fontWeight: '600',
-  },
-  emptySubText: {
-    fontSize: 14,
-    color: '#9ca3af',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  // 未読通知バッジ（改良版）
-  unreadBadge: {
-    backgroundColor: '#dc2626',
-    borderRadius: 12,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 12,
-    paddingHorizontal: 6,
-  },
-  unreadBadgeText: {
-    color: '#ffffff',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
-
-  // 設定セクションのスタイル
-  settingsSection: {
-    marginTop: 10,
-    paddingHorizontal: 20,
-  },
-  infoSection: {
-    marginTop: 15,
-    paddingHorizontal: 20,
-  },
-  integratedSettingsCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  integratedInfoCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  integratedSettingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  integratedSettingItemBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  settingItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  settingItemText: {
-    fontSize: 16,
-    color: '#333',
-    marginLeft: 12,
-    fontWeight: '400',
-  },
-
-  // ログアウトセクションのスタイル
-  logoutSection: {
-    marginTop: 15,
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  logoutItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  logoutText: {
-    fontSize: 16,
-    color: '#ff3b30',
-    marginLeft: 12,
-    fontWeight: '400',
   },
 });

@@ -74,14 +74,14 @@ const KurukatsuButton = ({
       case 'secondary':
         return {
           backgroundColor: '#ffffff',
-          textColor: '#2563eb',
+          textColor: '#1380ec',
           borderWidth: 2,
           borderColor: '#B0B7C3',
         };
       case 'outline':
         return {
           backgroundColor: 'transparent',
-          textColor: '#2563eb',
+          textColor: '#1380ec',
           borderWidth: 2,
           borderColor: backgroundColor,
         };
@@ -119,28 +119,6 @@ const KurukatsuButton = ({
     onPress && onPress();
   };
 
-  // シャドウスタイルを取得
-  const getShadowStyle = () => {
-    if (disabled || variant === 'outline') {
-      return {}; // disabledまたはoutlineの場合はシャドウなし
-    }
-    
-    return Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: {
-          width: 0,
-          height: pressed || loading ? 1 : 3,
-        },
-        shadowOpacity: pressed || loading ? 0.1 : 0.15,
-        shadowRadius: pressed || loading ? 2 : 4,
-      },
-      android: {
-        elevation: pressed || loading ? 2 : 4,
-      },
-    });
-  };
-
   return (
     <Animated.View 
       style={[
@@ -161,7 +139,6 @@ const KurukatsuButton = ({
             borderWidth: variantStyles.borderWidth,
             borderColor: disabled ? '#D1D5DB' : variantStyles.borderColor,
           },
-          getShadowStyle(),
           buttonStyle,
         ]}
         onPressIn={handlePressIn}

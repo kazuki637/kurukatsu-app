@@ -233,7 +233,7 @@ const SearchResultsScreen = ({ route, navigation }) => {
     >
       {/* ヘッダー画像（カードの外側に配置） */}
       {item.headerImageUrl && (
-        <Image source={{ uri: item.headerImageUrl }} style={styles.headerImageCard} contentFit="cover" />
+        <Image source={{ uri: item.headerImageUrl }} style={styles.headerImageCard} contentFit="cover" cachePolicy="memory-disk" />
       )}
       
       <View style={[
@@ -242,7 +242,7 @@ const SearchResultsScreen = ({ route, navigation }) => {
       ]}>
         <View style={styles.headerContainer}>
           {item.imageUrl ? (
-            <Image source={{ uri: item.imageUrl }} style={styles.accountImage} />
+            <Image source={{ uri: item.imageUrl }} style={styles.accountImage} cachePolicy="memory-disk" />
           ) : (
             <View style={[styles.accountImage, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
               <Ionicons name="people-outline" size={40} color="#aaa" />
@@ -271,6 +271,7 @@ const SearchResultsScreen = ({ route, navigation }) => {
             source={{ uri: item.thumbnailImage }}
             style={styles.thumbnailImage}
             placeholder={{ blurhash: 'LKN]y_?b%M_3%Mxu%Mxu%Mxu%Mxu' }} contentFit="cover" transition={1000}
+            cachePolicy="memory-disk"
           />
         )}
 

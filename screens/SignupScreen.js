@@ -10,12 +10,12 @@ import {
   TouchableWithoutFeedback, 
   Keyboard, 
   ScrollView, 
-  Image, 
   Linking,
   Dimensions,
   Animated,
   Platform
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { auth, db } from '../firebaseConfig';
@@ -64,8 +64,6 @@ const SignupScreen = ({ navigation }) => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
-  const [lastName, setLastName] = useState('');  // 姓
-  const [firstName, setFirstName] = useState(''); // 名
   const [university, setUniversity] = useState('');
   const [grade, setGrade] = useState('');
   const [gender, setGender] = useState('');
@@ -210,7 +208,7 @@ const SignupScreen = ({ navigation }) => {
         return password !== '' && confirmPassword !== '' && 
                password === confirmPassword && passwordErrors.length === 0;
       case 'name':
-        return lastName.trim() !== '' && firstName.trim() !== '';
+        return name.trim() !== '';
       case 'university':
         return university.trim() !== '';
       case 'grade':
@@ -238,7 +236,7 @@ const SignupScreen = ({ navigation }) => {
       const userDocRef = doc(db, 'users', user.uid);
       await setDoc(userDocRef, {
         email: user.email,
-        name: lastName.trim() + firstName.trim(), // 姓＋名で保存
+        name: name.trim(),
         university: university.trim(),
         grade,
         gender,
@@ -248,9 +246,7 @@ const SignupScreen = ({ navigation }) => {
         profileImageUrl: '',
         createdAt: new Date(),
         joinedCircleIds: [],
-        favoriteCircleIds: [],
-        isUniversityPublic: true,
-        isGradePublic: true
+        favoriteCircleIds: []
       });
       
       // 完了画面に進む
@@ -355,22 +351,13 @@ const SignupScreen = ({ navigation }) => {
           )}
 
           {stepData.type === 'name' && (
-            <>
-              <TextInput
-                style={styles.nameInputTop}
-                placeholder="姓"
-                value={lastName}
-                onChangeText={setLastName}
-                returnKeyType="next"
-              />
-              <TextInput
-                style={styles.nameInputBottom}
-                placeholder="名"
-                value={firstName}
-                onChangeText={setFirstName}
-                returnKeyType="next"
-              />
-            </>
+            <TextInput
+              style={styles.input}
+              placeholder="フルネーム（氏名）"
+              value={name}
+              onChangeText={setName}
+              returnKeyType="next"
+            />
           )}
 
           {stepData.type === 'university' && (
@@ -524,6 +511,7 @@ const SignupScreen = ({ navigation }) => {
               <Image 
                 source={require('../assets/icon.png')} 
                 style={styles.completeIcon}
+                cachePolicy="memory-disk"
               />
               <Text style={styles.completeMessage}>
                 アカウントが正常に作成されました！{'\n'}

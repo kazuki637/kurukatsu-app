@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, Alert, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert, ScrollView, ActivityIndicator, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import CommonHeader from '../components/CommonHeader';
 import { db } from '../firebaseConfig';
 import { doc, getDoc, getDocs, collection, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -135,11 +136,6 @@ const Calendar = ({ selectedDate, onDateSelect, events }) => {
     });
   };
 
-  const getEventCount = (date) => {
-    const dateStr = formatDate(date);
-    return events.filter(event => event.date === dateStr).length;
-  };
-
   const renderDayEvents = (date) => {
     const dateStr = formatDate(date);
     const dayEvents = events.filter(event => event.date === dateStr);
@@ -186,11 +182,6 @@ const Calendar = ({ selectedDate, onDateSelect, events }) => {
           <Text style={styles.monthTitle}>
             {currentMonth.getFullYear()}年 {monthNames[currentMonth.getMonth()]}
           </Text>
-          {getEventCount(currentMonth) > 0 && (
-            <Text style={styles.monthSubtitle}>
-              {getEventCount(currentMonth)}件のスケジュール
-            </Text>
-          )}
         </View>
         
         <TouchableOpacity 
@@ -768,13 +759,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1a1a1a',
     letterSpacing: 0.5,
-  },
-  monthSubtitle: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#666',
-    marginTop: 2,
-    letterSpacing: 0.3,
   },
   disabledButton: {
     opacity: 0.5,

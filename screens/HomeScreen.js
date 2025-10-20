@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Image, ActivityIndicator, FlatList } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator, FlatList, Alert } from 'react-native';
+import { Image } from 'expo-image';
 import CommonHeader from '../components/CommonHeader';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, db } from '../firebaseConfig';
 import { collection, query, where, getDocs, getDoc, doc, orderBy, limit, onSnapshot } from 'firebase/firestore';
 import { getArticles } from '../services/notionService';
+import useFirestoreDoc from '../hooks/useFirestoreDoc';
+import { useNotificationBadge } from '../hooks/useNotificationBadge';
 
 // import { useNotificationNavigation } from '../hooks/useNotificationNavigation';
 
@@ -53,6 +56,14 @@ const formatDate = (dateValue) => {
 };
 
 const HomeScreen = ({ navigation }) => {
+  const user = auth.currentUser;
+  const userId = user ? user.uid : null;
+  
+  // ユーザープロフィール取得
+  const { data: userProfile, loading: userProfileLoading, error: userProfileError } = useFirestoreDoc('users', userId);
+  
+  // 通知バッジフックを使用
+  const { unreadCounts, isLoading: notificationLoading } = useNotificationBadge();
 
   const [loading, setLoading] = useState(true);
   const [userUniversity, setUserUniversity] = useState('');
@@ -64,6 +75,9 @@ const HomeScreen = ({ navigation }) => {
   
   // ブロック機能の状態管理
   const [userBlockedCircleIds, setUserBlockedCircleIds] = useState([]);
+  
+  // 所属サークルの状態管理
+  const [joinedCircles, setJoinedCircles] = useState([]);
 
 
   // 通知ナビゲーションフックを使用（削除：直接遷移に変更）
@@ -166,6 +180,33 @@ const HomeScreen = ({ navigation }) => {
 
 
 
+  // 所属サークル情報を取得（MyPageScreenと同じロジック）
+  useEffect(() => {
+    if (!userProfile) {
+      setJoinedCircles([]);
+      return;
+    }
+
+    const fetchCircles = async () => {
+      try {
+        if (userProfile.joinedCircleIds && Array.isArray(userProfile.joinedCircleIds) && userProfile.joinedCircleIds.length > 0) {
+          const circlesRef = collection(db, 'circles');
+          const q = query(circlesRef, where('__name__', 'in', userProfile.joinedCircleIds));
+          const circlesSnapshot = await getDocs(q);
+          const joined = circlesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          setJoinedCircles(joined);
+        } else {
+          setJoinedCircles([]);
+        }
+      } catch (error) {
+        console.error('Error fetching circles:', error);
+        setJoinedCircles([]);
+      }
+    };
+
+    fetchCircles();
+  }, [userProfile]);
+
   // 記事データを取得する共通関数（Notion API使用）
   const fetchArticlesData = async () => {
     try {
@@ -246,12 +287,117 @@ const HomeScreen = ({ navigation }) => {
           <Image 
             source={require('../assets/HOME-Header-Title.png')} 
             style={styles.headerTitleImage}
-            resizeMode="contain"
+            contentFit="contain"
+            cachePolicy="memory-disk"
           />
         }
       />
       <SafeAreaView style={styles.contentSafeArea}>
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          {/* クイックアクセスボタン */}
+          <View style={styles.quickAccessCard}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.quickAccessContainer}
+            >
+              <TouchableOpacity 
+                style={styles.quickAccessButton}
+                onPress={() => navigation.navigate('ThreadList')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.quickAccessIconContainer}>
+                  <Ionicons name="chatbubbles-outline" size={20} color="#0284C7" />
+                </View>
+                <Text style={styles.quickAccessText}>掲示板</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.quickAccessButton}
+                onPress={() => Alert.alert('準備中', 'インターン機能は準備中です')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.quickAccessIconContainer}>
+                  <Ionicons name="briefcase-outline" size={20} color="#0284C7" />
+                </View>
+                <Text style={styles.quickAccessText}>インターン</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.quickAccessButton}
+                onPress={() => navigation.navigate('ArticleList')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.quickAccessIconContainer}>
+                  <Ionicons name="document-text-outline" size={20} color="#0284C7" />
+                </View>
+                <Text style={styles.quickAccessText}>記事</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.quickAccessButton}
+                onPress={() => navigation.navigate('Campaign')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.quickAccessIconContainer}>
+                  <Ionicons name="megaphone-outline" size={20} color="#0284C7" />
+                </View>
+                <Text style={styles.quickAccessText}>キャンペーン</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+
+          {/* 所属しているサークル */}
+          {joinedCircles.length > 0 && (
+            <View style={styles.joinedCirclesSection}>
+              <Text style={styles.sectionTitle}>所属しているサークル</Text>
+              {joinedCircles.map((circle) => (
+                <TouchableOpacity 
+                  key={circle.id} 
+                  style={styles.circleCardContainer}
+                  onPress={() => navigation.navigate('共通', { screen: 'CircleMember', params: { circleId: circle.id } })}
+                  activeOpacity={1}
+                >
+                  <View style={styles.circleCard}>
+                    <View style={styles.circleImageContainer}>
+                      {circle.imageUrl ? (
+                        <Image 
+                          source={{ uri: circle.imageUrl }} 
+                          style={styles.circleImage}
+                          contentFit="cover"
+                          cachePolicy="memory-disk"
+                        />
+                      ) : (
+                        <View style={[styles.circleImage, { backgroundColor: '#f8f9fa', justifyContent: 'center', alignItems: 'center' }]}> 
+                          <Ionicons name="people-outline" size={32} color="#6c757d" />
+                        </View>
+                      )}
+                    </View>
+                    
+                    <View style={styles.circleInfo}>
+                      <View style={styles.circleCategoryContainer}>
+                        <View style={styles.categoryBadge}>
+                          <Text style={styles.circleCategory}>{circle.genre || 'その他'}</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.circleName}>{circle.name}</Text>
+                      <View style={styles.circleUniversityContainer}>
+                        <Ionicons name="school-outline" size={14} color="#6c757d" />
+                        <Text style={styles.circleEvent}>{circle.universityName || '大学名未設定'}</Text>
+                      </View>
+                    </View>
+                    
+                    {/* 未読通知バッジ */}
+                    {unreadCounts[circle.id] > 0 && (
+                      <View style={styles.unreadBadge}>
+                        <Text style={styles.unreadBadgeText}>{unreadCounts[circle.id]}</Text>
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
           {/* 記事カード（横スクロール） */}
           <View style={styles.articleSectionContainer}>
             {/* 記事セクションヘッダー */}
@@ -297,7 +443,8 @@ const HomeScreen = ({ navigation }) => {
                         <Image 
                           source={{ uri: article.thumbnailUrl }} 
                           style={styles.infoCardImage}
-                          resizeMode="cover"
+                          contentFit="cover"
+                          cachePolicy="memory-disk"
                         />
                       ) : (
                         <View style={[styles.infoCardImage, { backgroundColor: '#f0f0f0', justifyContent: 'center', alignItems: 'center' }]}>
@@ -326,8 +473,6 @@ const HomeScreen = ({ navigation }) => {
             </View>
           </View>
 
-
-
           {/* 人気のサークル */}
           {popularCircles.length > 0 && (
             <View style={styles.popularSectionContainer}>
@@ -349,14 +494,14 @@ const HomeScreen = ({ navigation }) => {
                   >
                     {/* ヘッダー画像 */}
                     {circle.headerImageUrl && (
-                      <Image source={{ uri: circle.headerImageUrl }} style={styles.circleHeaderImage} />
+                      <Image source={{ uri: circle.headerImageUrl }} style={styles.circleHeaderImage} cachePolicy="memory-disk" />
                     )}
                     
                     <View style={[styles.popularCircleCard, !circle.headerImageUrl && styles.popularCircleCardWithoutHeader]}>
                       {/* サークルアイコンと基本情報 */}
                       <View style={styles.circleHeaderContainer}>
                         {circle.imageUrl ? (
-                          <Image source={{ uri: circle.imageUrl }} style={styles.circleIcon} />
+                          <Image source={{ uri: circle.imageUrl }} style={styles.circleIcon} cachePolicy="memory-disk" />
                         ) : (
                           <View style={[styles.circleIcon, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
                             <Ionicons name="people-outline" size={30} color="#aaa" />
@@ -402,14 +547,14 @@ const HomeScreen = ({ navigation }) => {
                   >
                     {/* ヘッダー画像 */}
                     {circle.headerImageUrl && (
-                      <Image source={{ uri: circle.headerImageUrl }} style={styles.circleHeaderImage} />
+                      <Image source={{ uri: circle.headerImageUrl }} style={styles.circleHeaderImage} cachePolicy="memory-disk" />
                     )}
                     
                     <View style={[styles.popularCircleCard, !circle.headerImageUrl && styles.popularCircleCardWithoutHeader]}>
                       {/* サークルアイコンと基本情報 */}
                       <View style={styles.circleHeaderContainer}>
                         {circle.imageUrl ? (
-                          <Image source={{ uri: circle.imageUrl }} style={styles.circleIcon} />
+                          <Image source={{ uri: circle.imageUrl }} style={styles.circleIcon} cachePolicy="memory-disk" />
                         ) : (
                           <View style={[styles.circleIcon, { backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center' }]}> 
                             <Ionicons name="people-outline" size={30} color="#aaa" />
@@ -462,7 +607,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 0,
     marginBottom: 10,
   },
   articleSectionTitle: {
@@ -793,6 +938,137 @@ const styles = StyleSheet.create({
   headerTitleImage: {
     height: 35,
     width: 125,
+  },
+  
+  
+  // 所属サークルセクション（MyPageScreenから移植）
+  joinedCirclesSection: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    marginBottom: 8,
+  },
+  circleCardContainer: {
+    marginBottom: 12,
+  },
+  circleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  circleImageContainer: {
+    position: 'relative',
+    marginRight: 16,
+  },
+  circleImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+  },
+  circleInfo: {
+    flex: 1,
+  },
+  circleCategoryContainer: {
+    marginBottom: 8,
+  },
+  categoryBadge: {
+    backgroundColor: '#dbeafe',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  circleCategory: {
+    fontSize: 11,
+    color: '#2563eb',
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  circleName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1f2937',
+    marginBottom: 6,
+    lineHeight: 22,
+  },
+  circleUniversityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  circleEvent: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginLeft: 6,
+  },
+  unreadBadge: {
+    backgroundColor: '#dc2626',
+    borderRadius: 12,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+    paddingHorizontal: 6,
+  },
+  unreadBadgeText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
+  
+  // クイックアクセスボタンセクション
+  quickAccessCard: {
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 0,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  quickAccessContainer: {
+    paddingRight: 0,
+  },
+  quickAccessButton: {
+    alignItems: 'center',
+    marginRight: 24,
+    width: 70,
+  },
+  quickAccessIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E0F2FE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  quickAccessText: {
+    fontSize: 11,
+    color: '#374151',
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: 14,
   },
 });
 

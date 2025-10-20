@@ -6,13 +6,13 @@ import {
   SafeAreaView, 
   TouchableOpacity, 
   ScrollView, 
-  Image, 
   Alert, 
   Modal,
   Animated,
   Dimensions,
   TextInput
 } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { db, auth } from '../firebaseConfig';

@@ -52,7 +52,7 @@ export default function CircleProfileScreen({ route, navigation }) {
   // タブ切り替え関数
   const handleTabChange = (tabName) => {
     setActiveTab(tabName);
-    const tabIndex = ['top', 'events', 'welcome'].indexOf(tabName);
+    const tabIndex = ['top', 'welcome'].indexOf(tabName);
     animateIndicator(tabIndex);
     setScrollProgress(tabIndex);
     if (horizontalScrollRef.current) {
@@ -68,7 +68,7 @@ export default function CircleProfileScreen({ route, navigation }) {
     const scrollX = event.nativeEvent.contentOffset.x;
     const screenWidth = Dimensions.get('window').width;
     const tabIndex = Math.round(scrollX / screenWidth);
-    const tabs = ['top', 'events', 'welcome'];
+    const tabs = ['top', 'welcome'];
     if (tabIndex >= 0 && tabIndex < tabs.length) {
       setActiveTab(tabs[tabIndex]);
       // スクロール完了時は即座に最終位置に設定
@@ -636,6 +636,14 @@ export default function CircleProfileScreen({ route, navigation }) {
           </View>
         </View>
         
+        {/* 活動場所 */}
+        {circleData.activityLocation && (
+          <View style={styles.activityLocationContainer}>
+            <Text style={styles.infoLabel}>活動場所</Text>
+            <Text style={styles.activityLocationText}>{circleData.activityLocation}</Text>
+          </View>
+        )}
+        
         {circleData.activityDays && circleData.activityDays.length > 0 && (
           <View style={styles.featuresContainer}>
             <Text style={styles.infoLabel}>活動曜日</Text>
@@ -671,50 +679,6 @@ export default function CircleProfileScreen({ route, navigation }) {
         )}
 
       </View>
-
-      {/* 活動場所 */}
-      {circleData.activityLocation && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>活動場所</Text>
-          <Text style={styles.activityLocationText}>{circleData.activityLocation}</Text>
-        </View>
-      )}
-
-      {/* こんな人におすすめ */}
-      {circleData.recommendations && circleData.recommendations.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>こんな人におすすめ</Text>
-          <View style={styles.recommendList}>
-            {circleData.recommendations.map((rec, idx) => (
-              <View key={idx} style={styles.recommendItem}>
-                <Text style={styles.recommendText}>{rec}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
-
-      {/* 代表者紹介 */}
-      {circleData.leaderMessage && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>代表者からのメッセージ</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginBottom: 12 }}>
-            {leaderProfileImage ? (
-              <Image source={{ uri: leaderProfileImage }} style={{width: 72, height: 72, borderRadius: 36, backgroundColor: '#eee'}} />
-            ) : (
-              <View style={{width: 72, height: 72, borderRadius: 36, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center'}}>
-                <Ionicons name="person-outline" size={36} color="#aaa" />
-              </View>
-            )}
-          </View>
-          <Text style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 60, fontSize: 16, marginBottom: 8, lineHeight: 24}}>
-            {circleData.leaderMessage}
-          </Text>
-        </View>
-      )}
-
-
-
 
       {/* 新歓スケジュール */}
       {circleData.welcome && circleData.welcome.schedule && (
@@ -788,11 +752,57 @@ export default function CircleProfileScreen({ route, navigation }) {
     return circleData.events.filter(event => !isEventExpired(event));
   };
 
-  const renderEventsTab = () => {
+  const renderWelcomeTab = () => {
     const activeEvents = getActiveEvents();
     
     return (
     <View style={styles.tabContent}>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>入会募集状況</Text>
+        {circleData.welcome?.isRecruiting ? (
+          <View style={styles.recruitingStatusContainer}>
+            <View style={[styles.recruitingIconContainer, { backgroundColor: '#d1fae5' }]}>
+              <Ionicons name="checkmark" size={24} color="#10b981" />
+            </View>
+            <Text style={styles.recruitingStatusText}>入会募集中</Text>
+          </View>
+        ) : (
+          <View style={styles.recruitingStatusContainer}>
+            <View style={[styles.recruitingIconContainer, { backgroundColor: '#fee2e2' }]}>
+              <Ionicons name="close" size={24} color="#ef4444" />
+            </View>
+            <Text style={styles.recruitingStatusText}>現在入会の募集はありません</Text>
+          </View>
+        )}
+      </View>
+      {circleData.welcome?.conditions && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>入会条件</Text>
+          <Text style={styles.description}>{circleData.welcome.conditions}</Text>
+        </View>
+      )}
+      {/* 新歓LINEグループ 追加 */}
+      {circleData.shinkanLineGroupLink && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>新歓LINEグループ</Text>
+          <TouchableOpacity style={styles.lineButton} onPress={() => Linking.openURL(circleData.shinkanLineGroupLink)}>
+            <Image 
+              source={require('../assets/SNS-icons/LINE_Brand_icon.png')} 
+              style={styles.snsLogoImage}
+              cachePolicy="memory-disk"
+            />
+            <Text style={styles.lineButtonText}>LINEグループを開く</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      {circleData.welcome?.schedule && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>新歓スケジュール</Text>
+          <Text style={styles.scheduleText}>{circleData.welcome.schedule}</Text>
+        </View>
+      )}
+      
+      {/* 新歓イベント */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>新歓イベント</Text>
         {activeEvents && activeEvents.length > 0 ? (
@@ -853,54 +863,6 @@ export default function CircleProfileScreen({ route, navigation }) {
   );
   };
 
-  const renderWelcomeTab = () => (
-    <View style={styles.tabContent}>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>入会募集状況</Text>
-        {circleData.welcome?.isRecruiting ? (
-          <View style={styles.recruitingStatusContainer}>
-            <View style={[styles.recruitingIconContainer, { backgroundColor: '#d1fae5' }]}>
-              <Ionicons name="checkmark" size={24} color="#10b981" />
-            </View>
-            <Text style={styles.recruitingStatusText}>入会募集中</Text>
-          </View>
-        ) : (
-          <View style={styles.recruitingStatusContainer}>
-            <View style={[styles.recruitingIconContainer, { backgroundColor: '#fee2e2' }]}>
-              <Ionicons name="close" size={24} color="#ef4444" />
-            </View>
-            <Text style={styles.recruitingStatusText}>現在入会の募集はありません</Text>
-          </View>
-        )}
-      </View>
-      {circleData.welcome?.conditions && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>入会条件</Text>
-          <Text style={styles.description}>{circleData.welcome.conditions}</Text>
-        </View>
-      )}
-      {/* 新歓LINEグループ 追加 */}
-      {circleData.shinkanLineGroupLink && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>新歓LINEグループ</Text>
-          <TouchableOpacity style={styles.lineButton} onPress={() => Linking.openURL(circleData.shinkanLineGroupLink)}>
-            <Image 
-              source={require('../assets/SNS-icons/LINE_Brand_icon.png')} 
-              style={styles.snsLogoImage}
-            />
-            <Text style={styles.lineButtonText}>LINEグループを開く</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-      {circleData.welcome?.schedule && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>新歓スケジュール</Text>
-          <Text style={styles.scheduleText}>{circleData.welcome.schedule}</Text>
-        </View>
-      )}
-    </View>
-  );
-
   // タブバー部分を元のactiveTab/setActiveTab方式に戻す
   const renderTabBar = () => (
     <View style={styles.tabBarContainer}>
@@ -914,18 +876,10 @@ export default function CircleProfileScreen({ route, navigation }) {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tabItem, activeTab === 'events' && styles.activeTabItem]}
-          onPress={() => handleTabChange('events')}
-        >
-          <Text style={[styles.tabLabel, getTabTextStyle(1)]}>
-            新歓イベント
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
           style={[styles.tabItem, activeTab === 'welcome' && styles.activeTabItem]}
           onPress={() => handleTabChange('welcome')}
         >
-          <Text style={[styles.tabLabel, getTabTextStyle(2)]}>
+          <Text style={[styles.tabLabel, getTabTextStyle(1)]}>
             新歓情報
           </Text>
         </TouchableOpacity>
@@ -937,8 +891,8 @@ export default function CircleProfileScreen({ route, navigation }) {
             {
               transform: [{
                 translateX: indicatorAnim.interpolate({
-                  inputRange: [0, 1, 2],
-                  outputRange: [0, Dimensions.get('window').width / 3, (Dimensions.get('window').width / 3) * 2],
+                  inputRange: [0, 1],
+                  outputRange: [0, Dimensions.get('window').width / 2],
                 })
               }]
             }
@@ -953,7 +907,6 @@ export default function CircleProfileScreen({ route, navigation }) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5' }}>
         <ActivityIndicator size="large" color="#007bff" />
-        <Text style={{ marginTop: 16, fontSize: 16, color: '#666' }}>読み込み中...</Text>
       </View>
     );
   }
@@ -1046,6 +999,7 @@ export default function CircleProfileScreen({ route, navigation }) {
                     <Image 
                       source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} 
                       style={styles.snsLogoImage}
+                      cachePolicy="memory-disk"
                     />
                   </TouchableOpacity>
                 )}
@@ -1054,6 +1008,7 @@ export default function CircleProfileScreen({ route, navigation }) {
                     <Image 
                       source={require('../assets/SNS-icons/X_logo-black.png')} 
                       style={styles.snsLogoImage}
+                      cachePolicy="memory-disk"
                     />
                   </TouchableOpacity>
                 )}
@@ -1078,9 +1033,6 @@ export default function CircleProfileScreen({ route, navigation }) {
         >
           <View style={styles.tabContentContainer}>
             {renderTopTab()}
-          </View>
-          <View style={styles.tabContentContainer}>
-            {renderEventsTab()}
           </View>
           <View style={styles.tabContentContainer}>
             {renderWelcomeTab()}
@@ -1147,8 +1099,7 @@ export default function CircleProfileScreen({ route, navigation }) {
           <View style={styles.confirmModal}>
             <Text style={styles.confirmModalTitle}>入会申請</Text>
             <Text style={styles.confirmModalText}>
-              {circleData?.name} に入会申請を{'\n'}
-              送信しますか？
+              {circleData?.name} に{'\n'}入会申請を送信しますか？
             </Text>
             <Text style={styles.confirmModalWarning}>
               申請後は取り消すことができません。
@@ -1377,7 +1328,7 @@ const styles = StyleSheet.create({
   animatedIndicator: {
     position: 'absolute',
     bottom: 0,
-    width: Dimensions.get('window').width / 3,
+    width: Dimensions.get('window').width / 2,
     height: 2,
     backgroundColor: '#2563eb',
   },
@@ -1393,27 +1344,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   tabContent: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
   },
   section: {
-    marginBottom: 25,
+    marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '500',
     color: '#1f2937',
-    marginBottom: 16,
+    marginBottom: 8,
+    backgroundColor: '#f3f4f6',
+    marginHorizontal: -20,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
   },
   description: {
     fontSize: 16,
     textAlign: 'left',
     lineHeight: 24,
     color: '#374151',
+    marginTop: 12,
   },
   infoGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 15,
+    marginTop: 12,
+    marginBottom: 0,
   },
   infoItem: {
     width: '30%',
@@ -1436,7 +1395,7 @@ const styles = StyleSheet.create({
     color: '#1f2937',
   },
   featuresContainer: {
-    marginTop: 10,
+    marginTop: 16,
   },
   featuresList: {
     flexDirection: 'row',
@@ -1476,7 +1435,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#e6ffe6',
     borderRadius: 10,
     padding: 10,
-    marginTop: 5,
+    marginTop: 12,
   },
   lineButtonText: {
     color: '#06C755',
@@ -1503,12 +1462,14 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     lineHeight: 24,
     color: '#666',
+    marginTop: 12,
   },
   placeholderText: {
     fontSize: 16,
     color: '#999',
     textAlign: 'center',
-    paddingVertical: 20,
+    marginTop: 12,
+    paddingVertical: 12,
   },
   actionBar: {
     backgroundColor: '#fff',
@@ -1587,7 +1548,7 @@ const styles = StyleSheet.create({
     aspectRatio: 16 / 9,
     borderRadius: 0,
     backgroundColor: '#eee',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   recommendList: {
     marginTop: 4,
@@ -1685,7 +1646,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   memberCompositionContainer: {
-    marginTop: 20,
+    marginTop: 16,
+  },
+  activityLocationContainer: {
+    marginTop: 16,
   },
 
 
@@ -1694,6 +1658,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e0e0e0',
+    marginTop: 12,
     marginBottom: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -1778,6 +1743,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#e9ecef',
+    marginTop: 12,
   },
   recruitingStatusText: {
     fontSize: 16,

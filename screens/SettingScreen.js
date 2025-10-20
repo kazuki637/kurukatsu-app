@@ -50,7 +50,7 @@ export default function SettingScreen({ navigation }) {
       {
         label: 'ブロックリスト',
         icon: 'lock-closed-outline',
-        onPress: () => navigation.navigate('共通', { screen: 'BlockManagement' })
+        onPress: () => navigation.navigate('BlockManagement')
       }
     ];
   };

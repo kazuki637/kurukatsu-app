@@ -7,12 +7,12 @@ import {
     SafeAreaView, 
     Alert, 
     Linking, 
-    Image, 
     Animated,
     ScrollView,
     Dimensions,
     Platform
 } from 'react-native';
+import { Image } from 'expo-image';
 import * as Notifications from 'expo-notifications';
 import * as Haptics from 'expo-haptics';
 import LottieView from 'lottie-react-native';
@@ -266,7 +266,8 @@ export default function OnboardingScreen({ navigation, onFinish }) {
                 <Image 
                   source={require('../assets/icon.png')}
                   style={styles.kurukatsuIcon}
-                  resizeMode="contain"
+                  contentFit="contain"
+                  cachePolicy="memory-disk"
                 />
               </View>
               

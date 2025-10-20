@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Linking, ActivityIndicator, Alert, SafeAreaView, StatusBar, Dimensions, TextInput, KeyboardAvoidingView, Platform, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, ActivityIndicator, SafeAreaView, StatusBar, Dimensions, TextInput, KeyboardAvoidingView, Platform, Animated, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Image as RNImage } from 'react-native';
+import { Image } from 'expo-image';
 import { db, auth } from '../firebaseConfig';
 import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, onSnapshot, increment, collection, addDoc, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -69,13 +69,11 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   const [isEditMode, setIsEditMode] = useState(false); // 編集モード判定
   const [editingEventIndex, setEditingEventIndex] = useState(null); // 編集中のイベントindex
   const eventModalizeRef = useRef(null); // Modalizeの参照
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false); // 削除確認モーダル
+  const [deletingEventIndex, setDeletingEventIndex] = useState(null); // 削除対象のイベントindex
   const [description, setDescription] = useState(''); // サークル紹介編集用
   const [descSaving, setDescSaving] = useState(false); // 保存中状態
-  const [recommendationsInput, setRecommendationsInput] = useState(''); // こんな人におすすめ編集用
-  const [recSaving, setRecSaving] = useState(false); // 保存中状態
   const [leaderProfileImage, setLeaderProfileImage] = useState(null); // 代表者のプロフィール画像
-  const [leaderMessage, setLeaderMessage] = useState(''); // 代表者メッセージ
-  const [leaderSaving, setLeaderSaving] = useState(false); // 保存中
   const [welcomeConditions, setWelcomeConditions] = useState(''); // 入会条件編集用
   const [welcomeSaving, setWelcomeSaving] = useState(false); // 保存中状態
   const [isRecruiting, setIsRecruiting] = useState(false); // 入会募集状態
@@ -105,7 +103,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   // タブ切り替え関数
   const handleTabChange = (tabName) => {
     setActiveTab(tabName);
-    const tabIndex = ['top', 'events', 'welcome'].indexOf(tabName);
+    const tabIndex = ['top', 'welcome'].indexOf(tabName);
     animateIndicator(tabIndex);
     setScrollProgress(tabIndex);
     if (horizontalScrollRef.current) {
@@ -121,7 +119,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     const scrollX = event.nativeEvent.contentOffset.x;
     const screenWidth = Dimensions.get('window').width;
     const tabIndex = Math.round(scrollX / screenWidth);
-    const tabs = ['top', 'events', 'welcome'];
+    const tabs = ['top', 'welcome'];
     if (tabIndex >= 0 && tabIndex < tabs.length) {
       setActiveTab(tabs[tabIndex]);
       // スクロール完了時は即座に最終位置に設定
@@ -168,36 +166,16 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     }
   }, [circleData]);
 
-  // 画面遷移時のアラート表示
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
-      if (!hasUnsavedChanges) {
-        return;
-      }
-
-      // デフォルトの遷移を防ぐ
-      e.preventDefault();
-
-      Alert.alert(
-        '未保存の変更があります',
-        '変更を保存せずに画面を離れますか？',
-        [
-          {
-            text: 'キャンセル',
-            style: 'cancel',
-            onPress: () => {},
-          },
-          {
-            text: '保存せずに離れる',
-            style: 'destructive',
-            onPress: () => navigation.dispatch(e.data.action),
-          },
-        ]
-      );
-    });
-
-    return unsubscribe;
-  }, [navigation, hasUnsavedChanges]);
+  // 画面遷移時のアラート表示（削除）
+  // useEffect(() => {
+  //   const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+  //     if (!hasUnsavedChanges) {
+  //       return;
+  //     }
+  //     e.preventDefault();
+  //   });
+  //   return unsubscribe;
+  // }, [navigation, hasUnsavedChanges]);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
@@ -360,7 +338,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
 
   const handleJoinRequest = async () => {
     if (!user) {
-      Alert.alert('ログインが必要です', '入会申請にはログインが必要です。');
       return;
     }
     try {
@@ -376,13 +353,12 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         requestedAt: new Date(),
       });
       setHasRequested(true);
-      Alert.alert('申請完了', '入会申請を送信しました。');
 
       // グローバル入会申請数を更新（+1）
       const currentCount = global.globalJoinRequestsCount?.[circleId] || 0;
       global.updateJoinRequestsCount(circleId, currentCount + 1);
     } catch (e) {
-      Alert.alert('エラー', '申請の送信に失敗しました');
+      console.error('申請の送信に失敗しました', e);
     }
   };
 
@@ -391,16 +367,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     // サークル紹介初期値セット
     if (circleData && typeof circleData.description === 'string') {
       setDescription(circleData.description);
-    }
-    // こんな人におすすめ初期値セット
-    if (circleData && Array.isArray(circleData.recommendations)) {
-      setRecommendationsInput(circleData.recommendations.join(', '));
-    }
-    if (circleData && typeof circleData.leaderMessage === 'string') {
-      setLeaderMessage(circleData.leaderMessage);
-    }
-    if (circleData && typeof circleData.leaderImageUrl === 'string') {
-      setLeaderImage({ uri: circleData.leaderImageUrl });
     }
     if (circleData && circleData.welcome && typeof circleData.welcome.conditions === 'string') {
       setWelcomeConditions(circleData.welcome.conditions);
@@ -434,7 +400,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
 
   const toggleFavorite = async () => {
     if (!user) {
-      Alert.alert("ログインが必要です", "お気に入り機能を利用するにはログインしてください。");
       return;
     }
 
@@ -448,20 +413,15 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         
         // グローバルお気に入り状態を更新
         global.updateFavoriteStatus(circleId, false);
-        
-        Alert.alert("お気に入り解除", "サークルをお気に入りから削除しました。");
       } else {
         await updateDoc(userDocRef, { favoriteCircleIds: arrayUnion(circleId) });
         await updateDoc(circleDocRef, { likes: increment(1) });
         
         // グローバルお気に入り状態を更新
         global.updateFavoriteStatus(circleId, true);
-        
-        Alert.alert("お気に入り登録", "サークルをお気に入りに追加しました！");
       }
     } catch (error) {
       console.error("Error toggling favorite: ", error);
-      Alert.alert("エラー", "お気に入り操作に失敗しました。");
     }
   };
 
@@ -497,7 +457,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             const response = await fetch(compressedUri);
             const blob = await response.blob();
             const storage = getStorage();
-            const fileName = `circle_images/${circleData.name}/headers/${circleId}_${Date.now()}`;
+            const fileName = `circle_images/${circleId}/headers/${Date.now()}`;
             const imgRef = storageRef(storage, fileName);
             await uploadBytes(imgRef, blob);
             const downloadUrl = await getDownloadURL(imgRef);
@@ -509,7 +469,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             console.log('ヘッダー画像アップロード完了');
           } catch (e) {
             console.error('ヘッダー画像アップロードエラー:', e);
-            Alert.alert('エラー', '画像のアップロードに失敗しました');
           } finally {
             setUploading(false);
           }
@@ -526,9 +485,8 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         await deleteImageFromStorage(circleData.headerImageUrl);
       }
       await updateDoc(doc(db, 'circles', circleId), { headerImageUrl: '' });
-      Alert.alert('削除完了', 'ヘッダー画像を削除しました');
     } catch (e) {
-      Alert.alert('エラー', 'ヘッダー画像の削除に失敗しました');
+      console.error('ヘッダー画像の削除に失敗しました', e);
     }
   };
 
@@ -609,31 +567,24 @@ export default function CircleProfileEditScreen({ route, navigation }) {
   const handleSaveEvent = async () => {
     // バリデーション
     if (!eventTitle.trim()) {
-      Alert.alert('入力エラー', 'タイトルを入力してください');
       return;
     }
     if (!eventImage) {
-      Alert.alert('入力エラー', '写真を選択してください');
       return;
     }
     if (!eventLocation.trim()) {
-      Alert.alert('入力エラー', '開催場所を入力してください');
       return;
     }
     if (!eventFee.trim()) {
-      Alert.alert('入力エラー', '参加費を入力してください');
       return;
     }
     if (!eventDetail.trim()) {
-      Alert.alert('入力エラー', '詳細を入力してください');
       return;
     }
     if (!eventSnsLink.trim()) {
-      Alert.alert('入力エラー', 'SNSリンクを入力してください');
       return;
     }
     if (!isValidUrl(eventSnsLink)) {
-      Alert.alert('入力エラー', 'SNSリンクは有効なURLを入力してください\n(http:// または https:// で始まる必要があります)');
       return;
     }
 
@@ -657,7 +608,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           const response = await fetch(compressedUri);
           const blob = await response.blob();
           const storage = getStorage();
-          const fileName = `circle_images/${circleData.name}/events/${circleId}_${Date.now()}`;
+          const fileName = `circle_images/${circleId}/events/${Date.now()}`;
           const imgRef = storageRef(storage, fileName);
           await uploadBytes(imgRef, blob);
           imageUrl = await getDownloadURL(imgRef);
@@ -665,7 +616,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           console.log('イベント画像アップロード完了');
         } catch (error) {
           console.error('イベント画像アップロードエラー:', error);
-          Alert.alert('エラー', 'イベント画像のアップロードに失敗しました');
           setEventUploading(false);
           return;
         }
@@ -691,40 +641,40 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         const newEvents = [...circleData.events];
         newEvents[editingEventIndex] = eventObj;
         await updateDoc(doc(db, 'circles', circleId), { events: newEvents });
-        Alert.alert('成功', 'イベントを更新しました');
       } else {
         // 新規追加モード
         await updateDoc(doc(db, 'circles', circleId), {
           events: arrayUnion(eventObj)
         });
-        Alert.alert('成功', 'イベントを追加しました');
       }
 
       eventModalizeRef.current?.close();
     } catch (e) {
       console.error('イベント保存エラー:', e);
-      Alert.alert('エラー', 'イベントの保存に失敗しました');
     } finally {
       setEventUploading(false);
     }
   };
-  // イベント削除
-  const handleDeleteEvent = async (idx) => {
+  // イベント削除確認
+  const handleConfirmDelete = async () => {
+    if (deletingEventIndex === null) return;
+    
+    setDeleteConfirmVisible(false);
+    
     try {
-      const eventObj = circleData.events[idx];
+      const eventObj = circleData.events[deletingEventIndex];
       // 既存画像があればStorageから削除
       if (eventObj && eventObj.image) {
         await deleteImageFromStorage(eventObj.image);
       }
       // events配列から該当イベントのみ除外
-      const newEvents = circleData.events.filter((_, i) => i !== idx);
+      const newEvents = circleData.events.filter((_, i) => i !== deletingEventIndex);
       await updateDoc(doc(db, 'circles', circleId), {
         events: newEvents
       });
-      setEditingEventIndex(null);
-      Alert.alert('削除完了', 'イベントを削除しました');
+      setDeletingEventIndex(null);
     } catch (e) {
-      Alert.alert('エラー', 'イベントの削除に失敗しました');
+      console.error('イベントの削除に失敗しました', e);
     }
   };
 
@@ -734,42 +684,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     try {
       await updateDoc(doc(db, 'circles', circleId), { description });
       // setCircleData(prev => ({ ...prev, description })); // useFirestoreDocは自動で更新
-      Alert.alert('保存完了', 'サークル紹介を更新しました');
     } catch (e) {
-      Alert.alert('エラー', 'サークル紹介の保存に失敗しました');
+      console.error('サークル紹介の保存に失敗しました', e);
     } finally {
       setDescSaving(false);
-    }
-  };
-
-  // こんな人におすすめ保存処理
-  const handleSaveRecommendations = async () => {
-    setRecSaving(true);
-    try {
-      const recArr = recommendationsInput.split(',').map(s => s.trim()).filter(Boolean);
-      await updateDoc(doc(db, 'circles', circleId), { recommendations: recArr });
-      // setCircleData(prev => ({ ...prev, recommendations: recArr })); // useFirestoreDocは自動で更新
-      Alert.alert('保存完了', 'おすすめ項目を更新しました');
-    } catch (e) {
-      Alert.alert('エラー', 'おすすめ項目の保存に失敗しました');
-    } finally {
-      setRecSaving(false);
-    }
-  };
-
-
-  // 代表者情報保存
-  const handleSaveLeader = async () => {
-    setLeaderSaving(true);
-    try {
-      await updateDoc(doc(db, 'circles', circleId), {
-        leaderMessage: leaderMessage,
-      });
-      Alert.alert('保存完了', '代表者メッセージを更新しました');
-    } catch (e) {
-      Alert.alert('エラー', '代表者情報の保存に失敗しました');
-    } finally {
-      setLeaderSaving(false);
     }
   };
 
@@ -780,9 +698,8 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       const newWelcome = { ...(circleData.welcome || {}), conditions: welcomeConditions };
       await updateDoc(doc(db, 'circles', circleId), { welcome: newWelcome });
       // setCircleData(prev => ({ ...prev, welcome: newWelcome })); // useFirestoreDocは自動で更新
-      Alert.alert('保存完了', '入会条件を更新しました');
     } catch (e) {
-      Alert.alert('エラー', '入会条件の保存に失敗しました');
+      console.error('入会条件の保存に失敗しました', e);
     } finally {
       setWelcomeSaving(false);
     }
@@ -817,7 +734,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             const response = await fetch(compressedUri);
             const blob = await response.blob();
             const storage = getStorage();
-            const fileName = `circle_images/${circleData.name}/activities/${circleId}_${Date.now()}`;
+            const fileName = `circle_images/${circleId}/activities/${Date.now()}`;
             const imgRef = storageRef(storage, fileName);
             await uploadBytes(imgRef, blob);
             const downloadUrl = await getDownloadURL(imgRef);
@@ -828,7 +745,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             console.log('活動写真アップロード完了');
           } catch (e) {
             console.error('活動写真アップロードエラー:', e);
-            Alert.alert('エラー', '活動写真の追加に失敗しました');
           } finally {
             setActivityUploading(false);
           }
@@ -846,9 +762,8 @@ export default function CircleProfileEditScreen({ route, navigation }) {
       const newImages = activityImages.filter((_, i) => i !== idx);
       await updateDoc(doc(db, 'circles', circleId), { activityImages: newImages });
       setActivityImages(newImages);
-      Alert.alert('削除完了', '活動写真を削除しました');
     } catch (e) {
-      Alert.alert('エラー', '活動写真の削除に失敗しました');
+      console.error('活動写真の削除に失敗しました', e);
     }
   };
 
@@ -882,7 +797,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             const response = await fetch(compressedUri);
             const blob = await response.blob();
             const storage = getStorage();
-            const fileName = `circle_images/${circleData.name}/activities/${circleId}_${Date.now()}`;
+            const fileName = `circle_images/${circleId}/activities/${Date.now()}`;
             const imgRef = storageRef(storage, fileName);
             await uploadBytes(imgRef, blob);
             const downloadUrl = await getDownloadURL(imgRef);
@@ -894,7 +809,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             console.log('活動写真差し替えアップロード完了');
           } catch (e) {
             console.error('活動写真差し替えアップロードエラー:', e);
-            Alert.alert('エラー', '活動写真の変更に失敗しました');
           } finally {
             setActivityUploading(false);
           }
@@ -909,8 +823,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     
     const hasChanges = 
       description !== (circleData.description || '') ||
-      recommendationsInput !== (circleData.recommendations?.join(', ') || '') ||
-      leaderMessage !== (circleData.leaderMessage || '') ||
       welcomeConditions !== (circleData.welcome?.conditions || '') ||
       snsLink !== (circleData.snsLink || '') ||
       xLink !== (circleData.xLink || '') ||
@@ -924,13 +836,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
 
   // 画面上部のCommonHeaderに保存ボタンを追加
   const handleHeaderSave = async () => {
-    // 必要な保存処理をここにまとめて実装（例：サークル紹介、こんな人におすすめ、代表者情報、SNSリンク、入会条件など）
-    // 例としてサークル紹介のみ保存
+    // 必要な保存処理をここにまとめて実装（サークル紹介、SNSリンク、入会条件など）
     try {
       await updateDoc(doc(db, 'circles', circleId), {
         description,
-        recommendations: recommendationsInput.split(',').map(s => s.trim()).filter(Boolean),
-        leaderMessage,
         welcome: { ...(circleData.welcome || {}), conditions: welcomeConditions, isRecruiting },
         snsLink,
         xLink,
@@ -938,28 +847,18 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         activityLocation,
       });
       setHasUnsavedChanges(false);
-      Alert.alert(
-        '保存完了', 
-        'プロフィール情報を保存しました',
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.goBack(),
-          },
-        ],
-        { cancelable: false }
-      );
+      navigation.goBack();
     } catch (e) {
-      Alert.alert('エラー', '保存に失敗しました');
+      console.error('保存に失敗しました', e);
     }
   };
 
   const renderTopTab = () => (
     <View style={styles.tabContent}>
       {/* 活動写真アップロード・表示 */}
-      <View style={{marginBottom: 20, width: '100%'}}>
+      <View style={{marginBottom: 24, width: '100%'}}>
         {activityImages && activityImages.length > 0 ? (
-          <View style={{position: 'relative', width: '100%', aspectRatio: 16/9, alignSelf: 'center', marginBottom: 20}}>
+          <View style={{position: 'relative', width: '100%', aspectRatio: 16/9, alignSelf: 'center'}}>
             <TouchableOpacity onPress={() => handleReplaceActivityImage(0)} activeOpacity={0.7} style={{width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center'}}>
                 <Image 
                   source={{ 
@@ -980,7 +879,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           </View>
         ) : (
           // 画像がない場合は追加ボタンのみ
-          <TouchableOpacity onPress={handleAddActivityImage} disabled={activityUploading} style={{width: '100%', aspectRatio: 16/9, borderRadius: 0, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center', marginBottom: 20, alignSelf: 'center'}}>
+          <TouchableOpacity onPress={handleAddActivityImage} disabled={activityUploading} style={{width: '100%', aspectRatio: 16/9, borderRadius: 0, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center', alignSelf: 'center'}}>
             {activityUploading ? (
               <ActivityIndicator size="small" color="#999" />
             ) : (
@@ -1000,7 +899,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             checkForChanges();
           }}
           multiline
-          style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 80, fontSize: 16, marginBottom: 8}}
+          style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 80, fontSize: 16, marginTop: 12, marginBottom: 8}}
         />
       </View>
 
@@ -1020,6 +919,20 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             <Text style={styles.infoLabel}>男女比</Text>
             <Text style={styles.infoValue}>{circleData.genderratio}</Text>
           </View>
+        </View>
+        
+        {/* 活動場所 */}
+        <View style={styles.activityLocationContainer}>
+          <Text style={styles.infoLabel}>活動場所</Text>
+          <TextInput
+            value={activityLocation}
+            onChangeText={(text) => {
+              setActivityLocation(text);
+              checkForChanges();
+            }}
+            placeholder="例：大学構内、○○教室、○○会館など"
+            style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', fontSize: 16, marginTop: 8}}
+          />
         </View>
         
         {circleData.activityDays && circleData.activityDays.length > 0 && (
@@ -1057,66 +970,14 @@ export default function CircleProfileEditScreen({ route, navigation }) {
         )}
       </View>
 
-      {/* 活動場所 */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>活動場所</Text>
-        <TextInput
-          value={activityLocation}
-          onChangeText={(text) => {
-            setActivityLocation(text);
-            checkForChanges();
-          }}
-          placeholder="例：大学構内、○○教室、○○会館など"
-          style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', fontSize: 16, marginBottom: 8}}
-        />
-      </View>
-
-      {/* こんな人におすすめ */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>こんな人におすすめ</Text>
-        <TextInput
-          value={recommendationsInput}
-          onChangeText={(text) => {
-            setRecommendationsInput(text);
-            checkForChanges();
-          }}
-          multiline
-          placeholder={"・新しい友達を作りたい人\n・○○が好きな人\n・○○が得意な人"}
-          style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 60, fontSize: 16, marginBottom: 8}}
-        />
-      </View>
-
-      {/* 代表者からのメッセージ */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>代表者からのメッセージ</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginBottom: 12 }}>
-          {leaderProfileImage ? (
-            <Image source={{ uri: leaderProfileImage }} style={{width: 72, height: 72, borderRadius: 36, backgroundColor: '#eee'}} />
-          ) : (
-            <View style={{width: 72, height: 72, borderRadius: 36, backgroundColor: '#eee', justifyContent: 'center', alignItems: 'center'}}>
-              <Ionicons name="person-outline" size={36} color="#aaa" />
-            </View>
-          )}
-        </View>
-        <TextInput
-          value={leaderMessage}
-          onChangeText={(text) => {
-            setLeaderMessage(text);
-            checkForChanges();
-          }}
-          multiline
-          placeholder="代表者からのメッセージを入力"
-          style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 60, fontSize: 16, marginBottom: 8}}
-        />
-      </View>
-
       {/* SNS */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>SNS</Text>
-        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: 8}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 12, marginBottom: 8}}>
           <Image 
             source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} 
             style={styles.snsLargeLogo}
+            cachePolicy="memory-disk"
           />
           <TextInput
             value={snsLink}
@@ -1134,6 +995,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           <Image 
             source={require('../assets/SNS-icons/X_logo-black.png')} 
             style={styles.snsLargeLogo}
+            cachePolicy="memory-disk"
           />
           <TextInput
             value={xLink}
@@ -1207,69 +1069,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
     }
   }, [circleData?.events?.length]);
 
-  const renderEventsTab = () => (
-    <View style={styles.tabContent}>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>新歓イベント</Text>
-        {/* イベント追加ボタン */}
-        <View style={styles.eventAddButtonContainer}>
-          <KurukatsuButton
-            title="新歓イベント追加"
-            onPress={navigateToAddEvent}
-            size="medium"
-            variant="primary"
-            hapticFeedback={true}
-            style={styles.eventAddButton}
-          />
-        </View>
-        
-        {/* イベントリスト（有効なイベントのみ表示） */}
-        {circleData.events && circleData.events.length > 0 && (
-          circleData.events.filter(event => !isEventExpired(event)).map((event, idx) => (
-            <View key={idx} style={styles.eventCard}>
-              {/* イベント画像 */}
-              {event.image && (
-                <Image source={{ uri: event.image }} style={styles.eventImage} resizeMode="cover" />
-              )}
-              
-              {/* イベント情報 */}
-              <View style={styles.eventCardContent}>
-                <Text style={styles.eventTitle}>{event.title}</Text>
-                
-                {/* 編集・削除ボタン */}
-                <View style={styles.eventActionsRow}>
-                  <TouchableOpacity
-                    style={styles.eventEditButton}
-                    onPress={() => navigateToEditEvent(idx)}
-                  >
-                    <Ionicons name="create-outline" size={20} color="#007bff" />
-                    <Text style={styles.eventEditButtonText}>編集</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.eventDeleteButton}
-                    onPress={() => {
-                      Alert.alert(
-                        '確認',
-                        'このイベントを削除しますか？',
-                        [
-                          { text: 'キャンセル', style: 'cancel' },
-                          { text: '削除', style: 'destructive', onPress: () => handleDeleteEvent(idx) }
-                        ]
-                      );
-                    }}
-                  >
-                    <Ionicons name="trash-outline" size={20} color="#dc3545" />
-                    <Text style={styles.eventDeleteButtonText}>削除</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          ))
-        )}
-      </View>
-    </View>
-  );
-
   const renderWelcomeTab = () => (
     <View style={styles.tabContent}>
       <View style={styles.section}>
@@ -1300,16 +1099,17 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           }}
           multiline
           placeholder={"・○○経験者\n・○○大学に在籍中の方\n・大学１年生"}
-          style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 60, fontSize: 16, marginBottom: 8}}
+          style={{borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', minHeight: 60, fontSize: 16, marginTop: 12, marginBottom: 8}}
         />
       </View>
       {/* 新歓LINEグループ 追加 */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>新歓LINEグループ</Text>
-        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', marginTop: 12}}>
           <Image 
             source={require('../assets/SNS-icons/LINE_Brand_icon.png')} 
             style={styles.snsLargeLogo}
+            cachePolicy="memory-disk"
           />
           <TextInput
             value={shinkanLineGroupLink}
@@ -1321,6 +1121,74 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             style={{flex: 1, marginLeft: 8, borderWidth: 1, borderColor: '#ccc', borderRadius: 8, padding: 8, backgroundColor: '#fff', fontSize: 16}}
             autoCapitalize="none"
             autoCorrect={false}
+          />
+        </View>
+      </View>
+      
+      {/* 新歓イベント */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>新歓イベント</Text>
+        
+        {/* イベントリスト（有効なイベントのみ表示） */}
+        {circleData.events && circleData.events.length > 0 && (
+          circleData.events.filter(event => !isEventExpired(event)).map((event, idx) => (
+            <View key={idx} style={styles.eventCard}>
+              {/* イベント画像 */}
+              {event.image && (
+                <Image source={{ uri: event.image }} style={styles.eventImage} resizeMode="cover" />
+              )}
+              
+              {/* イベント情報 */}
+              <View style={styles.eventCardContent}>
+                <Text style={styles.eventTitle}>{event.title}</Text>
+                
+                {/* 編集・削除ボタン */}
+                <View style={styles.eventActionsRow}>
+                  <KurukatsuButton
+                    title=""
+                    onPress={() => navigateToEditEvent(idx)}
+                    size="small"
+                    variant="secondary"
+                    hapticFeedback={true}
+                    style={styles.eventEditButtonKurukatsu}
+                  >
+                    <View style={styles.eventActionButtonContent}>
+                      <Ionicons name="create-outline" size={18} color="#007bff" />
+                      <Text style={styles.eventEditButtonText}>編集</Text>
+                    </View>
+                  </KurukatsuButton>
+                  <KurukatsuButton
+                    title=""
+                    onPress={() => {
+                      setDeletingEventIndex(idx);
+                      setDeleteConfirmVisible(true);
+                    }}
+                    size="small"
+                    variant="secondary"
+                    hapticFeedback={true}
+                    style={styles.eventDeleteButtonKurukatsu}
+                    buttonStyle={styles.eventDeleteButtonMain}
+                  >
+                    <View style={styles.eventActionButtonContent}>
+                      <Ionicons name="trash-outline" size={18} color="#dc3545" />
+                      <Text style={styles.eventDeleteButtonText}>削除</Text>
+                    </View>
+                  </KurukatsuButton>
+                </View>
+              </View>
+            </View>
+          ))
+        )}
+        
+        {/* イベント追加ボタン */}
+        <View style={styles.eventAddButtonContainer}>
+          <KurukatsuButton
+            title="新歓イベント追加"
+            onPress={navigateToAddEvent}
+            size="medium"
+            variant="primary"
+            hapticFeedback={true}
+            style={styles.eventAddButton}
           />
         </View>
       </View>
@@ -1340,18 +1208,10 @@ export default function CircleProfileEditScreen({ route, navigation }) {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tabItem, activeTab === 'events' && styles.activeTabItem]}
-          onPress={() => handleTabChange('events')}
-        >
-          <Text style={[styles.tabLabel, getTabTextStyle(1)]}>
-            新歓イベント
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
           style={[styles.tabItem, activeTab === 'welcome' && styles.activeTabItem]}
           onPress={() => handleTabChange('welcome')}
         >
-          <Text style={[styles.tabLabel, getTabTextStyle(2)]}>
+          <Text style={[styles.tabLabel, getTabTextStyle(1)]}>
             新歓情報
           </Text>
         </TouchableOpacity>
@@ -1363,8 +1223,8 @@ export default function CircleProfileEditScreen({ route, navigation }) {
             {
               transform: [{
                 translateX: indicatorAnim.interpolate({
-                  inputRange: [0, 1, 2],
-                  outputRange: [0, Dimensions.get('window').width / 3, (Dimensions.get('window').width / 3) * 2],
+                  inputRange: [0, 1],
+                  outputRange: [0, Dimensions.get('window').width / 2],
                 })
               }]
             }
@@ -1484,6 +1344,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
                     <Image 
                       source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} 
                       style={styles.snsLogoImage}
+                      cachePolicy="memory-disk"
                     />
                   </TouchableOpacity>
                 )}
@@ -1492,6 +1353,7 @@ export default function CircleProfileEditScreen({ route, navigation }) {
                     <Image 
                       source={require('../assets/SNS-icons/X_logo-black.png')} 
                       style={styles.snsLogoImage}
+                      cachePolicy="memory-disk"
                     />
                   </TouchableOpacity>
                 )}
@@ -1518,9 +1380,6 @@ export default function CircleProfileEditScreen({ route, navigation }) {
               {renderTopTab()}
             </View>
             <View style={styles.tabContentContainer}>
-              {renderEventsTab()}
-            </View>
-            <View style={styles.tabContentContainer}>
               {renderWelcomeTab()}
             </View>
           </ScrollView>
@@ -1528,6 +1387,49 @@ export default function CircleProfileEditScreen({ route, navigation }) {
 
         {/* アクションボタン完全削除済み */}
       </View>
+
+      {/* イベント削除確認モーダル */}
+      <Modal
+        visible={deleteConfirmVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setDeleteConfirmVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.deleteConfirmModal}>
+            <Ionicons name="alert-circle-outline" size={56} color="#dc3545" style={{ marginBottom: 16 }} />
+            <Text style={styles.deleteConfirmTitle}>イベントを削除</Text>
+            <Text style={styles.deleteConfirmText}>
+              このイベントを削除しますか？
+            </Text>
+            <Text style={styles.deleteConfirmWarning}>
+              削除したイベントは復元できません。
+            </Text>
+            <View style={styles.deleteConfirmButtons}>
+              <KurukatsuButton
+                title="キャンセル"
+                onPress={() => {
+                  setDeleteConfirmVisible(false);
+                  setDeletingEventIndex(null);
+                }}
+                size="medium"
+                variant="secondary"
+                hapticFeedback={true}
+                style={styles.deleteConfirmButtonCancel}
+              />
+              <KurukatsuButton
+                title="削除する"
+                onPress={handleConfirmDelete}
+                size="medium"
+                variant="primary"
+                hapticFeedback={true}
+                style={styles.deleteConfirmButtonDelete}
+                buttonStyle={styles.deleteConfirmButtonDeleteMain}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* イベント追加/編集ボトムシート */}
       <Modalize
@@ -1832,7 +1734,7 @@ const styles = StyleSheet.create({
   animatedIndicator: {
     position: 'absolute',
     bottom: 0,
-    width: Dimensions.get('window').width / 3,
+    width: Dimensions.get('window').width / 2,
     height: 2,
     backgroundColor: '#2563eb',
   },
@@ -1848,27 +1750,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   tabContent: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 20,
   },
   section: {
-    marginBottom: 25,
+    marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '500',
     color: '#1f2937',
-    marginBottom: 16,
+    marginBottom: 8,
+    backgroundColor: '#f3f4f6',
+    marginHorizontal: -20,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
   },
   description: {
     fontSize: 16,
     textAlign: 'left',
     lineHeight: 24,
     color: '#374151',
+    marginTop: 12,
   },
   infoGrid: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 15,
+    marginTop: 12,
+    marginBottom: 0,
   },
   infoItem: {
     width: '30%',
@@ -1891,7 +1801,7 @@ const styles = StyleSheet.create({
     color: '#1f2937',
   },
   featuresContainer: {
-    marginTop: 10,
+    marginTop: 16,
   },
   featuresList: {
     flexDirection: 'row',
@@ -1980,12 +1890,14 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     lineHeight: 24,
     color: '#666',
+    marginTop: 12,
   },
   placeholderText: {
     fontSize: 16,
     color: '#999',
     textAlign: 'center',
-    paddingVertical: 20,
+    marginTop: 12,
+    paddingVertical: 12,
   },
   actionBar: {
     backgroundColor: '#fff',
@@ -2114,7 +2026,7 @@ const styles = StyleSheet.create({
     aspectRatio: 16 / 9,
     borderRadius: 0,
     backgroundColor: '#eee',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   recommendList: {
     marginTop: 4,
@@ -2205,13 +2117,17 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   memberCompositionContainer: {
-    marginTop: 20,
+    marginTop: 16,
+  },
+  activityLocationContainer: {
+    marginTop: 16,
   },
   eventCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
     borderWidth: 1,
     borderColor: '#e0e0e0',
+    marginTop: 12,
     marginBottom: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -2239,28 +2155,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  eventEditButton: {
+  eventEditButtonKurukatsu: {
+    flex: 1,
+    minWidth: 0,
+  },
+  eventDeleteButtonKurukatsu: {
+    flex: 1,
+    minWidth: 0,
+  },
+  eventDeleteButtonMain: {
+    borderColor: '#ffcdd2',
+  },
+  eventActionButtonContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e3f2fd',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    justifyContent: 'center',
     gap: 6,
   },
   eventEditButtonText: {
     fontSize: 14,
     color: '#007bff',
     fontWeight: '600',
-  },
-  eventDeleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffebee',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    gap: 6,
   },
   eventDeleteButtonText: {
     fontSize: 14,
@@ -2273,6 +2188,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   eventAddButtonContainer: {
+    marginTop: 12,
     marginBottom: 20,
     alignItems: 'center',
   },
@@ -2319,21 +2235,24 @@ const styles = StyleSheet.create({
   },
   eventModalForm: {
     flex: 1,
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
   },
   eventModalFormContent: {
+    paddingTop: 20,
     paddingBottom: 20,
   },
   eventModalFormRow: {
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    marginBottom: 24,
   },
   eventModalFormLabel: {
     fontSize: 16,
-    color: '#333',
+    color: '#1f2937',
     fontWeight: '500',
-    marginBottom: 12,
+    marginBottom: 8,
+    backgroundColor: '#f3f4f6',
+    marginHorizontal: -20,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
   },
   eventModalFormInput: {
     fontSize: 16,
@@ -2343,6 +2262,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     backgroundColor: '#fff',
+    marginTop: 12,
   },
   eventImagePickerButton: {
     width: '100%',
@@ -2350,6 +2270,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: '#f0f0f0',
+    marginTop: 12,
   },
   eventImagePreview: {
     width: '100%',
@@ -2376,6 +2297,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     backgroundColor: '#fff',
+    marginTop: 12,
   },
   eventDateText: {
     fontSize: 16,
@@ -2441,6 +2363,7 @@ const styles = StyleSheet.create({
     borderColor: '#e9ecef',
     flex: 1,
     marginRight: 16,
+    marginTop: 12,
   },
   recruitingStatusText: {
     fontSize: 16,
@@ -2479,5 +2402,56 @@ const styles = StyleSheet.create({
   },
   toggleCircleActive: {
     transform: [{ translateX: 20 }],
+  },
+  // イベント削除確認モーダル用スタイル
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteConfirmModal: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 320,
+    alignItems: 'center',
+  },
+  deleteConfirmTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  deleteConfirmText: {
+    fontSize: 16,
+    color: '#111827',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  deleteConfirmWarning: {
+    fontSize: 14,
+    color: '#dc2626',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  deleteConfirmButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    gap: 12,
+  },
+  deleteConfirmButtonCancel: {
+    flex: 1,
+    minWidth: 120,
+  },
+  deleteConfirmButtonDelete: {
+    flex: 1,
+    minWidth: 120,
+  },
+  deleteConfirmButtonDeleteMain: {
+    backgroundColor: '#dc3545',
   },
 });

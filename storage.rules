@@ -22,7 +22,29 @@ service firebase.storage {
       allow read, write: if true; // 誰でも記事内画像を読み書きできる
     }
     
-    // サークル関連画像
+    // サークル関連画像（ID構造 - 新アプリ用）
+    match /circle_images/{circleId}/icons/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
+    match /circle_images/{circleId}/headers/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
+    match /circle_images/{circleId}/events/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
+    match /circle_images/{circleId}/activities/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+    
+    // サークル関連画像（サークル名構造 - 旧アプリ互換用）
+    // 新しいアプリがリリースされ、ユーザーが更新したら削除可能
     match /circle_images/{circleName}/icons/{fileName} {
       allow read: if request.auth != null;
       allow write: if request.auth != null;

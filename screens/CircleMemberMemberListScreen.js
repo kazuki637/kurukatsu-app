@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, FlatList, ActivityIndicator, TextInput, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, FlatList, ActivityIndicator, TextInput, Modal, Alert } from 'react-native';
+import { Image } from 'expo-image';
 import { CommonActions } from '@react-navigation/native';
 import CommonHeader from '../components/CommonHeader';
 import { db } from '../firebaseConfig';
@@ -181,7 +182,7 @@ export default function CircleMemberMemberListScreen({ route, navigation }) {
                   },
                   { name: 'サークル運営' }
                 ],
-                index: 2, // マイページタブをアクティブに
+                index: 0, // ホームタブをアクティブに
               },
             },
           ],
@@ -234,7 +235,11 @@ export default function CircleMemberMemberListScreen({ route, navigation }) {
                 const isMember = item.role === 'member';
                 
                  return (
-                   <View style={styles.memberItem}>
+                   <TouchableOpacity 
+                     style={styles.memberItem}
+                     onPress={() => navigation.navigate('共通', { screen: 'Profile', params: { userId: item.id } })}
+                     activeOpacity={0.7}
+                   >
                      {hasImage ? (
                        <Image
                          source={{ uri: item.profileImageUrl }}
@@ -265,7 +270,7 @@ export default function CircleMemberMemberListScreen({ route, navigation }) {
                          {getRoleDisplayName(item.role)}
                        </Text>
                      </View>
-                   </View>
+                   </TouchableOpacity>
                  );
               }}
               ListEmptyComponent={<Text style={styles.emptyText}>メンバーがいません</Text>}

@@ -1,4 +1,5 @@
-import { Image } from 'react-native';
+import { Image } from 'expo-image';
+import { Asset } from 'expo-asset';
 import { auth, db } from '../firebaseConfig';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 
@@ -85,8 +86,10 @@ class ImagePreloader {
       try {
         if (typeof asset === 'number') {
           // require()で読み込まれた画像のURIを取得してプリロード
-          const uri = Image.resolveAssetSource(asset).uri;
-          await Image.prefetch(uri);
+          const assetModule = Asset.fromModule(asset);
+          await assetModule.downloadAsync();
+          const uri = assetModule.localUri || assetModule.uri;
+          await Image.prefetch(uri, { cachePolicy: 'memory-disk' });
           this.preloadedImages.add(uri);
           this.preloadedImages.add(asset); // require番号も記録
           preloadedCount++;
@@ -132,7 +135,7 @@ class ImagePreloader {
         const userData = userDoc.data();
         if (userData.profileImageUrl && userData.profileImageUrl.trim() !== '') {
           console.log('👤 ユーザープロフィール画像プリロード開始');
-          await Image.prefetch(userData.profileImageUrl);
+          await Image.prefetch(userData.profileImageUrl, { cachePolicy: 'memory-disk' });
           this.preloadedImages.add(userData.profileImageUrl);
           console.log('✅ ユーザープロフィール画像プリロード完了');
         }
@@ -165,7 +168,7 @@ class ImagePreloader {
         const circleData = circleDoc.data();
         if (circleData.imageUrl && circleData.imageUrl.trim() !== '') {
           try {
-            await Image.prefetch(circleData.imageUrl);
+            await Image.prefetch(circleData.imageUrl, { cachePolicy: 'memory-disk' });
             this.preloadedImages.add(circleData.imageUrl);
             return circleData.name;
           } catch (error) {
@@ -197,7 +200,7 @@ class ImagePreloader {
     }
 
     try {
-      await Image.prefetch(imageUrl);
+      await Image.prefetch(imageUrl, { cachePolicy: 'memory-disk' });
       this.preloadedImages.add(imageUrl);
       return true;
     } catch (error) {

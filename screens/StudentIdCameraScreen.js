@@ -73,6 +73,7 @@ export default function StudentIdCameraScreen({ navigation, route }) {
               source={require('../assets/StudentIdGuide.png')} 
               style={styles.guideImage}
               contentFit="contain"
+              cachePolicy="memory-disk"
             />
           </View>
           

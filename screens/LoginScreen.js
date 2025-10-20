@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Image, TouchableWithoutFeedback, Keyboard, ScrollView, Linking } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, TouchableWithoutFeedback, Keyboard, ScrollView, Linking } from 'react-native';
+import { Image } from 'expo-image';
 import { auth } from '../firebaseConfig';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import KurukatsuButton from '../components/KurukatsuButton';
@@ -79,6 +80,7 @@ const LoginScreen = ({ navigation }) => {
           <Image 
             source={require('../assets/icon.png')} 
             style={styles.appIcon}
+            cachePolicy="memory-disk"
           />
         </View>
         

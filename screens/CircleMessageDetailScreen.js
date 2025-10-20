@@ -748,15 +748,17 @@ export default function CircleMessageDetailScreen({ route, navigation }) {
         </View>
         
         {/* 削除ボタン */}
-        <KurukatsuButton
-          title="削除する"
-          onPress={handleDeleteMessage}
-          variant="primary"
-          size="medium"
-          backgroundColor="#DC2626"
-          disabled={isDeleting}
-          style={styles.deleteButtonContainer}
-        />
+        <View style={styles.deleteButtonWrapper}>
+          <KurukatsuButton
+            title="削除する"
+            onPress={handleDeleteMessage}
+            variant="primary"
+            size="medium"
+            backgroundColor="#DC2626"
+            disabled={isDeleting}
+            style={styles.deleteButtonContainer}
+          />
+        </View>
       </ScrollView>
 
       {/* 削除確認モーダル */}
@@ -952,7 +954,13 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
   },
-  deleteButtonContainer: {
+  deleteButtonWrapper: {
     marginTop: 24,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  deleteButtonContainer: {
+    width: '100%',
+    maxWidth: 300,
   },
 }); 

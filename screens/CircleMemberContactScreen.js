@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
 import CommonHeader from '../components/CommonHeader';
 import { db } from '../firebaseConfig';
 import { doc, getDoc, getDocs, collection, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -109,16 +110,45 @@ export default function CircleMemberContactScreen({ route, navigation }) {
   // メッセージ取得関数
   const fetchMessages = async () => {
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user) {
+      console.log('CircleMemberContactScreen: No authenticated user');
+      return;
+    }
+    
+    console.log('CircleMemberContactScreen: Fetching messages for circleId:', circleId);
+    console.log('CircleMemberContactScreen: User UID:', user.uid);
     
     try {
+      // インデックス構築中のため、一時的にorderByを削除してクライアント側でソート
       const q = query(
         collection(db, 'users', user.uid, 'circleMessages'),
-        where('circleId', '==', circleId),
-        orderBy('sentAt', 'desc')
+        where('circleId', '==', circleId)
       );
+      
+      console.log('CircleMemberContactScreen: Query created, executing...');
       const snap = await getDocs(q);
-      const messagesData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      console.log('CircleMemberContactScreen: Query executed, docs count:', snap.docs.length);
+      
+      const messagesData = snap.docs.map(doc => {
+        const data = doc.data();
+        console.log('CircleMemberContactScreen: Message data:', {
+          id: doc.id,
+          circleId: data.circleId,
+          title: data.title,
+          sentAt: data.sentAt,
+          senderUid: data.senderUid
+        });
+        return { id: doc.id, ...data };
+      });
+      
+      // クライアント側でソート（sentAtの降順）
+      messagesData.sort((a, b) => {
+        const aTime = a.sentAt?.toDate ? a.sentAt.toDate().getTime() : 0;
+        const bTime = b.sentAt?.toDate ? b.sentAt.toDate().getTime() : 0;
+        return bTime - aTime; // 降順
+      });
+      
+      console.log('CircleMemberContactScreen: Total messages found:', messagesData.length);
       
       // 送信者情報を事前に取得
       const messagesWithSenderInfo = await Promise.all(
@@ -142,6 +172,7 @@ export default function CircleMemberContactScreen({ route, navigation }) {
         })
       );
       
+      console.log('CircleMemberContactScreen: Messages with sender info:', messagesWithSenderInfo.length);
       setMessages(messagesWithSenderInfo);
       
       // 各メッセージの未読状態をローカル状態に保存
@@ -153,6 +184,12 @@ export default function CircleMemberContactScreen({ route, navigation }) {
       
       // イベントベース更新のため、未読数更新は削除
     } catch (e) {
+      console.error('CircleMemberContactScreen: Error fetching messages:', e);
+      console.error('CircleMemberContactScreen: Error details:', {
+        code: e.code,
+        message: e.message,
+        stack: e.stack
+      });
       setMessages([]);
     } finally {
       setMessagesLoading(false);

@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Linking, Alert, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import CommonHeader from '../components/CommonHeader';
 import KurukatsuButton from '../components/KurukatsuButton';
@@ -91,76 +92,57 @@ export default function CircleEventDetailScreen({ route, navigation }) {
         )}
 
         {/* イベント情報セクション */}
-        <View style={styles.infoSection}>
+        <View style={styles.contentSection}>
           {/* タイトル */}
           <Text style={styles.eventTitle}>{event.title}</Text>
 
-          <View style={styles.divider} />
-
-          {/* 開催日時 */}
+          {/* 開催日 */}
           {event.eventDate && (
-            <View style={styles.infoRow}>
-              <View style={styles.infoIconContainer}>
-                <Ionicons name="calendar-outline" size={24} color="#007bff" />
-              </View>
-              <View style={styles.infoTextContainer}>
-                <Text style={styles.infoLabel}>開催日時</Text>
-                <Text style={styles.infoValue}>{formatEventDate(event.eventDate)}</Text>
-              </View>
+            <View style={styles.infoSection}>
+              <Text style={styles.sectionLabel}>開催日</Text>
+              <Text style={styles.sectionValue}>{formatEventDate(event.eventDate)}</Text>
             </View>
           )}
 
           {/* 開催場所 */}
           {event.location && (
-            <View style={styles.infoRow}>
-              <View style={styles.infoIconContainer}>
-                <Ionicons name="location-outline" size={24} color="#28a745" />
-              </View>
-              <View style={styles.infoTextContainer}>
-                <Text style={styles.infoLabel}>開催場所</Text>
-                <Text style={styles.infoValue}>{event.location}</Text>
-              </View>
+            <View style={styles.infoSection}>
+              <Text style={styles.sectionLabel}>開催場所</Text>
+              <Text style={styles.sectionValue}>{event.location}</Text>
             </View>
           )}
 
           {/* 参加費 */}
           {event.fee && (
-            <View style={styles.infoRow}>
-              <View style={styles.infoIconContainer}>
-                <Ionicons name="cash-outline" size={24} color="#ffc107" />
-              </View>
-              <View style={styles.infoTextContainer}>
-                <Text style={styles.infoLabel}>参加費</Text>
-                <Text style={styles.infoValue}>{event.fee}</Text>
-              </View>
+            <View style={styles.infoSection}>
+              <Text style={styles.sectionLabel}>参加費</Text>
+              <Text style={styles.sectionValue}>{event.fee}</Text>
             </View>
           )}
 
-          <View style={styles.divider} />
-
           {/* 詳細説明 */}
           {event.detail && (
-            <View style={styles.detailSection}>
+            <View style={styles.infoSection}>
               <Text style={styles.detailLabel}>詳細</Text>
               <Text style={styles.detailText}>{event.detail}</Text>
             </View>
           )}
+
+          {/* 申し込みボタン */}
+          {event.snsLink && (
+            <View style={styles.buttonContainer}>
+              <KurukatsuButton
+                title="申し込む"
+                onPress={handleApplicationPress}
+                size="medium"
+                variant="primary"
+                hapticFeedback={true}
+                style={styles.applicationButton}
+              />
+            </View>
+          )}
         </View>
       </ScrollView>
-
-      {/* 申し込みボタン */}
-      {event.snsLink && (
-        <View style={styles.buttonContainer}>
-          <KurukatsuButton
-            title="申し込む"
-            onPress={handleApplicationPress}
-            size="large"
-            variant="primary"
-            hapticFeedback={true}
-            style={styles.applicationButton}
-          />
-        </View>
-      )}
     </View>
   );
 }
@@ -194,68 +176,55 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   infoSection: {
+    marginBottom: 24,
+  },
+  contentSection: {
     backgroundColor: '#ffffff',
     paddingHorizontal: 20,
-    paddingVertical: 24,
+    paddingTop: 24,
+    paddingBottom: 24,
+  },
+  sectionLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1f2937',
+    marginBottom: 8,
+    backgroundColor: '#f3f4f6',
+    marginHorizontal: -20,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+  },
+  sectionValue: {
+    fontSize: 16,
+    color: '#374151',
+    lineHeight: 24,
+    marginTop: 12,
   },
   eventTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#1f2937',
     lineHeight: 32,
-    marginBottom: 20,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#e5e7eb',
-    marginVertical: 20,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 20,
-  },
-  infoIconContainer: {
-    width: 40,
-    alignItems: 'center',
-    marginRight: 12,
-    paddingTop: 2,
-  },
-  infoTextContainer: {
-    flex: 1,
-  },
-  infoLabel: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginBottom: 4,
-    fontWeight: '500',
-  },
-  infoValue: {
-    fontSize: 16,
-    color: '#1f2937',
-    lineHeight: 24,
-  },
-  detailSection: {
-    marginTop: 8,
+    marginBottom: 24,
   },
   detailLabel: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '500',
     color: '#1f2937',
-    marginBottom: 12,
+    marginBottom: 8,
+    backgroundColor: '#f3f4f6',
+    marginHorizontal: -20,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
   },
   detailText: {
     fontSize: 16,
     color: '#374151',
-    lineHeight: 26,
+    lineHeight: 24,
+    marginTop: 12,
   },
   buttonContainer: {
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    paddingBottom: 28,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    marginTop: 24,
   },
   applicationButton: {
     width: '100%',

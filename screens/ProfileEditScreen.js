@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Alert, Switch, Platform, ScrollView, StatusBar, Animated, Dimensions } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Switch, Platform, ScrollView, StatusBar, Animated, Dimensions } from 'react-native';
+import { Image } from 'expo-image';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,10 +25,13 @@ export default function ProfileEditScreen(props) {
   const navigation = useNavigation();
   const route = useRoute();
   const user = auth.currentUser;
-  const [name, setName] = useState(''); // 氏名（非公開）
+  const [name, setName] = useState(''); // 名前（非公開）
   const [university, setUniversity] = useState('');
   const [grade, setGrade] = useState('');
   const [gender, setGender] = useState('');
+  const [selfIntroduction, setSelfIntroduction] = useState('');
+  const [snsLink, setSnsLink] = useState('');
+  const [xLink, setXLink] = useState('');
   const [birthday, setBirthday] = useState(new Date(2000, 0, 1));
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [profileImage, setProfileImage] = useState(null);
@@ -103,6 +107,9 @@ export default function ProfileEditScreen(props) {
           setUniversity(d.university || '');
           setGrade(d.grade || '');
           setGender(d.gender || '');
+          setSelfIntroduction(d.selfIntroduction || '');
+          setSnsLink(d.snsLink || '');
+          setXLink(d.xLink || '');
           setBirthday(d.birthday ? new Date(d.birthday) : new Date(2000, 0, 1));
           setProfileImageUrl(d.profileImageUrl || '');
           setImageError(false);
@@ -133,6 +140,9 @@ export default function ProfileEditScreen(props) {
             university: d.university || '',
             grade: d.grade || '',
             gender: d.gender || '',
+            selfIntroduction: d.selfIntroduction || '',
+            snsLink: d.snsLink || '',
+            xLink: d.xLink || '',
             birthday: d.birthday ? new Date(d.birthday) : new Date(2000, 0, 1),
             profileImageUrl: d.profileImageUrl || '',
             studentIdUrl: d.studentIdUrl || '',
@@ -143,6 +153,9 @@ export default function ProfileEditScreen(props) {
           setUniversity('');
           setGrade('');
           setGender('');
+          setSelfIntroduction('');
+          setSnsLink('');
+          setXLink('');
           setBirthday(new Date(2000, 0, 1));
           setProfileImageUrl('');
           setStudentIdUrl('');
@@ -153,6 +166,9 @@ export default function ProfileEditScreen(props) {
             university: '',
             grade: '',
             gender: '',
+            selfIntroduction: '',
+            snsLink: '',
+            xLink: '',
             birthday: new Date(2000, 0, 1),
             profileImageUrl: '',
             studentIdUrl: '',
@@ -185,6 +201,9 @@ export default function ProfileEditScreen(props) {
       university !== originalData.university ||
       grade !== originalData.grade ||
       gender !== originalData.gender ||
+      selfIntroduction !== originalData.selfIntroduction ||
+      snsLink !== originalData.snsLink ||
+      xLink !== originalData.xLink ||
       birthday.getTime() !== originalData.birthday.getTime() ||
       profileImage !== null ||
       (profileImage === '' && originalData.profileImageUrl) ||
@@ -195,6 +214,9 @@ export default function ProfileEditScreen(props) {
       universityChanged: university !== originalData.university,
       gradeChanged: grade !== originalData.grade,
       genderChanged: gender !== originalData.gender,
+      selfIntroductionChanged: selfIntroduction !== originalData.selfIntroduction,
+      snsLinkChanged: snsLink !== originalData.snsLink,
+      xLinkChanged: xLink !== originalData.xLink,
       birthdayChanged: birthday.getTime() !== originalData.birthday.getTime(),
       imageChanged: profileImage !== null,
       imageDeleted: profileImage === '' && originalData.profileImageUrl,
@@ -419,10 +441,11 @@ export default function ProfileEditScreen(props) {
       await setDoc(userDocRef, {
         name,
         university,
-        isUniversityPublic: true,
         grade,
-        isGradePublic: true,
         gender,
+        selfIntroduction,
+        snsLink,
+        xLink,
         birthday: birthday.getFullYear() + '-' + 
                  String(birthday.getMonth() + 1).padStart(2, '0') + '-' + 
                  String(birthday.getDate()).padStart(2, '0'),
@@ -496,6 +519,8 @@ export default function ProfileEditScreen(props) {
     <View style={styles.container}>
       <CommonHeader 
         title="プロフィール編集" 
+        showBackButton={true}
+        onBack={() => navigation.goBack()}
         rightButtonLabel="保存" 
         onRightButtonPress={handleSave}
         rightButtonDisabled={isSaving || saveCompleted}
@@ -513,13 +538,11 @@ export default function ProfileEditScreen(props) {
               <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
                 {(profileImage && !imageError) || (profileImageUrl && !imageError) ? (
                   <Image
-                    source={{ 
-                      uri: profileImage || profileImageUrl,
-                      cache: 'force-cache'
-                    }}
+                    source={{ uri: profileImage || profileImageUrl }}
                     style={styles.profileImage}
                     onError={() => setImageError(true)}
-                    resizeMode="cover"
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
                   />
                 ) : (
                   <View style={[styles.profileImage, {backgroundColor: '#e0e0e0', justifyContent: 'center', alignItems: 'center', overflow: 'hidden'}]}>
@@ -533,18 +556,7 @@ export default function ProfileEditScreen(props) {
                     setProfileImage('');
                     setProfileImageUrl('');
                     setImageError(false);
-                    // 状態変更を即座に検知
-                    if (!originalData) return;
-                    
-                    const hasChanges = 
-                      name !== originalData.name ||
-                      university !== originalData.university ||
-                      grade !== originalData.grade ||
-                      gender !== originalData.gender ||
-                      birthday.getTime() !== originalData.birthday.getTime() ||
-                      true; // 画像が削除された場合は常に変更あり
-                    
-                    setHasUnsavedChanges(hasChanges);
+                    checkForChanges();
                   }}
                   style={{ marginLeft: 12, padding: 8, backgroundColor: '#fee', borderRadius: 24 }}
                 >
@@ -556,7 +568,7 @@ export default function ProfileEditScreen(props) {
           {/* フォームフィールド */}
           <View style={styles.formSection}>
             <View style={styles.formGroup}>
-              <Text style={styles.label}>氏名</Text>
+              <Text style={styles.label}>フルネーム（氏名）</Text>
               <TextInput 
                 style={styles.input} 
                 value={name} 
@@ -564,9 +576,70 @@ export default function ProfileEditScreen(props) {
                   setName(text);
                   checkForChanges();
                 }} 
-                placeholder="氏名を入力してください"
+                placeholder="フルネーム（氏名）"
                 placeholderTextColor="#a1a1aa"
               />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>自己紹介<Text style={styles.optional}>(任意)</Text></Text>
+              <TextInput 
+                style={[styles.input, styles.textAreaInput]} 
+                value={selfIntroduction} 
+                onChangeText={(text) => {
+                  setSelfIntroduction(text);
+                  checkForChanges();
+                }} 
+                placeholder="自己紹介を入力してください"
+                placeholderTextColor="#a1a1aa"
+                multiline={true}
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+            </View>
+
+            <View style={styles.formGroup}>
+              <Text style={styles.label}>SNSリンク<Text style={styles.optional}>(任意)</Text></Text>
+              <View style={styles.snsInputContainer}>
+                <View style={styles.snsInputRow}>
+                  <Image 
+                    source={require('../assets/SNS-icons/Instagram_Glyph_Gradient.png')} 
+                    style={styles.snsIcon}
+                    cachePolicy="memory-disk"
+                  />
+                  <TextInput
+                    value={snsLink}
+                    onChangeText={(text) => {
+                      setSnsLink(text);
+                      checkForChanges();
+                    }}
+                    placeholder="Instagramリンクを入力"
+                    style={styles.snsInput}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                  />
+                </View>
+                <View style={styles.snsInputRow}>
+                  <Image 
+                    source={require('../assets/SNS-icons/X_logo-black.png')} 
+                    style={styles.snsIcon}
+                    cachePolicy="memory-disk"
+                  />
+                  <TextInput
+                    value={xLink}
+                    onChangeText={(text) => {
+                      setXLink(text);
+                      checkForChanges();
+                    }}
+                    placeholder="X（旧Twitter）リンクを入力"
+                    style={styles.snsInput}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                  />
+                </View>
+              </View>
             </View>
 
             <View style={styles.formGroup}>
@@ -584,6 +657,7 @@ export default function ProfileEditScreen(props) {
                 />
               </View>
             </View>
+
             
             {/* 大学名候補 */}
             {showSuggestions && (
@@ -616,20 +690,8 @@ export default function ProfileEditScreen(props) {
                       key={g} 
                       style={[styles.selectButton, grade === g && styles.selectedButton]} 
                       onPress={() => {
-                        const newGrade = g;
-                        setGrade(newGrade);
-                        if (!originalData) return;
-                        
-                        const hasChanges = 
-                          name !== originalData.name ||
-                          university !== originalData.university ||
-                          newGrade !== originalData.grade ||
-                          gender !== originalData.gender ||
-                          birthday.getTime() !== originalData.birthday.getTime() ||
-                          profileImage !== null ||
-                          (profileImage === '' && originalData.profileImageUrl);
-                        
-                        setHasUnsavedChanges(hasChanges);
+                        setGrade(g);
+                        checkForChanges();
                       }}
                     >
                       <Text style={[styles.selectButtonText, grade === g && styles.selectedButtonText]}>{g}</Text>
@@ -645,20 +707,8 @@ export default function ProfileEditScreen(props) {
                     key={g} 
                     style={[styles.selectButton, gender === g && styles.selectedButton]} 
                     onPress={() => {
-                      const newGender = g;
-                      setGender(newGender);
-                      if (!originalData) return;
-                      
-                      const hasChanges = 
-                        name !== originalData.name ||
-                        university !== originalData.university ||
-                        grade !== originalData.grade ||
-                        newGender !== originalData.gender ||
-                        birthday.getTime() !== originalData.birthday.getTime() ||
-                        profileImage !== null ||
-                        (profileImage === '' && originalData.profileImageUrl);
-                      
-                      setHasUnsavedChanges(hasChanges);
+                      setGender(g);
+                      checkForChanges();
                     }}
                   >
                     <Text style={[styles.selectButtonText, gender === g && styles.selectedButtonText]}>{g}</Text>
@@ -682,21 +732,8 @@ export default function ProfileEditScreen(props) {
                     onChange={(event, selectedDate) => {
                       setShowDatePicker(Platform.OS === 'ios');
                       if (selectedDate) {
-                        const newBirthday = selectedDate;
-                        setBirthday(newBirthday);
-                        if (!originalData) return;
-                        
-                        const hasChanges = 
-                          name !== originalData.name ||
-                          university !== originalData.university ||
-                          grade !== originalData.grade ||
-                          gender !== originalData.gender ||
-                          newBirthday.getTime() !== originalData.birthday.getTime() ||
-                          profileImage !== null ||
-                          (profileImage === '' && originalData.profileImageUrl) ||
-                          studentIdImage !== null;
-                        
-                        setHasUnsavedChanges(hasChanges);
+                        setBirthday(selectedDate);
+                        checkForChanges();
                       }
                     }}
                     maximumDate={new Date()}
@@ -778,6 +815,37 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 12, 
     fontSize: 16, 
+    fontWeight: '400',
+    backgroundColor: '#ffffff',
+    color: '#18181b',
+    minHeight: 48,
+  },
+  textAreaInput: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  // SNS入力関連のスタイル
+  snsInputContainer: {
+    marginTop: 8,
+  },
+  snsInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  snsIcon: {
+    width: 24,
+    height: 24,
+    marginRight: 12,
+  },
+  snsInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#e4e4e7',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 16,
     fontWeight: '400',
     backgroundColor: '#ffffff',
     color: '#18181b',

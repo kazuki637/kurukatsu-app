@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, StatusBar, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function CommonHeader({ title, customTitle, showBackButton = false, onBack, rightButtonLabel, onRightButtonPress, rightButton, rightButtonDisabled = false, showActionButton = false, onActionButtonPress }) {

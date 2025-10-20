@@ -55,22 +55,30 @@ import CircleMemberMemberListScreen from './screens/CircleMemberMemberListScreen
 import CircleSettingsScreen from './screens/CircleSettingsScreen';
 import CircleMessageDetailScreen from './screens/CircleMessageDetailScreen';
 import SettingScreen from './screens/SettingScreen';
-import CircleManagementDetailScreen from './screens/CircleManagementDetailScreen';
 import CircleLeadershipTransferScreen from './screens/CircleLeadershipTransferScreen';
 import ReportScreen from './screens/ReportScreen';
 import BlockManagementScreen from './screens/BlockManagementScreen';
 import NotificationSettingsScreen from './screens/NotificationSettingsScreen';
+import ProfileScreen from './screens/ProfileScreen';
 
 import ImageCropScreen from './screens/ImageCropScreen';
 import StudentIdCameraScreen from './screens/StudentIdCameraScreen';
 import ArticleWebViewScreen from './screens/ArticleWebViewScreen';
 import ArticleListScreen from './screens/ArticleListScreen';
+import CampaignScreen from './screens/CampaignScreen';
+
+// 掲示板関連の画面
+import ThreadListScreen from './screens/ThreadListScreen';
+import ThreadCreateScreen from './screens/ThreadCreateScreen';
+import ThreadDetailScreen from './screens/ThreadDetailScreen';
+import PostCreateScreen from './screens/PostCreateScreen';
+import CommunityGuidelineScreen from './screens/CommunityGuidelineScreen';
 
 
 const AuthStack = createStackNavigator();
 const HomeStack = createStackNavigator();
 const SearchStack = createStackNavigator();
-const MyPageStack = createStackNavigator();
+const MyPageStack = createStackNavigator(); // マイページ用
 const CircleManagementStack = createStackNavigator();
 const SharedStack = createStackNavigator(); // 共通スクリーン用
 const Tab = createBottomTabNavigator();
@@ -250,9 +258,6 @@ global.updateJoinRequestsCount = (circleId, count) => {
   globalJoinRequestsCount[circleId] = count;
   
   // 各画面の入会申請数を更新
-  if (global.updateCircleManagementDetailJoinRequests) {
-    global.updateCircleManagementDetailJoinRequests(circleId, count);
-  }
   if (global.updateCircleMemberManagementJoinRequests) {
     global.updateCircleMemberManagementJoinRequests(circleId, count);
   }
@@ -325,6 +330,9 @@ function HomeStackScreen() {
       <HomeStack.Screen name="Home" component={HomeScreen} />
       <HomeStack.Screen name="ArticleWebView" component={ArticleWebViewScreen} />
       <HomeStack.Screen name="ArticleList" component={ArticleListScreen} />
+      <HomeStack.Screen name="ThreadList" component={ThreadListScreen} />
+      <HomeStack.Screen name="ThreadCreate" component={ThreadCreateScreen} />
+      <HomeStack.Screen name="Campaign" component={CampaignScreen} />
     </HomeStack.Navigator>
   );
 }
@@ -346,27 +354,21 @@ function SearchStackScreen() {
   );
 }
 
+
 // MyPage Tab Stack
 function MyPageStackScreen() {
   return (
     <MyPageStack.Navigator screenOptions={{ headerShown: false }}>
-      <MyPageStack.Screen name="MyPage" component={MyPageScreen} />
-      <MyPageStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
-      <MyPageStack.Screen name="HelpScreen" component={HelpScreen} />
-      <MyPageStack.Screen name="TermsOfServiceScreen" component={TermsOfServiceScreen} />
-      <MyPageStack.Screen name="PrivacyPolicyScreen" component={PrivacyPolicyScreen} />
-      <MyPageStack.Screen name="Settings" component={SettingScreen} />
+      <MyPageStack.Screen name="MyPageMain" component={MyPageScreen} />
     </MyPageStack.Navigator>
   );
 }
-
 
 // Circle Management Tab Stack
 function CircleManagementStackScreen() {
   return (
     <CircleManagementStack.Navigator screenOptions={{ headerShown: false, gestureEnabled: true }}>
       <CircleManagementStack.Screen name="CircleManagementScreen" component={CircleManagementScreen} options={{ headerShown: false, gestureEnabled: true }} />
-      <CircleManagementStack.Screen name="CircleManagementDetail" component={CircleManagementDetailScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleProfileEdit" component={CircleProfileEditScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleSettings" component={CircleSettingsScreen} options={{ headerShown: false, gestureEnabled: true }} />
       <CircleManagementStack.Screen name="CircleMemberManagement" component={CircleMemberManagementScreen} options={{ headerShown: false, gestureEnabled: true }} />
@@ -392,6 +394,13 @@ function SharedStackScreen() {
       <SharedStack.Screen name="BlockManagement" component={BlockManagementScreen} />
       <SharedStack.Screen name="ProfileEdit" component={ProfileEditScreen} />
       <SharedStack.Screen name="SearchResults" component={SearchResultsScreen} />
+      <SharedStack.Screen name="NotificationSettings" component={NotificationSettingsScreen} />
+      <SharedStack.Screen name="HelpScreen" component={HelpScreen} />
+      <SharedStack.Screen name="TermsOfServiceScreen" component={TermsOfServiceScreen} />
+      <SharedStack.Screen name="PrivacyPolicyScreen" component={PrivacyPolicyScreen} />
+      <SharedStack.Screen name="Settings" component={SettingScreen} />
+      <SharedStack.Screen name="Profile" component={ProfileScreen} />
+      <SharedStack.Screen name="CommunityGuideline" component={CommunityGuidelineScreen} />
     </SharedStack.Navigator>
   );
 }
@@ -558,6 +567,16 @@ function AppNavigator() {
           <RootStack.Screen 
             name="CircleRegistration" 
             component={CircleRegistrationScreen} 
+            options={{ headerShown: false }} 
+          />
+          <RootStack.Screen 
+            name="PostCreate" 
+            component={PostCreateScreen} 
+            options={{ headerShown: false }} 
+          />
+          <RootStack.Screen 
+            name="ThreadDetail" 
+            component={ThreadDetailScreen} 
             options={{ headerShown: false }} 
           />
         </>
